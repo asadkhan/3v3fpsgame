@@ -34,6 +34,7 @@ var _settings: Dictionary = {
 	"input/invert_mouse_y": {"default": false, "type": TYPE_BOOL},
 	"video/field_of_view": {"default": 90.0, "type": TYPE_FLOAT},
 	"video/fullscreen": {"default": false, "type": TYPE_BOOL},
+	"player/display_name": {"default": "", "type": TYPE_STRING},
 }
 
 
@@ -64,6 +65,12 @@ var field_of_view: float:
 var fullscreen: bool:
 	get: return get_setting("video/fullscreen")
 	set(value): set_setting("video/fullscreen", value)
+
+## The name shown to other players. Empty until the player picks one; see
+## [method NetworkManager.local_display_name] for the fallback.
+var display_name: String:
+	get: return get_setting("player/display_name")
+	set(value): set_setting("player/display_name", value)
 
 
 # --- Generic access -----------------------------------------------------
@@ -147,5 +154,7 @@ func _coerce(value: Variant, type: int) -> Variant:
 			return int(value)
 		TYPE_BOOL:
 			return bool(value)
+		TYPE_STRING:
+			return str(value)
 		_:
 			return value

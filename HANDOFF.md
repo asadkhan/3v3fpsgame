@@ -4,20 +4,21 @@ Persistent project memory between AI coding agents. **Read this first, then
 `README.md`** (the README documents architecture and conventions per chapter).
 Verify claims against the code — this file describes intent as of its last update.
 
-_Last updated: 2026-09-26 — Chapter 4 stabilization pass._
+_Last updated: 2026-09-26 — Chapter 7 (map) + Chapter 8 core (HUD/menus) + round win conditions._
 
 ---
 
 ## Current state
 
 - **Engine:** Godot 4.7.2-stable, Forward+, Jolt Physics, ENet high-level multiplayer.
-- **What it is:** an original 3v3 tactical FPS. Grey-box dev build: main menu
-  (Host / Join / Offline), one arena (`placeholder_environment`), one weapon
-  (Kestrel), practice range, dev overlay + dev network panel.
-- **Playable today:** offline or LAN host+client; move, shoot, die; the phase
-  loop WARMUP → BUY → ROUND_ACTIVE → ROUND_END → BUY… runs on timers and is
-  replicated to clients. **No round win condition exists yet**, so rounds only
-  end on the timer with no winner and a match never ends by itself.
+- **What it is:** an original 3v3 tactical FPS (Valorant-like direction).
+- **Playable today:** a complete match loop over LAN on the map **Meridian**:
+  styled main menu (name, Host / Join / Practice) → lobby (host presses
+  START / Enter) → WARMUP → BUY (spawn barriers up) → ROUND_ACTIVE → a side is
+  eliminated → ROUND_END → … first to 5 → MATCH_END (VICTORY / DEFEAT, host
+  REMATCH / anyone LEAVE). Full HUD. Offline = practice range with targets/turret.
+- **Still missing for the Valorant loop:** objective (plant/defuse), economy +
+  buy menu, more weapons, attack/defence side swap, audio, real art/animations.
 
 ## Chapters
 
@@ -26,17 +27,18 @@ _Last updated: 2026-09-26 — Chapter 4 stabilization pass._
 | 1 | Foundation & architecture | ✅ Done |
 | 2 | Player controller | ✅ Done |
 | 3 | Weapons & combat | ✅ Done |
-| 4 | 3v3 multiplayer | ✅ Done after the 2026-09-26 stabilization pass (below) |
-| 5 | Tactical round system | 🟡 Started: phase flow, BUY respawn, phase sync. Missing win conditions, objective, economy |
-| 6 | Unique mechanics | 🟡 Echo Field started early: deploy/detect works offline + online; **no echo display/UI, echoes not sent to the owning team** |
-| 7 | Map | ⬜ |
-| 8 | UI / HUD / menus | ⬜ |
+| 4 | 3v3 multiplayer | ✅ Done (stabilization pass 2026-09-26) |
+| 5 | Tactical round system | 🟡 Phase flow, host-authoritative sync, BUY respawn, **elimination win condition** done. Missing: objective, economy/buy, side swap, timeout-to-defenders |
+| 6 | Unique mechanics | 🟡 Echo Field deploys/detects offline + online; no echo display, echoes not sent to owning team |
+| 7 | Map | 🟡 **Meridian** built (3 lanes, 2 sites with site volumes, raised positions, spawn barriers, callouts). Needs playtesting/tuning; blockout-level art |
+| 8 | UI / HUD / menus | 🟡 Core done: HUD (top bar, health/ammo/ability, crosshair, kill feed, announcer, scoreboard, damage vignette), lobby, match-end, Esc menu w/ sensitivity + FOV, themed main menu. Missing: buy menu, full settings screen, minimap |
 | 9 | Art / audio / polish | ⬜ (no audio at all yet) |
 | 10 | Testing / optimization / ship | ⬜ |
 
-**Next planned work:** Chapter 5 — round win conditions (team elimination +
-timeout), then the objective (buy_state docs mention a "Signal Core"; its design
-is **not defined anywhere — ask the user** before building it), then economy/buy.
+**Next planned work (recommended order):** objective ("Signal Core" plant/defuse
+using the `bomb_sites` Area3Ds already on Meridian — confirm design with the
+user) → economy + buy menu (needs Jackal/Halberd runtime support) → attack/defence
+side swap at half → audio pass → map tuning from playtests.
 
 ## Architecture (quick map)
 
@@ -62,6 +64,22 @@ is **not defined anywhere — ask the user** before building it), then economy/b
   directly (cannot RPC itself). Verdict broadcast via `_confirm_shot`.
   Respawn: host → `_net_respawn_at` RPC (call_local) → every machine resets,
   owner teleports itself.
+- **Maps:** `scripts/maps/block_map.gd` (`BlockMap`) builds box geometry from
+  data (world layer, matching colliders), spawn markers, BUY-only spawn barriers
+  (group `spawn_barriers`) and site volumes (group `bomb_sites`, meta
+  `site_name`). `scripts/maps/meridian.gd` is the layout (tables of footprints).
+  `Playtest._use_environment()` loads Meridian online, the practice range offline,
+  as the child named `Environment`.
+- **Rounds:** `RoundActiveState` ends the round when one side is fully dead
+  (only when both sides have players). `Player.die()` on the host credits the
+  kill and broadcasts `_net_death_event` so `EventBus.player_died(victim, killer,
+  headshot)` fires on every machine. `GameManager.return_to_menu()` = always-legal leave.
+- **HUD:** `scenes/ui/hud.tscn` (in `playtest.tscn`), `scripts/ui/hud/*.gd`,
+  palette/theme in `scripts/ui/ui_theme.gd` (`UITheme`). HUD only reads state.
+  Inputs: Tab scoreboard, Enter start/rematch (host), Esc menu, F3 dev panels
+  (hidden by default, `Main._dev_ui_shown`).
+- **Names:** `GameConfig.display_name` (saved), sent in `request_spawn(name)`,
+  sanitized by the host (`NetworkManager.sanitize_name`).
 - RPC rule used throughout: host→client messages on client-owned nodes are
   `any_peer` + `get_remote_sender_id() == SERVER_PEER_ID`, never `authority`.
 
@@ -93,6 +111,11 @@ over localhost plus an offline run (Godot 4.7.2 headless, zero errors):
 
 ## Known issues / unfinished
 
+- Two instances on one PC share `user://settings.cfg`, so they default to the same saved name — type different names in the menu.
+- Timeout rounds are a draw (no score) until an objective defines attackers/defenders.
+- Dead players look at the floor; there is no spectate-teammate camera yet.
+- Kestrel viewmodel is a placeholder block model; no audio anywhere.
+
 - No round win conditions, objective, economy, buy menu (Chapter 5).
 - Echo Field: no visual echoes / UI; echoes stay on the host (Chapter 6).
 - Practice targets only topple on the host when a client shoots them (grey-box only; removed in Ch. 7).
@@ -106,6 +129,6 @@ over localhost plus an offline run (Godot 4.7.2 headless, zero errors):
 
 Run two instances (Godot editor: Debug → Customize Run Instances → 2, or run the
 exported exe twice). Instance 1: **Host**. Instance 2: **Join** (127.0.0.1).
-On the host, use the dev overlay buttons: LOBBY → WARMUP starts the round loop.
+In the lobby the host presses **START MATCH** (or Enter). Tab = scoreboard, Esc = menu, F3 = dev panels.
 Controls: WASD, Shift sprint, Ctrl/C crouch, Space jump, LMB fire, R reload,
 F Echo Field, Esc release mouse.

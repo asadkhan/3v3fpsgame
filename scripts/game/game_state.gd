@@ -88,6 +88,11 @@ func get_rules() -> MatchRules:
 # Shared by every timed phase. A timed state is then three lines in
 # [method enter] and three in [method update], with no bookkeeping of its own.
 
+## Seconds left on this phase's countdown, or 0 for untimed phases. For the HUD.
+func get_time_remaining() -> float:
+	return _remaining
+
+
 ## Arms the countdown for [param seconds]. Call from [method enter].
 func _start_countdown(seconds: float) -> void:
 	_remaining = maxf(seconds, 0.0)
