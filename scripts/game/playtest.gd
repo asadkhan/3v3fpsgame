@@ -56,6 +56,10 @@ const SPAWN_PATH := NodePath("../Players")
 ## Which marker a side spawns at. Two sides, two markers, authored by the
 ## environment in Chapter 1 precisely so this file would not have to change when
 ## networking arrived.
+##
+## Since the objective arrived these are really the [b]attacker[/b] and
+## [b]defender[/b] spawns: whichever side is attacking this half spawns at
+## AlphaSpawn. The names are kept so the practice range keeps working.
 const ALPHA_SPAWN := "AlphaSpawn"
 const BRAVO_SPAWN := "BravoSpawn"
 
@@ -414,6 +418,11 @@ func _on_phase_changed(previous: int, current: int) -> void:
 	if not GameManager.is_authority():
 		return
 	if current == GamePhase.Phase.BUY:
+		# The first round of each half: sides have (possibly) swapped, so
+		# everyone starts over with the starting credits and a pistol.
+		if GameManager.match_state.is_first_round_of_half():
+			GameManager.match_state.reset_loss_streaks()
+			Economy.reset_for_half()
 		_respawn_all_players()
 	elif current == GamePhase.Phase.LOBBY and previous == GamePhase.Phase.MATCH_END:
 		for body in NetworkManager.get_players():
@@ -475,7 +484,7 @@ func _marker_position(side: int) -> Vector3:
 
 
 func _marker_name(side: int) -> String:
-	return BRAVO_SPAWN if side == Team.Side.BRAVO else ALPHA_SPAWN
+	return ALPHA_SPAWN if side == GameManager.match_state.attacking_side() else BRAVO_SPAWN
 
 
 ## Is anything standing on this spot?

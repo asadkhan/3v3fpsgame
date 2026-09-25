@@ -3,7 +3,7 @@ extends BlockMap
 ## [b]Meridian[/b] - the first competitive 3v3 map.
 ##
 ## [codeblock]
-##            ALPHA (attackers) spawn            z = +45
+##               ATTACKER spawn                  z = +45
 ##        +--------[ spawn  ]--------+
 ##        |      attacker yard       |           z = +26..+32
 ##        | A lane |  mid  | B lane  |
@@ -14,7 +14,7 @@ extends BlockMap
 ##        +---back-+-------+-back----+
 ##        |      defender yard       |           z = -36..-33
 ##        +--------[ spawn  ]--------+
-##            BRAVO (defenders) spawn            z = -45
+##               DEFENDER spawn                  z = -45
 ## [/codeblock]
 ##
 ## Three routes from the attacker side - A lane, mid, B lane - with links
@@ -39,10 +39,9 @@ const MAX_X := 32.0
 const MIN_Z := -45.0
 const MAX_Z := 45.0
 
-const ALPHA_COLOUR := Color(0.3, 0.72, 1.0)
-const BRAVO_COLOUR := Color(1.0, 0.36, 0.3)
 const SITE_COLOUR := Color(1.0, 0.8, 0.3)
 const SIGN_COLOUR := Color(0.96, 0.93, 0.86)
+const BARRIER_COLOUR := Color(0.55, 0.85, 1.0)
 
 ## Full-height structures: [min corner (x, z), max corner (x, z)].
 const STRUCTURES := [
@@ -156,11 +155,13 @@ func _build_spawns() -> void:
 	_add_spawn_marker("AlphaSpawn", Vector3(0.0, 0.0, 40.0), 0.0)
 	_add_spawn_marker("BravoSpawn", Vector3(0.0, 0.0, -40.5), 180.0)
 
-	_add_spawn_barrier("AlphaBarrier", Vector2(-12, 31.6), Vector2(12, 32), ALPHA_COLOUR)
-	_add_spawn_barrier("BravoBarrier", Vector2(-12, -36), Vector2(12, -35.6), BRAVO_COLOUR)
+	# Sides swap spawns at half time, so the spawns are labelled by role and
+	# the barriers are neutral rather than team-coloured.
+	_add_spawn_barrier("AttackerBarrier", Vector2(-12, 31.6), Vector2(12, 32), BARRIER_COLOUR)
+	_add_spawn_barrier("DefenderBarrier", Vector2(-12, -36), Vector2(12, -35.6), BARRIER_COLOUR)
 
-	add_sign("ALPHA", Vector3(0.0, 4.2, 44.9), 180.0, ALPHA_COLOUR, 2.0)
-	add_sign("BRAVO", Vector3(0.0, 4.2, -44.9), 0.0, BRAVO_COLOUR, 2.0)
+	add_sign("ATTACKERS", Vector3(0.0, 4.2, 44.9), 180.0, SIGN_COLOUR, 2.0)
+	add_sign("DEFENDERS", Vector3(0.0, 4.2, -44.9), 0.0, SIGN_COLOUR, 2.0)
 
 
 func _build_sites_and_signs() -> void:

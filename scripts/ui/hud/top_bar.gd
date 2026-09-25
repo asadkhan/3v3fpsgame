@@ -20,6 +20,11 @@ var _bravo_pips: HudAlivePips
 var _clock: Label
 var _phase: Label
 var _round: Label
+var _alpha_role: Label
+var _bravo_role: Label
+
+## Set by [Hud]: the core is down, so the clock is its detonation timer.
+var core_planted: bool = false
 
 
 func _ready() -> void:
@@ -33,7 +38,9 @@ func _ready() -> void:
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(row)
 
-	_alpha_score = _score_box(row, UITheme.ALPHA)
+	var alpha_box := _score_box(row, UITheme.ALPHA)
+	_alpha_score = alpha_box[0]
+	_alpha_role = alpha_box[1]
 	_alpha_pips = HudAlivePips.new()
 	_alpha_pips.colour = UITheme.ALPHA
 	row.add_child(_alpha_pips)
@@ -54,18 +61,26 @@ func _ready() -> void:
 	_bravo_pips.colour = UITheme.BRAVO
 	_bravo_pips.right_to_left = true
 	row.add_child(_bravo_pips)
-	_bravo_score = _score_box(row, UITheme.BRAVO)
+	var bravo_box := _score_box(row, UITheme.BRAVO)
+	_bravo_score = bravo_box[0]
+	_bravo_role = bravo_box[1]
 
 
-func _score_box(parent: Control, colour: Color) -> Label:
+## [score label, ATTACK/DEFEND label]
+func _score_box(parent: Control, colour: Color) -> Array:
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(64, 52)
+	panel.custom_minimum_size = Vector2(72, 52)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(panel)
+	var column := VBoxContainer.new()
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_theme_constant_override(&"separation", -6)
+	panel.add_child(column)
 	var label := UITheme.label("0", UITheme.SIZE_LARGE + 4, colour, HORIZONTAL_ALIGNMENT_CENTER)
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	panel.add_child(label)
-	return label
+	column.add_child(label)
+	var role := UITheme.label("", UITheme.SIZE_SMALL - 3, UITheme.TEXT_DIM, HORIZONTAL_ALIGNMENT_CENTER)
+	column.add_child(role)
+	return [label, role]
 
 
 func update_view() -> void:
@@ -78,9 +93,13 @@ func update_view() -> void:
 	var timed := phase in [GamePhase.Phase.WARMUP, GamePhase.Phase.BUY,
 		GamePhase.Phase.ROUND_ACTIVE, GamePhase.Phase.ROUND_END]
 	_clock.text = UITheme.clock(remaining) if timed else "--"
-	_clock.add_theme_color_override(&"font_color",
-		UITheme.DANGER if phase == GamePhase.Phase.ROUND_ACTIVE and remaining <= 10.0 else UITheme.TEXT)
-	_phase.text = PHASE_TITLES.get(phase, "")
+	var urgent := phase == GamePhase.Phase.ROUND_ACTIVE and (core_planted or remaining <= 10.0)
+	_clock.add_theme_color_override(&"font_color", UITheme.DANGER if urgent else UITheme.TEXT)
+	_phase.text = "CORE PLANTED" if core_planted else PHASE_TITLES.get(phase, "")
+	_phase.add_theme_color_override(&"font_color", UITheme.DANGER if core_planted else UITheme.ACCENT)
+	var attacking := match_state.attacking_side(maxi(match_state.round_number, 1))
+	_alpha_role.text = "ATTACK" if attacking == Team.Side.ALPHA else "DEFEND"
+	_bravo_role.text = "ATTACK" if attacking == Team.Side.BRAVO else "DEFEND"
 	_round.text = "ROUND %d  -  FIRST TO %d" % [maxi(match_state.round_number, 1), GameManager.match_rules.rounds_to_win]
 
 	var counts := {Team.Side.ALPHA: [0, 0], Team.Side.BRAVO: [0, 0]}

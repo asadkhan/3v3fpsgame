@@ -39,6 +39,9 @@ func _ready() -> void:
 
 	GameManager.state_changed.connect(_on_phase_changed)
 	EventBus.player_died.connect(_on_player_died)
+	EventBus.core_planted.connect(_on_core_planted)
+	EventBus.core_defused.connect(_on_core_defused)
+	EventBus.core_detonated.connect(_on_core_detonated)
 
 
 func show_banner(title: String, subtitle: String = "", colour: Color = UITheme.TEXT, hold: float = 1.8) -> void:
@@ -74,7 +77,15 @@ func _on_phase_changed(_previous: int, current: int) -> void:
 		GamePhase.Phase.WARMUP:
 			show_banner("WARMUP", "The match starts shortly", UITheme.ACCENT)
 		GamePhase.Phase.BUY:
-			show_banner("ROUND %d" % round_number, "Buy phase - get ready", UITheme.TEXT)
+			var match_state := GameManager.match_state
+			var title := "ROUND %d" % round_number
+			if round_number == GameManager.match_rules.halftime_after() + 1:
+				title = "SWITCHING SIDES"
+			var subtitle := "Press B to buy"
+			if local_team != Team.Side.NONE:
+				var attacking := local_team == match_state.attacking_side()
+				subtitle = "%s   -   press B to buy" % ("ATTACK: plant the core" if attacking else "DEFEND: stop the plant")
+			show_banner(title, subtitle, UITheme.TEXT, 2.4)
 		GamePhase.Phase.ROUND_ACTIVE:
 			show_banner("FIGHT", "", UITheme.ACCENT, 0.6)
 		GamePhase.Phase.ROUND_END:
@@ -87,6 +98,20 @@ func _on_phase_changed(_previous: int, current: int) -> void:
 				show_banner("ROUND WON", GameManager.match_state.score_line(), UITheme.GOOD, 2.5)
 			else:
 				show_banner("ROUND LOST", GameManager.match_state.score_line(), UITheme.DANGER, 2.5)
+
+
+func _on_core_planted(_planter: int, site: String) -> void:
+	var attacking := local_team == GameManager.match_state.attacking_side()
+	show_banner("CORE PLANTED", "Site %s  -  %s" % [site, "hold it" if attacking else "defuse it"],
+		UITheme.DANGER, 1.8)
+
+
+func _on_core_defused(_defuser: int) -> void:
+	show_banner("CORE DEFUSED", "", UITheme.GOOD, 1.6)
+
+
+func _on_core_detonated() -> void:
+	show_banner("CORE DETONATED", "", UITheme.DANGER, 1.6)
 
 
 func _on_player_died(victim_id: int, killer_id: int, headshot: bool) -> void:

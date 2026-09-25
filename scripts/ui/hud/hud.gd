@@ -8,7 +8,8 @@ extends CanvasLayer
 ## live state. It only ever [b]reads[/b] game state - nothing here changes the
 ## match except the explicit buttons (start, rematch, leave).
 ##
-## Keys handled here: Tab (hold) scoreboard, Enter (host) start / rematch.
+## Keys handled here: Tab (hold) scoreboard, Enter (host) start / rematch,
+## B buy menu (buy phase only).
 
 ## Slower-changing pieces refresh at this interval rather than every frame.
 const SLOW_REFRESH := 0.2
@@ -24,6 +25,8 @@ var _scoreboard: HudScoreboard
 var _lobby: HudLobbyPanel
 var _match_end: HudMatchEndPanel
 var _pause: HudPauseMenu
+var _objective_prompt: HudObjectivePrompt
+var _buy: HudBuyMenu
 
 ## The player this machine drives, re-resolved each frame (bodies come and go).
 var _player: Player = null
@@ -45,10 +48,12 @@ func _ready() -> void:
 	_status = _add(HudPlayerStatus.new(), "PlayerStatus")
 	_kill_feed = _add(HudKillFeed.new(), "KillFeed")
 	_announcer = _add(HudAnnouncer.new(), "Announcer")
+	_objective_prompt = _add(HudObjectivePrompt.new(), "ObjectivePrompt")
 	_lobby = _add(HudLobbyPanel.new(), "LobbyPanel")
 	_scoreboard = _add(HudScoreboard.new(), "Scoreboard")
 	_match_end = _add(HudMatchEndPanel.new(), "MatchEndPanel")
 	_pause = _add(HudPauseMenu.new(), "PauseMenu")
+	_buy = _add(HudBuyMenu.new(), "BuyMenu")
 
 	GameManager.state_changed.connect(_on_phase_changed)
 
@@ -71,10 +76,16 @@ func _process(delta: float) -> void:
 	_top_bar.update_view()
 	_status.update_view(_player)
 	_scoreboard.visible = Input.is_action_pressed(&"scoreboard")
-	_announcer.visible = not _scoreboard.visible
+	_announcer.visible = not _scoreboard.visible and not (_buy != null and _buy.is_open)
 	_lobby.update_view(delta)
 	_match_end.update_view(team)
 	_pause.update_view()
+	_pause.visible = _pause.visible and not _buy.is_open
+	_buy.update_view(_player)
+	var objective := get_tree().get_first_node_in_group(SignalCoreObjective.GROUP) as SignalCoreObjective
+	_objective_prompt.update_view(objective, _player)
+	_top_bar.core_planted = objective != null and objective.is_planted() \
+		and GameManager.is_in(GamePhase.Phase.ROUND_ACTIVE)
 
 	_slow_left -= delta
 	if _slow_left <= 0.0:
@@ -88,6 +99,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_lobby.start_match()
 		elif GameManager.is_in(GamePhase.Phase.MATCH_END):
 			_match_end.rematch()
+	elif event.is_action_pressed(&"buy_menu"):
+		_buy.toggle(_player)
 	elif event.is_action_pressed(&"scoreboard"):
 		# Refresh immediately on the press, not up to one slow tick later.
 		_scoreboard.visible = true

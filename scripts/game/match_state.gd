@@ -30,6 +30,9 @@ var winning_team: int = Team.Side.NONE
 
 var _scores: Dictionary = {}
 
+## Consecutive rounds each side has lost, for the economy's loss bonus.
+var _loss_streaks: Dictionary = {}
+
 
 func _init(match_rules: MatchRules = null) -> void:
 	# Optional so a bare MatchState.new() still works in a test, falling back
@@ -44,6 +47,10 @@ func reset() -> void:
 	last_round_winner = Team.Side.NONE
 	winning_team = Team.Side.NONE
 	_scores = {
+		Team.Side.ALPHA: 0,
+		Team.Side.BRAVO: 0,
+	}
+	_loss_streaks = {
 		Team.Side.ALPHA: 0,
 		Team.Side.BRAVO: 0,
 	}
@@ -76,6 +83,42 @@ func add_round_win(team: int) -> bool:
 	return false
 
 
+## The side attacking in [param for_round] (default: the current round). ALPHA
+## attacks the first half and BRAVO the second - see
+## [method MatchRules.halftime_after]. Derived from the round number, so it
+## needs no replication of its own.
+func attacking_side(for_round: int = -1) -> int:
+	var number := round_number if for_round < 0 else for_round
+	return Team.Side.ALPHA if number <= rules.halftime_after() else Team.Side.BRAVO
+
+
+func defending_side(for_round: int = -1) -> int:
+	return Team.opposing_side(attacking_side(for_round))
+
+
+## Whether the current round is the first one after the sides swapped.
+func is_first_round_of_half() -> bool:
+	return round_number == 1 or round_number == rules.halftime_after() + 1
+
+
+func get_loss_streak(team: int) -> int:
+	return _loss_streaks.get(team, 0)
+
+
+## Updates both sides' loss streaks for a finished round.
+func record_round_result(winner: int) -> void:
+	for side in [Team.Side.ALPHA, Team.Side.BRAVO]:
+		if winner == Team.Side.NONE:
+			continue
+		_loss_streaks[side] = 0 if side == winner else get_loss_streak(side) + 1
+
+
+## Clears the loss streaks, at the start of each half.
+func reset_loss_streaks() -> void:
+	_loss_streaks[Team.Side.ALPHA] = 0
+	_loss_streaks[Team.Side.BRAVO] = 0
+
+
 func is_match_over() -> bool:
 	return winning_team != Team.Side.NONE
 
@@ -90,6 +133,8 @@ func to_dict() -> Dictionary:
 		"winning_team": winning_team,
 		"score_alpha": get_score(Team.Side.ALPHA),
 		"score_bravo": get_score(Team.Side.BRAVO),
+		"streak_alpha": get_loss_streak(Team.Side.ALPHA),
+		"streak_bravo": get_loss_streak(Team.Side.BRAVO),
 	}
 
 
@@ -100,6 +145,8 @@ func apply_dict(data: Dictionary) -> void:
 	winning_team = int(data.get("winning_team", Team.Side.NONE))
 	_scores[Team.Side.ALPHA] = int(data.get("score_alpha", 0))
 	_scores[Team.Side.BRAVO] = int(data.get("score_bravo", 0))
+	_loss_streaks[Team.Side.ALPHA] = int(data.get("streak_alpha", 0))
+	_loss_streaks[Team.Side.BRAVO] = int(data.get("streak_bravo", 0))
 
 
 ## "ALPHA 2 - 1 BRAVO" - for the HUD and the console.

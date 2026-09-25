@@ -48,6 +48,43 @@ const DEFAULT_PATH := "res://data/match_rules.tres"
 @export_range(0.0, 120.0, 0.5) var round_end_seconds: float = 5.0
 
 
+# --- Objective (Signal Core) ----------------------------------------------
+
+## Seconds the carrier must hold the plant key, standing on a site.
+@export_range(0.5, 15.0, 0.5) var plant_seconds: float = 4.0
+
+## Seconds a defender must hold the defuse key beside a planted core.
+@export_range(0.5, 20.0, 0.5) var defuse_seconds: float = 7.0
+
+## Seconds from planting until the core detonates. Replaces the round clock.
+@export_range(5.0, 120.0, 1.0) var detonation_seconds: float = 40.0
+
+# --- Economy ----------------------------------------------------------------
+
+## Credits every player has at the start of each half.
+@export_range(0, 20000, 50) var starting_credits: int = 800
+
+## Most credits a player can hold.
+@export_range(0, 50000, 50) var max_credits: int = 9000
+
+@export_range(0, 10000, 50) var round_win_credits: int = 3000
+
+## Paid to the losing side, plus [member loss_streak_bonus] for each earlier
+## consecutive loss, capped at [member loss_streak_cap] bonuses.
+@export_range(0, 10000, 50) var round_loss_credits: int = 1900
+@export_range(0, 5000, 50) var loss_streak_bonus: int = 500
+@export_range(0, 10) var loss_streak_cap: int = 2
+
+@export_range(0, 5000, 50) var kill_credits: int = 200
+@export_range(0, 5000, 50) var plant_credits: int = 300
+
+
+## Rounds played before the sides swap attack and defence: one fewer than the
+## number needed to win, so each side attacks for half of a full-length match.
+func halftime_after() -> int:
+	return maxi(rounds_to_win - 1, 1)
+
+
 ## Total session size these rules imply: two teams of [member players_per_team].
 func get_team_size() -> int:
 	return players_per_team * 2
@@ -89,8 +126,9 @@ func validate() -> bool:
 
 ## One-line summary for the debug overlay and logs.
 func summary() -> String:
-	return "%dv%d, first to %d | warmup %ds, buy %ds, round %ds, result %ds" % [
-		players_per_team, players_per_team, rounds_to_win,
+	return "%dv%d, first to %d, swap after %d | warmup %ds, buy %ds, round %ds, result %ds | plant %ss, defuse %ss, core %ds" % [
+		players_per_team, players_per_team, rounds_to_win, halftime_after(),
 		int(warmup_seconds), int(round_start_seconds),
 		int(round_seconds), int(round_end_seconds),
+		plant_seconds, defuse_seconds, int(detonation_seconds),
 	]
