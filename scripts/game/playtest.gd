@@ -168,9 +168,15 @@ Networked spawning is disabled." % SPAWN_PATH)
 ## its own, but doing it here in the right order means the frame is never drawn
 ## with two cameras both claiming to be current.
 func _step_aside_from_overview_camera() -> void:
+	# Removed outright rather than just switched off. A disabled camera is still
+	# a candidate whenever Godot looks for "the next camera" after another one
+	# stops being current, and that is how the host's view used to end up
+	# above the map when a player joined. The match always has a player camera,
+	# so the overview camera has no job here.
 	var overview := find_child("OverviewCamera", true, false) as Camera3D
 	if overview != null:
-		overview.current = false
+		overview.get_parent().remove_child(overview)
+		overview.queue_free()
 
 
 # --- Offline --------------------------------------------------------------
@@ -319,6 +325,12 @@ func _on_player_spawned(body: Node) -> void:
 ## first: freeing by hand then is correct, and freeing an already-freed node
 ## cannot happen because the lookup is what found it.
 func _on_peer_unregistered(peer_id: int) -> void:
+	# On a client in a live session the host's spawner removes the body, and a
+	# body freed here first makes that despawn message arrive for a node that
+	# no longer exists ("recv_nodes.has(net_id)" error). When the session itself
+	# is gone, [method _on_roster_updated] clears every body anyway.
+	if NetworkManager.is_online and not NetworkManager.is_host:
+		return
 	var body := NetworkManager.get_player_for(peer_id)
 	if body == null:
 		return

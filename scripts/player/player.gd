@@ -517,7 +517,19 @@ func _ready() -> void:
 ## second call silently undoes the first, which is the kind of bug that only
 ## shows up as a camera that flickers between owners on join.
 func _apply_authority_state() -> void:
-	_camera.current = not is_network_remote
+	# The camera is not `current` in the scene file, on purpose. A camera that
+	# enters the tree as current steals the view from whoever had it, and
+	# switching it off again with `current = false` makes Godot hand the view to
+	# the "next" camera it finds - in the grey box, the elevated overview
+	# camera. That is exactly what happened to the host every time a client
+	# joined: the view jumped above the map and stayed there. So only the body
+	# this machine drives ever claims the view, and a remote one releases it
+	# without passing it on.
+	if is_network_remote:
+		if _camera.current:
+			_camera.clear_current(false)
+	else:
+		_camera.make_current()
 
 	# A remote body carries a viewmodel and a hit marker that nobody can see.
 	# Hiding them is not just tidiness: six visible Kestrels floating in front
@@ -681,7 +693,10 @@ func _configure_replication() -> void:
 ## because you are standing inside it. Getting only one half right produces
 ## either invisible teammates or a gun floating in front of your face.
 func _apply_remote_appearance() -> void:
-	_camera.current = false
+	# Released without handing the view to another camera; see
+	# [method _apply_authority_state].
+	if _camera.current:
+		_camera.clear_current(false)
 	_set_weapon_visible(false)
 	if _hit_marker != null:
 		_hit_marker.visible = false

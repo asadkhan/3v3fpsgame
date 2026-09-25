@@ -88,6 +88,8 @@ over localhost plus an offline run (Godot 4.7.2 headless, zero errors):
 16. Dev panel Host/Join from inside a match left the offline body → handled in `Playtest`.
 17. Main menu kept a captured mouse after returning from a match → released.
 18. Orphan `round_start_state.gd.uid` removed; README phase diagram, node tree and Kestrel table corrected.
+19. **Host view jumped above the map when a player joined** (user-reported). `player.tscn`'s camera was `current = true`, so each new body stole the view and releasing it passed it to the arena's `OverviewCamera`. Camera is now non-current in the scene; only the local body calls `make_current()`, remote bodies `clear_current(false)`; `Playtest` frees the overview camera. Verified with host + 2 clients, windowed.
+20. Clients freed departing players' bodies themselves, so the host's despawn then errored (`recv_nodes.has(net_id)`) → on a live client the spawner removes them.
 
 ## Known issues / unfinished
 
