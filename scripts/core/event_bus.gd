@@ -36,6 +36,19 @@ signal shot_fired(shooter_id: int, origin: Vector3, direction: Vector3)
 ## An ability was activated. [param ability_id] matches an entry in [code]res://data/[/code].
 signal ability_used(user_id: int, ability_id: StringName)
 
+# --- Objective ----------------------------------------------------------
+
+## The Signal Core was planted on [param site]. [param planter_id] is 0 on
+## clients (they only learn that it happened). Raised on every machine.
+signal core_planted(planter_id: int, site: String)
+
+## A defender finished defusing the planted core. Raised on every machine.
+signal core_defused(defuser_id: int)
+
+## The planted core's clock ran out. Raised by the round on the host, then by
+## the objective's snapshot on clients.
+signal core_detonated
+
 # --- Match flow ---------------------------------------------------------
 
 ## A round is being set up. This fires at [b]BUY[/b], not when combat

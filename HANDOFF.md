@@ -4,7 +4,7 @@ Persistent project memory between AI coding agents. **Read this first, then
 `README.md`** (the README documents architecture and conventions per chapter).
 Verify claims against the code — this file describes intent as of its last update.
 
-_Last updated: 2026-09-26 — Chapter 7 (map) + Chapter 8 core (HUD/menus) + round win conditions._
+_Last updated: 2026-09-26 — objective (Signal Core), economy + buy menu, half-time side swap._
 
 ---
 
@@ -12,33 +12,27 @@ _Last updated: 2026-09-26 — Chapter 7 (map) + Chapter 8 core (HUD/menus) + rou
 
 - **Engine:** Godot 4.7.2-stable, Forward+, Jolt Physics, ENet high-level multiplayer.
 - **What it is:** an original 3v3 tactical FPS (Valorant-like direction).
-- **Playable today:** a complete match loop over LAN on the map **Meridian**:
-  styled main menu (name, Host / Join / Practice) → lobby (host presses
-  START / Enter) → WARMUP → BUY (spawn barriers up) → ROUND_ACTIVE → a side is
-  eliminated → ROUND_END → … first to 5 → MATCH_END (VICTORY / DEFEAT, host
-  REMATCH / anyone LEAVE). Full HUD. Offline = practice range with targets/turret.
-- **Still missing for the Valorant loop:** objective (plant/defuse), economy +
-  buy menu, more weapons, attack/defence side swap, audio, real art/animations.
+- **Playable today (LAN):** the full competitive loop on **Meridian** - lobby →
+  BUY (20 s, spawn barriers, B = buy menu) → ROUND_ACTIVE (100 s): attackers
+  carry the **Signal Core** and plant it on A or B (hold E, 4 s); defenders
+  defuse (hold E, 7 s) → detonation after 40 s. Win by elimination, plant +
+  detonation, defuse, or (defenders) timeout. Credits for wins/losses (loss
+  streak bonus), kills and plants. Four weapons (Wren sidearm free; Jackal,
+  Halberd, Kestrel buyable), slots 1/2, primary lost on death. Sides swap after
+  `rounds_to_win - 1` rounds with credits and guns reset. First to 5.
+- **Next:** models / VFX / audio / animations (user's plan), then balancing.
 
 ## Chapters
 
 | Ch | Topic | Status |
 |----|-------|--------|
-| 1 | Foundation & architecture | ✅ Done |
-| 2 | Player controller | ✅ Done |
-| 3 | Weapons & combat | ✅ Done |
-| 4 | 3v3 multiplayer | ✅ Done (stabilization pass 2026-09-26) |
-| 5 | Tactical round system | 🟡 Phase flow, host-authoritative sync, BUY respawn, **elimination win condition** done. Missing: objective, economy/buy, side swap, timeout-to-defenders |
-| 6 | Unique mechanics | 🟡 Echo Field deploys/detects offline + online; no echo display, echoes not sent to owning team |
-| 7 | Map | 🟡 **Meridian** built (3 lanes, 2 sites with site volumes, raised positions, spawn barriers, callouts). Needs playtesting/tuning; blockout-level art |
-| 8 | UI / HUD / menus | 🟡 Core done: HUD (top bar, health/ammo/ability, crosshair, kill feed, announcer, scoreboard, damage vignette), lobby, match-end, Esc menu w/ sensitivity + FOV, themed main menu. Missing: buy menu, full settings screen, minimap |
-| 9 | Art / audio / polish | ⬜ (no audio at all yet) |
+| 1-4 | Foundation, controller, combat, multiplayer | ✅ Done |
+| 5 | Tactical round system | ✅ Objective, win conditions, economy, buy, side swap. (Possible later: overtime, shields/armour, weapon drops) |
+| 6 | Unique mechanics | 🟡 Echo Field works (also detects plant/defuse activity); no echo display yet |
+| 7 | Map | 🟡 Meridian built and playable; needs human playtest tuning; blockout art |
+| 8 | UI / HUD / menus | ✅ Core done incl. buy menu, objective prompts, credits, slots. Missing: full settings screen, minimap |
+| 9 | Art / audio / polish | ⬜ NEXT - models, effects, sound, animations |
 | 10 | Testing / optimization / ship | ⬜ |
-
-**Next planned work (recommended order):** objective ("Signal Core" plant/defuse
-using the `bomb_sites` Area3Ds already on Meridian — confirm design with the
-user) → economy + buy menu (needs Jackal/Halberd runtime support) → attack/defence
-side swap at half → audio pass → map tuning from playtests.
 
 ## Architecture (quick map)
 
@@ -80,6 +74,23 @@ side swap at half → audio pass → map tuning from playtests.
   (hidden by default, `Main._dev_ui_shown`).
 - **Names:** `GameConfig.display_name` (saved), sent in `request_spawn(name)`,
   sanitized by the host (`NetworkManager.sanitize_name`).
+- **Objective:** `scripts/game/objective/signal_core_objective.gd` (node
+  `Objective` in `playtest.tscn`, group `objective`). Host-authoritative:
+  carrier assignment at BUY, drop/pickup, plant/defuse progress (ticked in
+  `_process` on real time, same clock as the round timer - do not move it to
+  `_physics_process`), replicated as a snapshot RPC. Clients only send "holding
+  E". Raises `EventBus.core_planted/core_defused/core_detonated` on every
+  machine. `RoundActiveState` owns the clock (switches to detonation timer on
+  plant) and all win rules.
+- **Economy:** `scripts/game/economy.gd` (pays rounds, half reset),
+  `MatchRules` has all amounts, `PlayerState.credits` replicated in the state RPC.
+- **Loadout:** `scripts/player/player_loadout.gd` (node `Loadout` under Player):
+  primary + sidearm, per-weapon magazines, host-validated `request_buy`,
+  slot switch broadcast so the host resolves shots with the held weapon.
+  `WeaponCatalog` lists weapons by id. Firing is blocked while the mouse is free.
+- **Sides:** `MatchState.attacking_side()` derives attack/defence from the round
+  number (ALPHA attacks first half). Spawns are by role: attackers at
+  `AlphaSpawn`, defenders at `BravoSpawn`.
 - RPC rule used throughout: host→client messages on client-owned nodes are
   `any_peer` + `get_remote_sender_id() == SERVER_PEER_ID`, never `authority`.
 
@@ -112,7 +123,9 @@ over localhost plus an offline run (Godot 4.7.2 headless, zero errors):
 ## Known issues / unfinished
 
 - Two instances on one PC share `user://settings.cfg`, so they default to the same saved name — type different names in the menu.
-- Timeout rounds are a draw (no score) until an objective defines attackers/defenders.
+- Testing two windowed instances on one laptop overloads it: the background instance's game clock slows (Godot caps frame delta). Real matches on separate PCs are unaffected; for local tests prefer lower resolution.
+- Halberd's "rpm" on the buy card uses its in-burst interval.
+- The core has no explosion effect or sounds yet (art/audio pass).
 - Dead players look at the floor; there is no spectate-teammate camera yet.
 - Kestrel viewmodel is a placeholder block model; no audio anywhere.
 
@@ -131,4 +144,4 @@ Run two instances (Godot editor: Debug → Customize Run Instances → 2, or run
 exported exe twice). Instance 1: **Host**. Instance 2: **Join** (127.0.0.1).
 In the lobby the host presses **START MATCH** (or Enter). Tab = scoreboard, Esc = menu, F3 = dev panels.
 Controls: WASD, Shift sprint, Ctrl/C crouch, Space jump, LMB fire, R reload,
-F Echo Field, Esc release mouse.
+F Echo Field, E plant/defuse, B buy (buy phase), 1/2 weapons, Tab scoreboard, Esc menu, F3 dev panels.

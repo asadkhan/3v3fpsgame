@@ -14,6 +14,8 @@ var _ammo: Label
 var _reserve: Label
 var _weapon_name: Label
 var _reload: Label
+var _credits: Label
+var _slots: Label
 
 
 func _ready() -> void:
@@ -40,6 +42,9 @@ func _build_left() -> void:
 	row.add_child(health_column)
 	_name = UITheme.label("", UITheme.SIZE_SMALL, UITheme.TEXT_DIM)
 	_health = UITheme.label("100", UITheme.SIZE_HUGE - 12, UITheme.TEXT)
+	_credits = UITheme.label("", UITheme.SIZE_SMALL, UITheme.GOOD)
+	UITheme.pin(_credits, Vector2(0.0, 1.0), 26, -150, 360, -126)
+	add_child(_credits)
 	_health_bar = _bar(UITheme.TEXT)
 	health_column.add_child(_name)
 	health_column.add_child(_health)
@@ -82,6 +87,10 @@ func _build_right() -> void:
 
 	_reload = UITheme.label("", UITheme.SIZE_SMALL, UITheme.ACCENT, HORIZONTAL_ALIGNMENT_RIGHT)
 	column.add_child(_reload)
+
+	_slots = UITheme.label("", UITheme.SIZE_SMALL, UITheme.TEXT_DIM, HORIZONTAL_ALIGNMENT_RIGHT)
+	UITheme.pin(_slots, Vector2(1.0, 1.0), -400, -150, -26, -126)
+	add_child(_slots)
 
 
 func _bar(colour: Color) -> ProgressBar:
@@ -127,6 +136,16 @@ func update_view(player: Player) -> void:
 			_ability_fill.value = 1.0
 		var ability_ready := not field.is_active and not field.is_on_cooldown()
 		_ability_key.add_theme_color_override(&"font_color", UITheme.ACCENT if ability_ready else UITheme.TEXT_DIM)
+
+	_credits.text = "%d CREDITS" % player.state.credits
+	var primary := player.loadout.primary_data()
+	var primary_text := ("1  %s" % primary.display_name.to_upper()) if primary != null else "1  -"
+	var sidearm_text := "2  %s" % WeaponCatalog.sidearm().display_name.to_upper()
+	if player.loadout.held_slot == PlayerLoadout.SLOT_PRIMARY and primary != null:
+		primary_text = "[%s]" % primary_text
+	else:
+		sidearm_text = "[%s]" % sidearm_text
+	_slots.text = "%s     %s" % [primary_text, sidearm_text]
 
 	var weapon := player.weapon
 	if weapon == null or weapon.data == null:

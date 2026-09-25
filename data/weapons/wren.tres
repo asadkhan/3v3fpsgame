@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="WeaponData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1_weapon_data"]
+
+[resource]
+script = ExtResource("1_weapon_data")
+weapon_id = &"wren"
+display_name = "Wren"
+category = 0
+damage = 26.0
+headshot_multiplier = 3.0
+falloff_multiplier = 0.7
+max_range = 35.0
+fire_mode = 0
+fire_interval = 0.16
+burst_count = 1
+spread_degrees = 0.4
+magazine_size = 12
+reload_time = 1.6
+price = 0
+recoil_kick_degrees = 1.2
+recoil_yaw_degrees = 0.3
+recoil_recovery_degrees = 60.0
+viewmodel_kick = 0.06
+move_speed_multiplier = 1.0
+blocks_sprint = false

@@ -17,8 +17,12 @@ func enter(_previous: GameState) -> void:
 	var winner := match_data.last_round_winner
 
 	# A round with no winner is not scored, and does not stop the match.
-	if winner != Team.Side.NONE and is_authority():
-		match_data.add_round_win(winner)
+	if is_authority():
+		if winner != Team.Side.NONE:
+			match_data.add_round_win(winner)
+		# Paid before the streaks move on, so a first loss earns the base amount.
+		Economy.pay_round(winner)
+		match_data.record_round_result(winner)
 
 	EventBus.round_ended.emit(winner)
 	resolution_updated.emit(_remaining)

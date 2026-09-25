@@ -25,6 +25,13 @@ var team: int = Team.Side.NONE
 var health: int = MAX_HEALTH
 var is_alive: bool = true
 
+## Credits for the buy menu. Host-authoritative; mirrored to clients.
+var credits: int = 0
+
+## The bought primary weapon's id, or &"" when only the sidearm is carried.
+## Kept across rounds while the player survives; lost on death.
+var primary_id: StringName = &""
+
 var kills: int = 0
 var deaths: int = 0
 var assists: int = 0

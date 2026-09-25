@@ -763,8 +763,8 @@ func _equip_weapon() -> void:
 
 	# The shared [WeaponData] instance is handed to the weapon by reference and
 	# never written to, so six players in a match all firing the Kestrel cannot
-	# change each other's spread.
-	weapon.equip(starting_weapon, self)
+	# change each other's spread. Which one is decided by the loadout.
+	loadout.refill()
 
 	weapon.fired.connect(_on_weapon_fired)
 	weapon.recoil_requested.connect(_on_recoil_requested)
@@ -1041,9 +1041,12 @@ func _on_dry_fired() -> void:
 	dry_fired.emit()
 
 
-## The weapon every player starts a match holding. Chapter 5 replaces this with
-## whatever the buy system hands out.
-@export var starting_weapon: WeaponData = preload("res://data/weapons/kestrel.tres")
+## Primary + sidearm, switching and buying. See [PlayerLoadout].
+@onready var loadout: PlayerLoadout = $Loadout
+
+## Set by the objective while this player is planting or defusing: movement,
+## jumping and firing stop, looking around does not.
+var objective_lock: bool = false
 
 
 # --- Public API --------------------------------------------------------
@@ -1452,8 +1455,9 @@ func _reset_life_presentation() -> void:
 	# The weapon only comes back into view on the machine that looks through
 	# it; a remote body never shows a viewmodel.
 	_set_weapon_visible(not is_network_remote)
+	objective_lock = false
 	if weapon != null:
-		weapon.equip(starting_weapon, self)
+		loadout.refill()
 
 
 ## Enters the dead state: control off, movement stopped, camera on the way to
@@ -1500,8 +1504,12 @@ func die(source: Node = null) -> void:
 		var killer_id := EventBus.INVALID_PEER
 		if killer != null and killer != self:
 			killer.state.record_kill()
+			if killer.state.team != state.team:
+				Economy.add_credits(killer.state, GameManager.match_rules.kill_credits)
 			killer._publish_net_state()
 			killer_id = killer.peer_id
+		# The bought weapon is lost with the life.
+		loadout.server_on_death()
 		var headshot := _last_hit_zone == Damageable.HitZone.HEAD
 		EventBus.player_died.emit(peer_id, killer_id, headshot)
 		if NetworkManager.is_online:
@@ -1543,7 +1551,7 @@ func _publish_net_state(broadcast: bool = true) -> void:
 	if not NetworkManager.is_online or not broadcast:
 		return
 	NetworkManager.players.record_health(peer_id, state.health, state.is_alive)
-	_net_state_receive.rpc(net_health, net_alive, net_team, state.kills, state.deaths)
+	_net_state_receive.rpc(net_health, net_alive, net_team, state.kills, state.deaths, state.credits)
 
 
 ## Applies the host's authoritative word about a body's health, team and death.
@@ -1564,13 +1572,14 @@ func _publish_net_state(broadcast: bool = true) -> void:
 ## authority this chapter exists to take away. Sender identity is the
 ## verifiable thing, and it is verified.
 @rpc("any_peer", "call_remote", "reliable")
-func _net_state_receive(health_value: int, alive: bool, side: int, kills: int, deaths: int) -> void:
+func _net_state_receive(health_value: int, alive: bool, side: int, kills: int, deaths: int, credits: int) -> void:
 	if multiplayer.get_remote_sender_id() != NetworkManager.SERVER_PEER_ID:
 		return
 
-	# Scoreboard numbers are the host's; a client only mirrors them.
+	# Scoreboard numbers and credits are the host's; a client only mirrors them.
 	state.kills = kills
 	state.deaths = deaths
+	state.credits = credits
 
 	net_health = health_value
 	net_alive = alive
@@ -1656,6 +1665,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"toggle_mouse_capture"):
 		capture_mouse(not is_mouse_captured())
 		get_viewport().set_input_as_handled()
+		return
+
+	if event.is_action_pressed(&"weapon_primary"):
+		loadout.switch_to(PlayerLoadout.SLOT_PRIMARY)
+		return
+	if event.is_action_pressed(&"weapon_sidearm"):
+		loadout.switch_to(PlayerLoadout.SLOT_SIDEARM)
 		return
 
 	# Echo Field deployment (Chapter 6)
@@ -1760,7 +1776,9 @@ func _update_combat(delta: float) -> void:
 	# The trigger is read here and nowhere else. The player owns the input
 	# switch, so a remote player with input off holds a weapon that cannot fire
 	# and the weapon itself never has to know the word "input".
-	var can_trigger := _controls_active()
+	# The pointer must be captured too: with it free the player is clicking on
+	# a menu (buy, Esc), and those clicks must not also fire the gun.
+	var can_trigger := _controls_active() and is_mouse_captured()
 	weapon.update_trigger(
 		can_trigger and Input.is_action_pressed(&"fire"),
 		can_trigger and Input.is_action_just_pressed(&"fire"),
@@ -1866,7 +1884,7 @@ func _read_input() -> void:
 ## corpse and a local corpse are both dead; only one of them is remote, and
 ## Chapter 4 needs to be able to say which.
 func _controls_active() -> bool:
-	return input_enabled and state.is_alive
+	return input_enabled and state.is_alive and not objective_lock
 
 
 ## Current movement input in world space, already rotated into the player's
