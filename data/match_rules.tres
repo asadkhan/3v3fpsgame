@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="MatchRules" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/game/match_rules.gd" id="1_match_rules"]
+
+[resource]
+script = ExtResource("1_match_rules")
+rounds_to_win = 5
+players_per_team = 3
+warmup_seconds = 5.0
+round_start_seconds = 3.0
+round_seconds = 90.0
+round_end_seconds = 5.0

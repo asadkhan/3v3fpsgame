@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="WeaponData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1_weapon_data"]
+
+[resource]
+script = ExtResource("1_weapon_data")
+weapon_id = &"kestrel"
+display_name = "Kestrel"
+category = 2
+damage = 26.0
+headshot_multiplier = 2.2
+falloff_multiplier = 0.75
+max_range = 45.0
+fire_mode = 1
+fire_interval = 0.09
+burst_count = 1
+spread_degrees = 0.6
+magazine_size = 30
+reload_time = 2.1
+price = 0
+recoil_kick_degrees = 0.8
+recoil_yaw_degrees = 0.3
+recoil_recovery_degrees = 45.0
+viewmodel_kick = 0.05
+move_speed_multiplier = 0.92
+blocks_sprint = false

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="WeaponData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1_weapon_data"]
+
+[resource]
+script = ExtResource("1_weapon_data")
+weapon_id = &"jackal"
+display_name = "Jackal"
+category = 1
+damage = 22.0
+headshot_multiplier = 1.6
+falloff_multiplier = 0.45
+max_range = 22.0
+fire_mode = 1
+fire_interval = 0.075
+burst_count = 3
+spread_degrees = 1.1
+magazine_size = 30
+reload_time = 2.1
+price = 700
