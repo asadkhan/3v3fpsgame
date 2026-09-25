@@ -1,0 +1,12 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/impact_effect.gd" id="1_impact"]
+
+[sub_resource type="QuadMesh" id="Quad_spark"]
+size = Vector2(1, 1)
+
+[node name="ImpactEffect" type="Node3D"]
+script = ExtResource("1_impact")
+
+[node name="Quad" type="MeshInstance3D" parent="."]
+mesh = SubResource("Quad_spark")

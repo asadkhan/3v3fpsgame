@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="WeaponData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1_weapon_data"]
+
+[resource]
+script = ExtResource("1_weapon_data")
+weapon_id = &"halberd"
+display_name = "Halberd"
+category = 2
+damage = 34.0
+headshot_multiplier = 2.5
+falloff_multiplier = 0.6
+max_range = 55.0
+fire_mode = 1
+fire_interval = 0.105
+burst_count = 3
+spread_degrees = 0.45
+magazine_size = 25
+reload_time = 2.5
+price = 1600

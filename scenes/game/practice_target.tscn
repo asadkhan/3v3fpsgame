@@ -1,0 +1,50 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/game/practice_target.gd" id="1_target"]
+
+[sub_resource type="CapsuleShape3D" id="Shape_body"]
+radius = 0.3
+height = 1.7
+
+[sub_resource type="CapsuleMesh" id="Mesh_body"]
+radius = 0.3
+height = 1.7
+
+[sub_resource type="SphereShape3D" id="Shape_head"]
+radius = 0.22
+
+[sub_resource type="SphereMesh" id="Mesh_head"]
+radius = 0.22
+height = 0.44
+
+[node name="PracticeTarget" type="StaticBody3D"]
+collision_layer = 4
+collision_mask = 0
+script = ExtResource("1_target")
+
+[node name="Body" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
+shape = SubResource("Shape_body")
+
+[node name="BodyMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
+mesh = SubResource("Mesh_body")
+
+[node name="Head" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.78, 0)
+collision_layer = 4
+collision_mask = 0
+
+[node name="HeadCollision" type="CollisionShape3D" parent="Head"]
+shape = SubResource("Shape_head")
+
+[node name="HeadMesh" type="MeshInstance3D" parent="Head"]
+mesh = SubResource("Mesh_head")
+
+[node name="HealthLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.45, 0)
+pixel_size = 0.0035
+billboard = 1
+text = "100"
+font_size = 96
+outline_size = 24

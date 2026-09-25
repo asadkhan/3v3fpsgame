@@ -1,0 +1,148 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/dev_overlay.gd" id="1_dev_overlay"]
+
+[node name="DevOverlay" type="CanvasLayer"]
+layer = 10
+script = ExtResource("1_dev_overlay")
+
+[node name="Panel" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 3
+anchors_preset = 11
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -440.0
+grow_horizontal = 0
+grow_vertical = 2
+
+[node name="Background" type="ColorRect" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.05, 0.055, 0.07, 0.93)
+
+[node name="Margin" type="MarginContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="Column" type="VBoxContainer" parent="Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="Panel/Margin/Column"]
+layout_mode = 2
+text = "DEBUG OVERLAY - NOT THE GAME"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="Panel/Margin/Column"]
+layout_mode = 2
+text = "Development information and phase-forcing buttons. Both are removed for release builds - see DEV_OVERLAY_ENABLED in scripts/core/main.gd. A real match is driven by the rules, not by clicking."
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="GapTop" type="Control" parent="Panel/Margin/Column"]
+custom_minimum_size = Vector2(0, 16)
+layout_mode = 2
+
+[node name="PhaseLabel" type="Label" parent="Panel/Margin/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "MAIN_MENU"
+horizontal_alignment = 1
+
+[node name="NoteLabel" type="Label" parent="Panel/Margin/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="GapInfo" type="Control" parent="Panel/Margin/Column"]
+custom_minimum_size = Vector2(0, 12)
+layout_mode = 2
+
+[node name="SceneHeading" type="Label" parent="Panel/Margin/Column"]
+layout_mode = 2
+text = "Current scene"
+horizontal_alignment = 1
+
+[node name="SceneLabel" type="Label" parent="Panel/Margin/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="NetworkHeading" type="Label" parent="Panel/Margin/Column"]
+layout_mode = 2
+text = "Networking"
+horizontal_alignment = 1
+
+[node name="NetLabel" type="Label" parent="Panel/Margin/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="RosterLabel" type="Label" parent="Panel/Margin/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 1
+
+[node name="RulesLabel" type="Label" parent="Panel/Margin/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="ScoreLabel" type="Label" parent="Panel/Margin/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 1
+
+[node name="PlayerHeading" type="Label" parent="Panel/Margin/Column"]
+layout_mode = 2
+text = "Player"
+horizontal_alignment = 1
+
+[node name="PlayerLabel" type="Label" parent="Panel/Margin/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "no player in the scene"
+horizontal_alignment = 1
+
+[node name="FpsLabel" type="Label" parent="Panel/Margin/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "FPS --"
+horizontal_alignment = 1
+
+[node name="GapBottom" type="Control" parent="Panel/Margin/Column"]
+custom_minimum_size = Vector2(0, 16)
+layout_mode = 2
+
+[node name="TransitionPrompt" type="Label" parent="Panel/Margin/Column"]
+layout_mode = 2
+text = "Force the game into a phase (these moves also happen automatically on a timer):"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="TransitionCenter" type="CenterContainer" parent="Panel/Margin/Column"]
+layout_mode = 2
+
+[node name="TransitionBox" type="HBoxContainer" parent="Panel/Margin/Column/TransitionCenter"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 8

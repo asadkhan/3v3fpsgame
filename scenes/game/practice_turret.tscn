@@ -1,0 +1,76 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/game/practice_turret.gd" id="1_turret"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_hull"]
+albedo_color = Color(0.3, 0.32, 0.36, 1)
+metallic = 0.4
+roughness = 0.6
+
+[sub_resource type="StandardMaterial3D" id="Mat_accent"]
+albedo_color = Color(0.72, 0.24, 0.2, 1)
+metallic = 0.2
+roughness = 0.5
+
+[sub_resource type="BoxMesh" id="Mesh_base"]
+size = Vector3(0.9, 0.5, 0.9)
+
+[sub_resource type="CylinderMesh" id="Mesh_pillar"]
+top_radius = 0.18
+bottom_radius = 0.24
+height = 0.7
+
+[sub_resource type="BoxMesh" id="Mesh_barrel"]
+size = Vector3(0.14, 0.14, 0.8)
+
+[sub_resource type="SphereShape3D" id="Shape_base"]
+radius = 0.45
+
+[node name="PracticeTurret" type="Node3D"]
+script = ExtResource("1_turret")
+
+[node name="Base" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 0)
+material_override = SubResource("Mat_hull")
+mesh = SubResource("Mesh_base")
+
+[node name="Pillar" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
+material_override = SubResource("Mat_hull")
+mesh = SubResource("Mesh_pillar")
+
+[node name="Head" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 0)
+
+[node name="Housing" type="MeshInstance3D" parent="Head"]
+material_override = SubResource("Mat_hull")
+mesh = SubResource("Mesh_base")
+
+[node name="Lens" type="MeshInstance3D" parent="Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
+material_override = SubResource("Mat_accent")
+mesh = SubResource("Mesh_base")
+scale = Vector3(0.35, 0.15, 0.35)
+
+[node name="Barrel" type="MeshInstance3D" parent="Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.55)
+material_override = SubResource("Mat_accent")
+mesh = SubResource("Mesh_barrel")
+
+[node name="Muzzle" type="Marker3D" parent="Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.95)
+
+[node name="Flash" type="OmniLight3D" parent="Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.95)
+light_color = Color(1, 0.45, 0.3, 1)
+light_energy = 0.0
+omni_range = 2.0
+shadow_enabled = false
+
+[node name="Collision" type="StaticBody3D" parent="."]
+collision_layer = 4
+collision_mask = 0
+
+[node name="BaseShape" type="CollisionShape3D" parent="Collision"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 0)
+shape = SubResource("Shape_base")
