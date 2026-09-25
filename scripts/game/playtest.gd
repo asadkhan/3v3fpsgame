@@ -38,6 +38,13 @@ extends Node3D
 
 const PLAYER_SCENE := preload("res://scenes/player/player.tscn")
 
+## The competitive map every networked match is played on.
+const MATCH_MAP := preload("res://scenes/maps/meridian.tscn")
+
+## The offline practice range: targets, a turret and the movement test pieces.
+## Offline play is for practice, so it gets the range rather than an empty map.
+const PRACTICE_RANGE := preload("res://scenes/game/placeholder_environment.tscn")
+
 ## Where spawned bodies are parented, relative to the spawner.
 ##
 ## A named constant rather than a literal in the scene file, because the path
@@ -82,7 +89,7 @@ var player: Player = null
 
 
 func _ready() -> void:
-	_step_aside_from_overview_camera()
+	_use_environment(MATCH_MAP if NetworkManager.is_online else PRACTICE_RANGE)
 	_configure_spawner()
 
 	# The spawner is only asked to do anything by the host, but the signal
@@ -114,7 +121,8 @@ func _ready() -> void:
 			# arrive through - exists now, so the host may send one. Asking
 			# here rather than having the host guess is what stops the spawn
 			# message arriving before there is anywhere to put it.
-			NetworkManager.request_spawn.rpc_id(NetworkManager.SERVER_PEER_ID)
+			NetworkManager.request_spawn.rpc_id(NetworkManager.SERVER_PEER_ID,
+				NetworkManager.local_display_name())
 		return
 
 	_spawn_offline_player()
@@ -163,6 +171,25 @@ Networked spawning is disabled." % SPAWN_PATH)
 	_spawner.spawn_limit = 0
 
 
+## Makes [param scene] the level under the node name [code]Environment[/code],
+## replacing whatever was there. Spawn markers are looked up under that name, so
+## any map works as long as it provides [code]AlphaSpawn[/code] and
+## [code]BravoSpawn[/code]. A no-op when that level is already loaded.
+func _use_environment(scene: PackedScene) -> void:
+	var current := get_node_or_null(^"Environment")
+	if current != null:
+		if current.scene_file_path == scene.resource_path:
+			return
+		# Out of the tree now, so the replacement can take the name at once.
+		remove_child(current)
+		current.queue_free()
+	var level := scene.instantiate()
+	level.name = "Environment"
+	add_child(level)
+	move_child(level, 0)
+	_step_aside_from_overview_camera()
+
+
 ## The grey box keeps the elevated camera it needed in Chapter 1, to prove the
 ## scene rendered at all. Godot would hand the screen to the player anyway on
 ## its own, but doing it here in the right order means the frame is never drawn
@@ -198,8 +225,7 @@ func _spawn_offline_player() -> void:
 	# synchronisers point at nobody.
 	player.pending_peer_id = NetworkManager.SERVER_PEER_ID
 	player.pending_team = Team.Side.ALPHA
-	player.pending_display_name = PlayerRegistry.default_name_for(
-		NetworkManager.SERVER_PEER_ID)
+	player.pending_display_name = NetworkManager.local_display_name()
 	add_child(player)
 
 	# Added before the teleport so the player's own _ready has run - it is what
@@ -352,6 +378,7 @@ func _on_roster_updated() -> void:
 		return
 
 	_clear_all_players()
+	_use_environment(PRACTICE_RANGE)
 	_spawn_offline_player()
 
 
@@ -359,6 +386,7 @@ func _on_roster_updated() -> void:
 
 func _on_hosting_started(_port: int) -> void:
 	_clear_all_players()
+	_use_environment(MATCH_MAP)
 	var side := NetworkManager.players.team_of(NetworkManager.local_peer_id)
 	_on_peer_registered(NetworkManager.local_peer_id, side,
 		NetworkManager.players.display_name_of(NetworkManager.local_peer_id))
@@ -369,7 +397,9 @@ func _on_join_succeeded() -> void:
 	# ignores a second request for a peer that already has a body, so this is
 	# safe even when the scene's own _ready has already asked.
 	_clear_all_players()
-	NetworkManager.request_spawn.rpc_id(NetworkManager.SERVER_PEER_ID)
+	_use_environment(MATCH_MAP)
+	NetworkManager.request_spawn.rpc_id(NetworkManager.SERVER_PEER_ID,
+				NetworkManager.local_display_name())
 
 
 # --- Rounds ---------------------------------------------------------------
@@ -377,10 +407,18 @@ func _on_join_succeeded() -> void:
 ## Every round starts with everyone alive, full, and at their side's spawn.
 ## Done by the authority only; on a session that goes through
 ## [method Player.server_respawn_at], which the owning machines carry out.
-func _on_phase_changed(_previous: int, current: int) -> void:
-	if current != GamePhase.Phase.BUY or not GameManager.is_authority():
+##
+## A rematch (MATCH_END -> LOBBY) is a fresh match: everyone is stood back up
+## and the scoreboard is cleared.
+func _on_phase_changed(previous: int, current: int) -> void:
+	if not GameManager.is_authority():
 		return
-	_respawn_all_players()
+	if current == GamePhase.Phase.BUY:
+		_respawn_all_players()
+	elif current == GamePhase.Phase.LOBBY and previous == GamePhase.Phase.MATCH_END:
+		for body in NetworkManager.get_players():
+			body.state.reset_score()
+		_respawn_all_players()
 
 
 func _respawn_all_players() -> void:

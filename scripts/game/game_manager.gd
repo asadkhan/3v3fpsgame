@@ -193,6 +193,16 @@ func describe_phase() -> String:
 	]
 
 
+## Leaves whatever is happening for the title screen. Always allowed, from any
+## phase and on any machine - a player must never be trapped in a match - so it
+## deliberately skips [constant ALLOWED_TRANSITIONS]. Entering MAIN_MENU ends
+## any network session (see the main menu state).
+func return_to_menu() -> void:
+	if current_phase == GamePhase.Phase.MAIN_MENU:
+		return
+	_enter_phase(GamePhase.Phase.MAIN_MENU, current_state)
+
+
 ## Disconnects from any session and quits. Routed through here so that
 ## leaving the game always tears the network down, no matter who asked.
 func quit_game() -> void:

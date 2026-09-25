@@ -1,6 +1,16 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1_menu"]
+
+[sub_resource type="Gradient" id="Grad_bg"]
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(0.09, 0.1, 0.13, 1, 0.03, 0.03, 0.05, 1)
+
+[sub_resource type="GradientTexture2D" id="Tex_bg"]
+gradient = SubResource("Grad_bg")
+fill = 1
+fill_from = Vector2(0.5, 0.35)
+fill_to = Vector2(1.2, 1.2)
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -11,6 +21,16 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_menu")
 
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = SubResource("Tex_bg")
+expand_mode = 1
+
 [node name="Center" type="CenterContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
@@ -20,17 +40,39 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Column" type="VBoxContainer" parent="Center"]
+custom_minimum_size = Vector2(380, 0)
 layout_mode = 2
 theme_override_constants/separation = 10
 
 [node name="Title" type="Label" parent="Center/Column"]
+unique_name_in_owner = true
 layout_mode = 2
-text = "3v3 Tactical FPS"
+text = "3v3 TACTICAL FPS"
 horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="Center/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "working title"
+horizontal_alignment = 1
+
+[node name="Spacer" type="Control" parent="Center/Column"]
+custom_minimum_size = Vector2(0, 16)
+layout_mode = 2
+
+[node name="NameLabel" type="Label" parent="Center/Column"]
+layout_mode = 2
+text = "Your name"
+
+[node name="NameEdit" type="LineEdit" parent="Center/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+max_length = 16
+placeholder_text = "Player name"
 
 [node name="AddressLabel" type="Label" parent="Center/Column"]
 layout_mode = 2
-text = "Host address"
+text = "Host address (for Join)"
 
 [node name="AddressEdit" type="LineEdit" parent="Center/Column"]
 unique_name_in_owner = true
@@ -39,26 +81,30 @@ text = "127.0.0.1"
 
 [node name="HostButton" type="Button" parent="Center/Column"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
-text = "Host game"
+text = "HOST MATCH"
 
 [node name="JoinButton" type="Button" parent="Center/Column"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
-text = "Join game"
+text = "JOIN MATCH"
 
 [node name="OfflineButton" type="Button" parent="Center/Column"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
-text = "Play offline (no networking)"
+text = "PRACTICE RANGE (offline)"
 
 [node name="QuitButton" type="Button" parent="Center/Column"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
-text = "Quit"
+text = "QUIT"
 
 [node name="StatusLabel" type="Label" parent="Center/Column"]
 unique_name_in_owner = true
 layout_mode = 2
-text = ""
 horizontal_alignment = 1
+autowrap_mode = 3

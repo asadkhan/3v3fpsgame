@@ -486,6 +486,7 @@ func _ready() -> void:
 	# Mouse look belongs to whichever camera this player owns, so a second
 	# player in the match does not fight the first one for the pointer.
 	_camera.fov = GameConfig.field_of_view
+	GameConfig.setting_changed.connect(_on_setting_changed)
 
 	if _weapon_mount != null:
 		_viewmodel_rest = _weapon_mount.position
@@ -505,6 +506,11 @@ func _ready() -> void:
 		return
 
 	_apply_authority_state()
+
+
+func _on_setting_changed(key: String, value: Variant) -> void:
+	if key == "video/field_of_view":
+		_camera.fov = float(value)
 
 
 ## Turns the identity fields into everything that follows from them: which
@@ -1097,12 +1103,18 @@ func is_crouching() -> bool:
 ## through the same static; Chapter 4's replicated shots call it on the host
 ## after validation. Nothing else has a way in, and nothing else needs to -
 ## which is precisely what stops a client from deciding its own health.
+## The zone of the most recent damaging hit, so a death can report whether it
+## was a headshot.
+var _last_hit_zone: int = Damageable.HitZone.BODY
+
+
 func apply_damage(amount: float, _source: Node = null, _zone: Damageable.HitZone = Damageable.HitZone.BODY) -> float:
 	if not state.is_alive or amount <= 0.0:
 		return 0.0
 
 	var removed := state.apply_damage(amount)
 	if removed > 0.0:
+		_last_hit_zone = _zone
 		took_hit.emit(_source, removed, _zone)
 		var attacker := _source as Player
 		EventBus.player_damaged.emit(peer_id,
@@ -1490,7 +1502,10 @@ func die(source: Node = null) -> void:
 			killer.state.record_kill()
 			killer._publish_net_state()
 			killer_id = killer.peer_id
-		EventBus.player_died.emit(peer_id, killer_id)
+		var headshot := _last_hit_zone == Damageable.HitZone.HEAD
+		EventBus.player_died.emit(peer_id, killer_id, headshot)
+		if NetworkManager.is_online:
+			_net_death_event.rpc(killer_id, headshot)
 
 	_begin_death_presentation(source)
 
@@ -1502,6 +1517,16 @@ func die(source: Node = null) -> void:
 	_publish_net_state()
 
 	health_changed.emit(state.health, false)
+
+
+## Host to clients: "this player was killed by that one". Lets every machine
+## raise [signal EventBus.player_died] for the kill feed. Health and the corpse
+## are handled separately by the state RPC.
+@rpc("any_peer", "call_remote", "reliable")
+func _net_death_event(killer_id: int, headshot: bool) -> void:
+	if multiplayer.get_remote_sender_id() != NetworkManager.SERVER_PEER_ID:
+		return
+	EventBus.player_died.emit(peer_id, killer_id, headshot)
 
 
 ## Copies [member state] into the mirror fields and broadcasts them.

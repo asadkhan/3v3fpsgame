@@ -12,6 +12,7 @@ extends Control
 ## [signal NetworkManager.join_succeeded] rather than happening immediately.
 
 @onready var _address_edit: LineEdit = %AddressEdit
+@onready var _name_edit: LineEdit = %NameEdit
 @onready var _status_label: Label = %StatusLabel
 
 ## Guards the join-succeeded handler so a late success from an abandoned
@@ -35,6 +36,21 @@ func _ready() -> void:
 	_address_edit.text = NetworkManager.DEFAULT_ADDRESS
 	_status_label.text = ""
 
+	theme = UITheme.build()
+	%Title.add_theme_font_size_override(&"font_size", UITheme.SIZE_HUGE)
+	%Title.add_theme_color_override(&"font_color", UITheme.ACCENT)
+	%Subtitle.add_theme_color_override(&"font_color", UITheme.TEXT_DIM)
+	%Subtitle.add_theme_font_size_override(&"font_size", UITheme.SIZE_SMALL)
+	_name_edit.text = NetworkManager.local_display_name()
+
+
+## Stores the typed name before any path into a match, so the host - or the
+## local body offline - is given it.
+func _commit_name() -> void:
+	var clean := NetworkManager.sanitize_name(_name_edit.text)
+	if not clean.is_empty():
+		GameConfig.display_name = clean
+
 
 ## Single-player, no session at all.
 ##
@@ -48,12 +64,14 @@ func _ready() -> void:
 ## Any existing session is left first, so pressing this after a failed join
 ## does not drop you into a lobby with a stale peer underneath.
 func _on_offline_pressed() -> void:
+	_commit_name()
 	if NetworkManager.is_online:
 		NetworkManager.leave_game()
 	GameManager.change_state(GamePhase.Phase.LOBBY)
 
 
 func _on_host_pressed() -> void:
+	_commit_name()
 	# A host is connected the instant create_server() succeeds, so the lobby
 	# can be entered straight away.
 	if NetworkManager.is_online:
@@ -66,6 +84,7 @@ func _on_host_pressed() -> void:
 
 
 func _on_join_pressed() -> void:
+	_commit_name()
 	var address := _address_edit.text.strip_edges()
 	if address.is_empty():
 		address = NetworkManager.DEFAULT_ADDRESS

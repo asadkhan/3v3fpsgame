@@ -24,8 +24,10 @@ signal player_left(peer_id: int)
 signal player_damaged(victim_id: int, attacker_id: int, amount: float)
 
 ## A player was killed. [param killer_id] is [constant INVALID_PEER] for deaths
-## caused by the environment.
-signal player_died(victim_id: int, killer_id: int)
+## caused by the environment. Raised on every machine: on the host by
+## [method Player.die], on clients by the host's death announcement - so the
+## kill feed and the round's elimination check see the same events everywhere.
+signal player_died(victim_id: int, killer_id: int, was_headshot: bool)
 
 ## A shot was taken. For tracers, muzzle flash and the kill feed - the
 ## authoritative hit resolution is Chapter 3's job, not this signal's.

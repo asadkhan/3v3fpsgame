@@ -137,6 +137,18 @@ func _ready() -> void:
 		_dev_overlay.refresh()
 
 
+## Whether the developer panels are on screen. Off by default now that the game
+## has a real HUD; F3 ([code]toggle_dev_ui[/code]) flips them.
+var _dev_ui_shown: bool = false
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"toggle_dev_ui"):
+		_dev_ui_shown = not _dev_ui_shown
+		_apply_screen_mode(GameManager.current_phase)
+		get_viewport().set_input_as_handled()
+
+
 ## The one place a phase becomes a screen. Adding a real menu, HUD or match
 ## scene later means adding a line to [constant SCREENS] and nothing else.
 func _on_state_changed(_previous_phase: int, current_phase: int) -> void:
@@ -190,7 +202,7 @@ func _apply_screen_mode(phase: int) -> void:
 		_placeholder = null
 
 	if _dev_overlay != null:
-		_dev_overlay.visible = not SCREENS_WITHOUT_OVERLAY.has(phase)
+		_dev_overlay.visible = _dev_ui_shown and not SCREENS_WITHOUT_OVERLAY.has(phase)
 
 	# The network panel is hidden on the main menu for a different reason from
 	# the overlay: the menu already has Host and Join, so showing both would
@@ -199,4 +211,4 @@ func _apply_screen_mode(phase: int) -> void:
 	# for a session that is already running and wants a Leave button and a
 	# roster, neither of which the menu has room for.
 	if _dev_network_ui != null:
-		_dev_network_ui.visible = phase != GamePhase.Phase.MAIN_MENU
+		_dev_network_ui.visible = _dev_ui_shown and phase != GamePhase.Phase.MAIN_MENU

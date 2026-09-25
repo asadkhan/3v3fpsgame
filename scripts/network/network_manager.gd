@@ -296,7 +296,7 @@ func host_game(port: int = DEFAULT_PORT, max_players: int = 0) -> Error:
 	# be the one participant with no body and no side. Registering it here
 	# rather than waiting for a connection event is deliberate: ENet never
 	# raises `peer_connected` for the server about itself.
-	register_peer(SERVER_PEER_ID, PlayerRegistry.default_name_for(SERVER_PEER_ID))
+	register_peer(SERVER_PEER_ID, local_display_name())
 
 	print("[Network] Hosting on port %d for up to %d players" % [port, cap])
 	hosting_started.emit(port)
@@ -388,7 +388,7 @@ func _on_peer_connected(id: int) -> void:
 ## host's own player needs no handshake: it is spawned by its own match scene
 ## the moment that scene exists, which is the same condition.
 @rpc("any_peer", "call_remote", "reliable")
-func request_spawn() -> void:
+func request_spawn(player_name: String = "") -> void:
 	if not multiplayer.is_server():
 		return
 
@@ -400,6 +400,13 @@ func request_spawn() -> void:
 	if not players.has_peer(sender):
 		push_warning("NetworkManager: spawn requested by unregistered peer %d; refused." % sender)
 		return
+
+	# The client's chosen name, cleaned. Arrives here rather than at connect
+	# time because ENet's handshake carries no payload.
+	var clean := sanitize_name(player_name)
+	if not clean.is_empty():
+		players.update(sender, {"display_name": clean})
+		roster_updated.emit()
 
 	# Phase first, so the client is in the host's phase - with the host's score
 	# and countdown - before its body arrives.
@@ -440,6 +447,30 @@ func _on_server_disconnected() -> void:
 	# with three frozen teammates and a live mouse.
 	leave_game()
 	server_disconnected.emit()
+
+
+## Longest name the game will display.
+const MAX_NAME_LENGTH := 16
+
+
+## The name this machine plays under: the player's saved choice, or a generated
+## one that is then saved so it stays the same between sessions.
+func local_display_name() -> String:
+	var chosen := sanitize_name(GameConfig.display_name)
+	if chosen.is_empty():
+		chosen = "Player%03d" % (randi() % 1000)
+		GameConfig.display_name = chosen
+	return chosen
+
+
+## Trims, strips control characters and caps the length. Applied on the host to
+## whatever a client sends, because a name is shown on every screen.
+static func sanitize_name(raw: String) -> String:
+	var out := ""
+	for character in raw.strip_edges():
+		if character.unicode_at(0) >= 32:
+			out += character
+	return out.substr(0, MAX_NAME_LENGTH).strip_edges()
 
 
 ## One line for the dev UI: role, peer id, and roster size.
