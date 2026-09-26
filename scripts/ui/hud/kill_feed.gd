@@ -15,6 +15,7 @@ func _ready() -> void:
 	alignment = BoxContainer.ALIGNMENT_BEGIN
 	add_theme_constant_override(&"separation", 4)
 	EventBus.player_died.connect(_on_player_died)
+	EventBus.player_callout.connect(_on_callout)
 
 
 func _on_player_died(victim_id: int, killer_id: int, headshot: bool) -> void:
@@ -35,6 +36,17 @@ func _on_player_died(victim_id: int, killer_id: int, headshot: bool) -> void:
 
 	var involves_me := local != null and (local == killer or local == victim)
 	_add_entry(text, involves_me)
+
+
+## The big moments - aces, clutches, first blood - get their own line so the
+## whole server sees them.
+func _on_callout(peer_id: int, kind: StringName) -> void:
+	if not kind in [MatchTracker.ACE, MatchTracker.CLUTCH, MatchTracker.FIRST_BLOOD]:
+		return
+	var player := NetworkManager.get_player_for(peer_id)
+	var local := NetworkManager.get_local_player()
+	_add_entry("%s  [color=#%s]%s[/color]" % [_name_bbcode(player, peer_id), UITheme.ACCENT.to_html(false),
+		MatchTracker.callout_text(kind)], player != null and player == local)
 
 
 func _name_bbcode(player: Player, fallback_id: int = 0) -> String:

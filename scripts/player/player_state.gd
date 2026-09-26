@@ -40,6 +40,19 @@ var kills: int = 0
 var deaths: int = 0
 var assists: int = 0
 
+# --- Match stats (host-authoritative; mirrored to clients by MatchTracker) ----
+
+var damage_dealt: int = 0
+var headshot_kills: int = 0
+var first_bloods: int = 0
+var plants: int = 0
+var defuses: int = 0
+var aces: int = 0
+var clutches: int = 0
+
+## The player's level from their local profile, shown next to their name.
+var level: int = 1
+
 ## Whether the current death has been credited to the scoreboard yet. Guards
 ## [method record_death] against double counting.
 var _death_recorded: bool = false
@@ -132,6 +145,51 @@ func reset_score() -> void:
 	kills = 0
 	deaths = 0
 	assists = 0
+	damage_dealt = 0
+	headshot_kills = 0
+	first_bloods = 0
+	plants = 0
+	defuses = 0
+	aces = 0
+	clutches = 0
+
+
+## Combat score for the match: damage, plus a bonus per kill, assist and
+## objective play. Divided by rounds played this is the per-round figure the
+## scoreboard shows - it rewards impact, not just the last hit.
+func combat_score() -> int:
+	return damage_dealt + kills * 150 + assists * 50 + (plants + defuses) * 50
+
+
+func combat_score_per_round(rounds: int) -> int:
+	return int(round(float(combat_score()) / float(maxi(rounds, 1))))
+
+
+## Share of kills that were headshots, 0..100.
+func headshot_percent() -> int:
+	return int(round(100.0 * headshot_kills / maxf(kills, 1)))
+
+
+## Everything the scoreboard and the result screen need, as plain data for an RPC.
+func stats_to_dict() -> Dictionary:
+	return {
+		"kills": kills, "deaths": deaths, "assists": assists,
+		"damage": damage_dealt, "hs_kills": headshot_kills, "first_bloods": first_bloods,
+		"plants": plants, "defuses": defuses, "aces": aces, "clutches": clutches,
+	}
+
+
+func apply_stats_dict(data: Dictionary) -> void:
+	kills = int(data.get("kills", kills))
+	deaths = int(data.get("deaths", deaths))
+	assists = int(data.get("assists", assists))
+	damage_dealt = int(data.get("damage", damage_dealt))
+	headshot_kills = int(data.get("hs_kills", headshot_kills))
+	first_bloods = int(data.get("first_bloods", first_bloods))
+	plants = int(data.get("plants", plants))
+	defuses = int(data.get("defuses", defuses))
+	aces = int(data.get("aces", aces))
+	clutches = int(data.get("clutches", clutches))
 
 
 ## "12 / 3 / 1" - kills, deaths, assists.

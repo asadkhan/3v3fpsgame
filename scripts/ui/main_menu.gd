@@ -42,6 +42,57 @@ func _ready() -> void:
 	%Subtitle.add_theme_color_override(&"font_color", UITheme.TEXT_DIM)
 	%Subtitle.add_theme_font_size_override(&"font_size", UITheme.SIZE_SMALL)
 	_name_edit.text = NetworkManager.local_display_name()
+	_build_profile_card()
+
+
+## Your level, title, progress to the next level and career numbers - the
+## first thing on screen, so every match visibly moves something.
+func _build_profile_card() -> void:
+	var card := PanelContainer.new()
+	UITheme.pin(card, Vector2(0.0, 0.5), 40, -170, 360, -170)
+	add_child(card)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override(&"separation", 6)
+	card.add_child(column)
+
+	column.add_child(UITheme.label(Profile.title().to_upper(), UITheme.SIZE_SMALL, UITheme.ACCENT))
+	column.add_child(UITheme.label("LEVEL %d" % Profile.level, UITheme.SIZE_LARGE + 6, UITheme.TEXT))
+	var bar := ProgressBar.new()
+	bar.show_percentage = false
+	bar.custom_minimum_size = Vector2(0, 8)
+	bar.max_value = 1.0
+	bar.value = float(Profile.xp) / float(Profile.xp_for_level(Profile.level))
+	var back := StyleBoxFlat.new()
+	back.bg_color = Color(1, 1, 1, 0.12)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = UITheme.GOOD
+	bar.add_theme_stylebox_override(&"background", back)
+	bar.add_theme_stylebox_override(&"fill", fill)
+	column.add_child(bar)
+	column.add_child(UITheme.label("%d / %d XP to level %d" % [Profile.xp, Profile.xp_for_level(Profile.level),
+		Profile.level + 1], UITheme.SIZE_SMALL, UITheme.TEXT_DIM))
+
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, 6)
+	column.add_child(spacer)
+	if Profile.matches == 0:
+		column.add_child(UITheme.label("Play your first match to start\nearning XP and career stats.",
+			UITheme.SIZE_SMALL, UITheme.TEXT_DIM))
+		return
+	for line: Array in [
+		["Matches", "%d   (%d%% won)" % [Profile.matches, Profile.win_rate()]],
+		["K / D", "%.2f   (%d / %d)" % [Profile.kd_ratio(), Profile.kills, Profile.deaths]],
+		["Headshot kills", "%d%%" % Profile.headshot_rate()],
+		["Aces  /  Clutches", "%d  /  %d" % [Profile.aces, Profile.clutches]],
+		["Match MVPs", str(Profile.mvps)],
+		["Best ACS", str(Profile.best_score)],
+	]:
+		var row := HBoxContainer.new()
+		var key := UITheme.label(line[0], UITheme.SIZE_SMALL, UITheme.TEXT_DIM)
+		key.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(key)
+		row.add_child(UITheme.label(line[1], UITheme.SIZE_SMALL, UITheme.TEXT, HORIZONTAL_ALIGNMENT_RIGHT))
+		column.add_child(row)
 
 
 ## Stores the typed name before any path into a match, so the host - or the

@@ -4,7 +4,7 @@ Persistent project memory between AI coding agents. **Read this first, then
 `README.md`** (the README documents architecture and conventions per chapter).
 Verify claims against the code — this file describes intent as of its last update.
 
-_Last updated: 2026-09-26 — Valorant-style ADS added. Shields and teammate spectating in. Abilities beyond Echo Field: out of scope (user decision)._
+_Last updated: 2026-09-26 — game-feel and retention pass: view feel, shot visuals, synthesized audio, stats/callouts/progression. Abilities beyond Echo Field: out of scope (user decision)._
 
 ---
 
@@ -25,7 +25,16 @@ _Last updated: 2026-09-26 — Valorant-style ADS added. Shields and teammate spe
   living teammate after a 2 s death cam (click cycles).
   ADS (right mouse, hold or toggle in Esc menu): light zoom, tighter spread,
   less recoil, slower movement; per-weapon values in the weapon `.tres` files.
-- **Next:** models / VFX / audio / animations (user's plan), then balancing.
+- **Feel:** weapon sway/bob/sprint pose/landing + camera bob (toggle), tracers,
+  muzzle flash sprite, bullet holes, impact debris, and a full synthesized
+  soundscape (3D gunshots/footsteps, hit/headshot/kill sounds, core beeps,
+  round stings). Walking fast/sprinting is audible; crouching or aiming is silent.
+- **Retention:** host-tracked match stats (damage, assists, HS kills, first
+  bloods, plants/defuses, aces, clutches, ACS), callouts (FIRST BLOOD, DOUBLE /
+  TRIPLE KILL, ACE, CLUTCH), result screen with MVP and XP, and a saved local
+  profile (level, title, career stats) on the main menu; levels show in lobby
+  and scoreboard.
+- **Next:** the user's models/animations, then UI art polish and balancing.
 
 ## Chapters
 
@@ -109,6 +118,20 @@ _Last updated: 2026-09-26 — Valorant-style ADS added. Shields and teammate spe
   per-model sight alignment to tune when real weapon models arrive.
 - **Fire rate:** weapon cooldown carries sub-frame leftover time (capped at
   one frame), so fire intervals are exact rather than rounded up to frames.
+- **View feel:** `scripts/player/player_view_feel.gd` (node `ViewFeel`) - cosmetic
+  offsets of the viewmodel mount and camera local transform only.
+- **Shot FX:** `scripts/fx/` - `tracer.gd`, `muzzle_flash_mesh.gd`, `bullet_hole.gd`,
+  `impact_effect.gd`; `WeaponFx` decides who draws what (see its comments).
+  `Weapon.Surface` (none/world/entity) travels through hitscan -> `_confirm_shot`
+  -> `shot_resolved`.
+- **Audio:** `scripts/core/audio.gd` autoload `Audio` synthesizes every sound at
+  startup; `play(name)` flat, `play_at(name, pos)` 3D. Swap in recorded sounds
+  by loading them into `_library` under the same names.
+- **Stats/progression:** `scripts/game/match_tracker.gd` (node `Tracker` in
+  `playtest.tscn`, host-authoritative, replicates stats + callouts);
+  `PlayerState` stats + `combat_score()`; `scripts/core/profile.gd` autoload
+  `Profile` (user://profile.cfg); XP is paid by `HudMatchEndPanel` once per real
+  online match. Levels travel in the roster via `request_spawn(name, level)`.
 - RPC rule used throughout: host→client messages on client-owned nodes are
   `any_peer` + `get_remote_sender_id() == SERVER_PEER_ID`, never `authority`.
 
@@ -143,7 +166,9 @@ over localhost plus an offline run (Godot 4.7.2 headless, zero errors):
 - Two instances on one PC share `user://settings.cfg`, so they default to the same saved name — type different names in the menu.
 - Testing two windowed instances on one laptop overloads it: the background instance's game clock slows (Godot caps frame delta). Real matches on separate PCs are unaffected; for local tests prefer lower resolution.
 - Halberd's "rpm" on the buy card uses its in-burst interval.
-- The core has no explosion effect or sounds yet (art/audio pass).
+- The core has no explosion visual yet (sound exists).
+- Profile/XP is local per machine (no account server); a player could edit their own file.
+- Automated probes run inside the project write to the same `user://` as the real game; clear `user://profile.cfg` and the saved name after testing.
 - Dead players look at the floor; there is no spectate-teammate camera yet.
 - Kestrel viewmodel is a placeholder block model; no audio anywhere.
 

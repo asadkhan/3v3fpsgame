@@ -79,7 +79,7 @@ func update_view(delta: float) -> void:
 	var bravo: Array[String] = []
 	for peer_id in NetworkManager.players.peer_ids():
 		var entry := NetworkManager.players.get_entry(peer_id)
-		var line := String(entry.get("display_name", "?"))
+		var line := "[%d] %s" % [NetworkManager.level_of(peer_id), String(entry.get("display_name", "?"))]
 		if peer_id == NetworkManager.local_peer_id:
 			line += "  (you)"
 		if peer_id == NetworkManager.SERVER_PEER_ID:

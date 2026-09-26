@@ -87,10 +87,15 @@ func _process(delta: float) -> void:
 	_vignette.update_view(_player, delta)
 	_top_bar.update_view()
 	_status.update_view(spectator.target if spectating else _player, spectating)
+	# The result screen carries the score and everyone's numbers itself.
+	var match_over := GameManager.is_in(GamePhase.Phase.MATCH_END)
+	_top_bar.visible = not match_over
+	if match_over:
+		_status.visible = false
 	_scoreboard.visible = Input.is_action_pressed(&"scoreboard")
 	_announcer.visible = not _scoreboard.visible and not (_buy != null and _buy.is_open)
 	_lobby.update_view(delta)
-	_match_end.update_view(team)
+	_match_end.update_view(team, delta)
 	_pause.update_view()
 	_pause.visible = _pause.visible and not _buy.is_open
 	_buy.update_view(_player)
