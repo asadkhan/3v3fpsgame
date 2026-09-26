@@ -36,6 +36,7 @@ var _settings: Dictionary = {
 	"video/fullscreen": {"default": false, "type": TYPE_BOOL},
 	"player/display_name": {"default": "", "type": TYPE_STRING},
 	"input/aim_toggle": {"default": false, "type": TYPE_BOOL},
+	"video/head_bob": {"default": true, "type": TYPE_BOOL},
 }
 
 
@@ -66,6 +67,12 @@ var field_of_view: float:
 var fullscreen: bool:
 	get: return get_setting("video/fullscreen")
 	set(value): set_setting("video/fullscreen", value)
+
+## Camera bob while moving. Off for players prone to motion sickness; the
+## weapon still bobs either way.
+var head_bob: bool:
+	get: return get_setting("video/head_bob")
+	set(value): set_setting("video/head_bob", value)
 
 ## Right mouse toggles aiming instead of holding it.
 var aim_toggle: bool:
