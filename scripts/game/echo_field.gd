@@ -242,9 +242,12 @@ func _sync_field_state(active: bool, position: Vector3, peer_id: int, team: int,
 
 
 func _apply_active(active: bool, position: Vector3, peer_id: int, team: int, dur: float) -> void:
+	var was_active := is_active
 	is_active = active
 	if active:
 		global_position = position
+		if not was_active:
+			Audio.play_at(&"echo_deploy", position, 0.0, 0.03, 45.0)
 		owner_peer_id = peer_id
 		owning_team = team
 		time_remaining = dur

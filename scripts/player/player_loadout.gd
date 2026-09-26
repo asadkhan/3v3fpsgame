@@ -223,6 +223,8 @@ func _equip(data: WeaponData, fresh: bool) -> void:
 		weapon.ammo_changed.emit(weapon.ammo_in_magazine, weapon.reserve_ammo)
 	# A new weapon comes up at the hip; each gun aims with its own numbers.
 	_player.aim.reset()
+	if not _player.is_network_remote and _player.is_inside_tree() and _player.state.is_alive:
+		Audio.play(&"switch", -8.0)
 	_player.weapon_changed.emit(weapon)
 	changed.emit()
 

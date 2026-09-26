@@ -99,6 +99,7 @@ func _on_shot_resolved(at: Vector3, normal: Vector3, _victim: Player, zone: int,
 func _on_shot_fired(origin: Vector3, direction: Vector3) -> void:
 	if _weapon == null or _weapon.data == null:
 		return
+	Audio.play(_shot_sound(), -3.0, 0.05)
 	var end := origin + direction * _weapon.data.max_range
 	var space := get_world_3d().direct_space_state
 	if space != null:
@@ -111,6 +112,19 @@ func _on_shot_fired(origin: Vector3, direction: Vector3) -> void:
 	_spawn_tracer(end, false)
 
 
+## The gunshot sound for the held weapon.
+func _shot_sound() -> StringName:
+	var data := _weapon.data if _weapon != null else null
+	if data == null:
+		return &"shot_rifle"
+	match data.category:
+		WeaponData.Category.PISTOL:
+			return &"shot_pistol"
+		WeaponData.Category.SUBMACHINE_GUN:
+			return &"shot_smg"
+	return &"shot_burst" if data.fire_mode == WeaponData.FireMode.BURST else &"shot_rifle"
+
+
 func _is_remote_shooter() -> bool:
 	return _player != null and _player.is_network_remote
 
@@ -119,6 +133,9 @@ func _spawn_tracer(to: Vector3, with_flash: bool) -> void:
 	if _weapon == null:
 		return
 	var from := _weapon.get_muzzle_position()
+	if with_flash:
+		# Somebody else's shot: heard from where they are, so it can be located.
+		Audio.play_at(_shot_sound(), from, 2.0, 0.05, 110.0)
 	if from.distance_to(to) < 0.5:
 		return
 	var tracer := Tracer.new()

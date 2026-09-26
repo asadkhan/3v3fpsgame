@@ -22,6 +22,7 @@ EventBus="*res://scripts/core/event_bus.gd"
 GameConfig="*res://scripts/core/game_config.gd"
 NetworkManager="*res://scripts/network/network_manager.gd"
 GameManager="*res://scripts/game/game_manager.gd"
+Audio="*res://scripts/core/audio.gd"
 
 [display]
 

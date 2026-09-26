@@ -99,6 +99,15 @@ func _process(delta: float) -> void:
 	_top_bar.core_planted = objective != null and objective.is_planted() \
 		and GameManager.is_in(GamePhase.Phase.ROUND_ACTIVE)
 
+	# A purchase confirmed by the host shows up as credits dropping by exactly
+	# the price of something - which is what tells it apart from the half-time
+	# reset, the other thing that lowers credits during the buy phase.
+	if _player != null:
+		var spent := _last_credits - _player.state.credits
+		if spent > 0 and GameManager.is_in(GamePhase.Phase.BUY) and _is_a_price(spent):
+			Audio.play(&"buy", -6.0, 0.0)
+		_last_credits = _player.state.credits
+
 	_slow_left -= delta
 	if _slow_left <= 0.0:
 		_slow_left = SLOW_REFRESH
@@ -139,9 +148,21 @@ func _track_local_player() -> void:
 	var health := _player.state.health + _player.state.shield
 	if health < _last_health:
 		_vignette.flash(float(_last_health - health))
+		Audio.play(&"hurt", -6.0, 0.08)
 	_last_health = health
 
 var _last_health: int = PlayerState.MAX_HEALTH
+var _last_credits: int = 0
+
+
+func _is_a_price(amount: int) -> bool:
+	for data in WeaponCatalog.buyable():
+		if data.price == amount:
+			return true
+	for shield_id in PlayerLoadout.SHIELD_IDS:
+		if PlayerLoadout.shield_price(shield_id) == amount:
+			return true
+	return false
 
 
 func _on_phase_changed(_previous: int, current: int) -> void:

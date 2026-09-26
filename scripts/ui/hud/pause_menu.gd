@@ -10,6 +10,8 @@ var _sensitivity_value: Label
 var _fov: HSlider
 var _fov_value: Label
 var _aim_mode: Button
+var _volume: HSlider
+var _volume_value: Label
 var _head_bob: Button
 
 
@@ -36,6 +38,17 @@ func _ready() -> void:
 	_sensitivity.step = 0.01
 	_sensitivity.value = GameConfig.mouse_sensitivity
 	_sensitivity.value_changed.connect(_on_sensitivity)
+
+	var volume_row := _slider_row(column, "Volume")
+	_volume = volume_row[0]
+	_volume_value = volume_row[1]
+	_volume.min_value = 0.0
+	_volume.max_value = 1.0
+	_volume.step = 0.01
+	_volume.value = GameConfig.master_volume
+	_volume.value_changed.connect(func(value: float) -> void:
+		GameConfig.master_volume = value
+		_refresh_values())
 
 	var fov_row := _slider_row(column, "Field of view")
 	_fov = fov_row[0]
@@ -88,6 +101,8 @@ func _slider_row(parent: Control, title: String) -> Array:
 func _refresh_values() -> void:
 	_sensitivity_value.text = "%.2f" % _sensitivity.value
 	_fov_value.text = "%d" % int(_fov.value)
+	if _volume != null:
+		_volume_value.text = "%d%%" % int(_volume.value * 100.0)
 
 
 func _on_sensitivity(value: float) -> void:
