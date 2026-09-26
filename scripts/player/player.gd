@@ -39,7 +39,11 @@ signal health_changed(health: int, alive: bool)
 ## is false when this arrived over the network, which is how the shooter - and
 ## its weapon feedback - tell its own confirmed hit apart from a verdict about
 ## somebody else's.
-signal shot_resolved(at: Vector3, normal: Vector3, victim: Player, zone: int, killed: bool, is_local: bool)
+signal shot_resolved(at: Vector3, normal: Vector3, victim: Player, zone: int, killed: bool, is_local: bool, surface: int)
+
+## This machine's own player fired: the ray it fired along, spread included.
+## For presentation (the tracer) - it is emitted before anything is resolved.
+signal shot_fired(origin: Vector3, direction: Vector3)
 
 ## A shot landed on this player. Fired on every machine, including the victim's
 ## own, so a HUD hit indicator is one connection rather than a special case for
@@ -847,6 +851,7 @@ func _on_weapon_fired() -> void:
 	# Before this call existed `spread_degrees` was authored on every weapon and
 	# read by nothing, so every gun was perfectly accurate.
 	var direction := weapon.apply_spread(get_look_direction(), aim.spread_scale())
+	shot_fired.emit(origin, direction)
 
 	# Offline, this player is the whole authority and the raycast runs right
 	# here. Online, the host is the authority for what a shot hit, so the ray
@@ -976,7 +981,8 @@ func _resolve_shot(sender: int, origin: Vector3, direction: Vector3) -> void:
 
 	# The host ran the raycast here, so its own weapon has already drawn the
 	# impact: this is a local result.
-	shot_resolved.emit(hit_point, hit_normal, victim_player, zone, killed, true)
+	var surface := weapon.last_surface
+	shot_resolved.emit(hit_point, hit_normal, victim_player, zone, killed, true, surface)
 
 	# Tell the other machines what happened, so they can draw the impact and
 	# the shooter's hit marker. `call_remote` means the host does not receive
@@ -988,7 +994,8 @@ func _resolve_shot(sender: int, origin: Vector3, direction: Vector3) -> void:
 		victim_player.peer_id if victim_player != null else 0,
 		hit,
 		killed,
-		peer_id)
+		peer_id,
+		surface)
 
 
 ## Applies another machine's authoritative verdict about a shot.
@@ -1016,7 +1023,7 @@ func _resolve_shot(sender: int, origin: Vector3, direction: Vector3) -> void:
 ## user-visible result of pulling the trigger on a connection that is not
 ## losing packets, and a dropped verdict reads as "my gun does not work".
 @rpc("any_peer", "call_remote", "reliable")
-func _confirm_shot(point: Vector3, normal: Vector3, zone: int, victim_peer_id: int, hit: bool, killed: bool, shooter_peer_id: int) -> void:
+func _confirm_shot(point: Vector3, normal: Vector3, zone: int, victim_peer_id: int, hit: bool, killed: bool, shooter_peer_id: int, surface: int) -> void:
 	# Only the host's word counts. Checked here rather than trusted from the
 	# annotation for the reason above.
 	if multiplayer.get_remote_sender_id() != NetworkManager.SERVER_PEER_ID:
@@ -1035,7 +1042,7 @@ func _confirm_shot(point: Vector3, normal: Vector3, zone: int, victim_peer_id: i
 	# host never receives its own `call_remote` broadcast), so nothing has been
 	# drawn yet - including for this machine's own shots, which previously
 	# produced no impact at all on a client.
-	shot_resolved.emit(point, normal, victim, zone, killed, false)
+	shot_resolved.emit(point, normal, victim, zone, killed, false, surface)
 
 
 func _on_recoil_requested(_pitch_degrees: float, _yaw_degrees: float) -> void:
@@ -1270,6 +1277,10 @@ func _advance_remote_interpolation(delta: float) -> void:
 	_render_rotation_y = lerp_angle(_render_rotation_y, target_yaw, minf(1.0, delta * 12.0))
 	global_position = _render_position
 	rotation.y = _render_rotation_y
+	# The head follows the replicated pitch too, so anything placed relative to
+	# it - the muzzle a tracer starts from, a spectator's view - points where
+	# this player is actually looking.
+	_head.rotation.x = lerp_angle(_head.rotation.x, net_pitch, minf(1.0, delta * 12.0))
 	_render_initialised = true
 
 

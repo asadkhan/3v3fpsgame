@@ -48,14 +48,13 @@ func _ready() -> void:
 		return
 	_weapon.impact_requested.connect(_on_impact_requested)
 
-	# Chapter 4: when this machine is not the one that resolved the shot, the
-	# impact arrives as a verdict from the host rather than as this weapon's own
-	# signal. Without this connection an online client's shots would produce no
-	# visible hit at all - the muzzle flash comes from the local trigger, but
-	# the impact comes from the authority, and only the authority's raycast ever
-	# ran.
+	# When this machine is not the one that resolved the shot, the impact
+	# arrives as a verdict from the host rather than as this weapon's own
+	# signal, and this machine's own trigger pulls draw their tracer the moment
+	# they happen rather than waiting for that verdict.
 	if _player != null:
 		_player.shot_resolved.connect(_on_shot_resolved)
+		_player.shot_fired.connect(_on_shot_fired)
 
 
 func _find_player() -> Player:
@@ -67,18 +66,76 @@ func _find_player() -> Player:
 	return null
 
 
-func _on_impact_requested(at: Vector3, normal: Vector3, zone: int) -> void:
-	_spawn_impact(at, normal, zone)
+## Who draws what, so every shot is drawn exactly once on every machine:
+##
+## - [b]Tracer.[/b] The shooter's own machine draws it instantly from the local
+##   trigger ([method _on_shot_fired]). Every other machine draws it when it
+##   learns about the shot - the host from its own resolution
+##   ([method _on_impact_requested] on a remote body's weapon), clients from the
+##   host's verdict ([method _on_shot_resolved]) - and adds a muzzle flash,
+##   because the shooter's viewmodel is invisible to them.
+## - [b]Impact.[/b] Drawn from whichever resolution this machine sees: the
+##   weapon's own hitscan (offline, or the host), or the verdict (clients).
+func _on_impact_requested(at: Vector3, normal: Vector3, zone: int, surface: int) -> void:
+	_spawn_impact(at, normal, zone, surface)
+	if _is_remote_shooter():
+		_spawn_tracer(at, true)
 
 
-## The one place an impact actually gets drawn, shared by the local
-## weapon's own signal and the network's verdict.
+func _on_shot_resolved(at: Vector3, normal: Vector3, _victim: Player, zone: int, _killed: bool,
+		is_local: bool, surface: int) -> void:
+	if is_local:
+		# Already drawn from the weapon's own signal on the machine that ran the
+		# raycast. Drawing it again would double every effect.
+		return
+	_spawn_impact(at, normal, zone, surface)
+	if _is_remote_shooter():
+		_spawn_tracer(at, true)
+
+
+## This machine's own shot: trace a purely visual ray to find where the streak
+## should end. The real result comes from the authority; this only decides where
+## a line of light is drawn, so it may disagree by a hair and nobody can tell.
+func _on_shot_fired(origin: Vector3, direction: Vector3) -> void:
+	if _weapon == null or _weapon.data == null:
+		return
+	var end := origin + direction * _weapon.data.max_range
+	var space := get_world_3d().direct_space_state
+	if space != null:
+		var query := PhysicsRayQueryParameters3D.create(origin, end, CollisionLayers.WEAPON_MASK)
+		if _player != null:
+			query.exclude = [_player.get_rid()]
+		var hit := space.intersect_ray(query)
+		if not hit.is_empty():
+			end = hit.position
+	_spawn_tracer(end, false)
+
+
+func _is_remote_shooter() -> bool:
+	return _player != null and _player.is_network_remote
+
+
+func _spawn_tracer(to: Vector3, with_flash: bool) -> void:
+	if _weapon == null:
+		return
+	var from := _weapon.get_muzzle_position()
+	if from.distance_to(to) < 0.5:
+		return
+	var tracer := Tracer.new()
+	tracer.setup(from, to, with_flash)
+	get_tree().current_scene.add_child(tracer)
+
+
+## The one place an impact actually gets drawn: the spark and debris, plus a
+## bullet hole on scenery. Nothing at all for a round that hit only air.
 ##
 ## Refuses anything further than [member max_impact_distance] from this
 ## player's eye. A round that travelled the weapon's whole range is fine; a
 ## point 400 m away came from either a wrong origin or a node that has since
 ## been freed, and neither is worth filling the screen with.
-func _spawn_impact(at: Vector3, normal: Vector3, zone: int) -> void:
+func _spawn_impact(at: Vector3, normal: Vector3, zone: int, surface: int) -> void:
+	if surface == Weapon.Surface.NONE:
+		return
 	if impact_scene == null or _live >= MAX_LIVE_EFFECTS:
 		return
 	if _player != null and _player.get_eye_position().distance_to(at) > max_impact_distance:
@@ -92,27 +149,16 @@ func _spawn_impact(at: Vector3, normal: Vector3, zone: int) -> void:
 	# was spawned instead of being dragged through the room as the player walks.
 	# It removes itself when it expires, so nothing has to remember to clean up.
 	get_tree().current_scene.add_child(effect)
-	effect.setup(at, normal, zone)
+	effect.setup(at, normal, zone, surface == Weapon.Surface.ENTITY)
 
 	_live += 1
 	effect.tree_exited.connect(_on_effect_freed)
 
+	if surface == Weapon.Surface.WORLD:
+		var hole := BulletHole.new()
+		hole.setup(at, normal)
+		get_tree().current_scene.add_child(hole)
+
 
 func _on_effect_freed() -> void:
 	_live = maxi(0, _live - 1)
-
-
-## Draws an impact the network told us about rather than one this weapon found.
-##
-## The host broadcasts the point, the surface normal and the zone - the three
-## things a spark needs and nothing more. No damage, no hit point precision, no
-## "what did I hit" reconstruction: the client is not being asked to agree with
-## the host about ballistics, only to show that something happened.
-func _on_shot_resolved(at: Vector3, normal: Vector3, _victim: Player, zone: int, _killed: bool, is_local: bool) -> void:
-	if is_local:
-		# This machine's own shot, already drawn from the weapon's own signal on
-		# whichever machine ran the raycast - here if we are the authority,
-		# arriving as a verdict if we are not. Drawing it again would put two
-		# effects on the same square centimetre.
-		return
-	_spawn_impact(at, normal, zone)
