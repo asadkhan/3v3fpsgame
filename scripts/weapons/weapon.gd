@@ -67,7 +67,19 @@ signal hit_confirmed(killed: bool, zone: int, health_left: int)
 ## honest: the replicated shot is a gameplay fact, and the spark is something
 ## the machine that pressed the trigger draws locally, so the host validating
 ## someone else's shot cannot end up drawing sparks in front of the shooter.
-signal impact_requested(position: Vector3, normal: Vector3, zone: int)
+signal impact_requested(position: Vector3, normal: Vector3, zone: int, surface: int)
+
+## What a round ended on, so the presentation can tell a wall (spark, bullet
+## hole) from a body (blood, no hole) from open air (nothing at all).
+enum Surface {
+	NONE,    ## Travelled its full range without hitting anything.
+	WORLD,   ## Scenery.
+	ENTITY,  ## Something damageable - a player or a practice target.
+}
+
+## The [enum Surface] of the most recent [method hitscan]. The host reads it to
+## tell clients what a shot struck.
+var last_surface: int = Surface.NONE
 
 ## The trigger was pulled with an empty magazine. Drives the dry-fire click.
 signal dry_fired
@@ -264,6 +276,8 @@ func _tick(delta: float) -> void:
 			# permanent muzzle.
 			var t := _flash_left / MUZZLE_FLASH_TIME
 			_muzzle_flash.light_energy = MUZZLE_FLASH_ENERGY * t * t
+		if _flash_mesh != null:
+			_flash_mesh.visible = _flash_left > 0.0
 
 	if is_reloading:
 		_reload_left -= delta
@@ -333,7 +347,8 @@ func hitscan(origin: Vector3, direction: Vector3) -> Dictionary:
 	var result := space.intersect_ray(query)
 	if result.is_empty():
 		_last_shot_end = origin + direction * data.max_range
-		impact_requested.emit(_last_shot_end, -direction, Damageable.HitZone.BODY)
+		last_surface = Surface.NONE
+		impact_requested.emit(_last_shot_end, -direction, Damageable.HitZone.BODY, Surface.NONE)
 		return {}
 
 	_last_shot_end = result.position
@@ -358,7 +373,8 @@ func _apply_damage_to(result: Dictionary, origin: Vector3, direction: Vector3) -
 	if not Damageable.is_damageable(target):
 		# A wall still gets a mark on it. Where the round stopped is a fact
 		# about the world; whether anything was hurt is a separate one.
-		impact_requested.emit(point, normal, Damageable.HitZone.BODY)
+		last_surface = Surface.WORLD
+		impact_requested.emit(point, normal, Damageable.HitZone.BODY, Surface.WORLD)
 		return
 
 	# Measured here, not read from the result.
@@ -383,7 +399,8 @@ func _apply_damage_to(result: Dictionary, origin: Vector3, direction: Vector3) -
 	# Emitted before the early-out so a body that is already down still shows
 	# where the round went. A hit marker is feedback about the player's
 	# accuracy, not a reward for damage.
-	impact_requested.emit(point, normal, zone)
+	last_surface = Surface.ENTITY
+	impact_requested.emit(point, normal, zone, Surface.ENTITY)
 
 	if dealt <= 0.0:
 		# Connected but did no damage - already dead, or a target that declined
@@ -483,10 +500,24 @@ func get_muzzle_position() -> Vector3:
 
 
 func _flash_muzzle() -> void:
-	if _muzzle_flash == null:
-		return
 	_flash_left = MUZZLE_FLASH_TIME
-	_muzzle_flash.light_energy = MUZZLE_FLASH_ENERGY
+	if _muzzle_flash != null:
+		_muzzle_flash.light_energy = MUZZLE_FLASH_ENERGY
+	if _flash_mesh == null and _muzzle_point != null:
+		# Built on first use rather than in the scene, so every weapon scene gets
+		# one without having to author it.
+		_flash_mesh = MuzzleFlashMesh.create(0.22)
+		_muzzle_point.add_child(_flash_mesh)
+	if _flash_mesh != null:
+		# A different shape every shot, so automatic fire flickers rather than
+		# showing one frozen sprite.
+		_flash_mesh.visible = true
+		_flash_mesh.rotation.z = randf() * TAU
+		_flash_mesh.scale = Vector3.ONE * randf_range(0.75, 1.2)
+
+
+## The viewmodel's flash sprite, created on the first shot.
+var _flash_mesh: MeshInstance3D = null
 
 
 func _request_recoil() -> void:
