@@ -187,7 +187,7 @@ to -Z, scales it by 0.16 (a rifle is ~0.83 m) and mounts accessories:
 
 | Weapon | Model | Accessories |
 |---|---|---|
-| Wren | Pistol_5 (root scaled 0.8) | - |
+| Wren | **Poly Haven service_pistol** (realistic PBR, real-world metres, variant "a" with wood grips; `_b` parts, loose magazines and bullet hidden) | - |
 | Swift | SubmachineGun_3 | Flashlight |
 | Harrier | AssaultRifle2_3 | Scope_3 (scope overlay, ADS zoom 1.8) |
 | Kestrel | AssaultRifle2_1 | Grip, Flashlight |
@@ -209,7 +209,8 @@ viewmodel. Each model scene places the hands with `HandR` / `HandL` markers
 (children of `Model`) carrying metadata `grip` (`pistol` / `vertical` / `rail`),
 `radius` (thickness held, metres) and optional `hand_scale`; the shoulders are
 fixed below the camera and each arm reaches its hand with two-bone IK. Sleeves
-take the team colour (Alpha blue-grey, Bravo tan). Local-only and rigid with
+take the team colour (Alpha blue-grey, Bravo tan). Sleeves, straps and gloves use scanned Poly Haven cloth/leather
+(rough_linen, fabric_leather_02). Local-only and rigid with
 the gun (no hand animation for reload yet). Swap for a skinned arm model later
 if real art arrives - only the markers need to stay.
 
@@ -234,7 +235,11 @@ All from **Poly Haven (CC0)**. The fetch script used was a small wrapper around
     mipmaps because they are only ever assigned from code.
 - **Sky / light** `assets/sky/desert_environment.tres`, shared by Meridian and
   the practice range.
-  - Sky: qwantani_late_afternoon_puresky HDRI.
+  - Sky: qwantani_late_afternoon_puresky HDRI, re-saved as `desert_sky.exr`
+    with every pixel capped at 4.0. The raw sun disc is ~65000x the sky and
+    blew out every metal surface; the DirectionalLight is the sun.
+  - The saved environment has only the Low features on; `GraphicsQuality`
+    turns the rest on per preset.
   - Rendering: AgX tonemapping, fog, glow, and SSAO/SSIL/volumetric fog/SDFGI
     per preset.
   - The sun matches the HDRI's sun azimuth (raised to 30 deg for play).

@@ -34,12 +34,12 @@ const SLEEVE_COLOURS := {
 
 var _body: Node = null
 var _team: int = -1
-var _fabric: StandardMaterial3D
-var _leather: StandardMaterial3D
-var _hard: StandardMaterial3D
-var _nylon: StandardMaterial3D
-var _accent: StandardMaterial3D
-var _patch: StandardMaterial3D
+var _fabric: BaseMaterial3D
+var _leather: BaseMaterial3D
+var _hard: BaseMaterial3D
+var _nylon: BaseMaterial3D
+var _accent: BaseMaterial3D
+var _patch: BaseMaterial3D
 
 
 ## Builds both arms. [param viewmodel] is the node this rig lives under (its
@@ -270,28 +270,29 @@ static func _relative(node: Node3D, ancestor: Node3D) -> Transform3D:
 
 
 func _make_materials() -> void:
-	# Ripstop: a fine noise normal map, projected triplanar since the
-	# primitives' UVs stretch.
-	var noise := FastNoiseLite.new()
-	noise.frequency = 0.35
-	var bumps := NoiseTexture2D.new()
-	bumps.noise = noise
-	bumps.as_normal_map = true
-	bumps.bump_strength = 6.0
-	bumps.seamless = true
-	bumps.width = 128
-	bumps.height = 128
-	_fabric = _material(SLEEVE_COLOURS[Team.Side.NONE], 1.0)
-	_fabric.normal_enabled = true
-	_fabric.normal_texture = bumps
-	_fabric.normal_scale = 1.0
-	_fabric.uv1_triplanar = true
-	_fabric.uv1_scale = Vector3(40, 40, 40)
-	_leather = _material(Color(0.075, 0.075, 0.08), 0.6)
+	# Scanned cloth and leather (Poly Haven, CC0), projected in the arm's own
+	# space since the primitives' UVs stretch. The sleeve cloth is pale, so the
+	# team colour tints it.
+	_fabric = _scanned("rough_linen", SLEEVE_COLOURS[Team.Side.NONE], 9.0)
+	_leather = _scanned("fabric_leather_02", Color(0.11, 0.11, 0.115), 14.0)
 	_hard = _material(Color(0.11, 0.11, 0.12), 0.38)
-	_nylon = _material(Color(0.09, 0.095, 0.1), 0.9)
+	_nylon = _scanned("rough_linen", Color(0.13, 0.135, 0.14), 16.0)
 	_accent = _material(UITheme.ACCENT, 0.5)
-	_patch = _material(Color(0.12, 0.13, 0.12), 1.0)
+	_patch = _scanned("rough_linen", Color(0.22, 0.23, 0.2), 20.0)
+
+
+static func _scanned(texture_id: String, tint: Color, tiles_per_metre: float) -> BaseMaterial3D:
+	var base := "res://assets/materials/%s/%s_" % [texture_id, texture_id]
+	var material := ORMMaterial3D.new()
+	material.albedo_texture = load(base + "diff.jpg")
+	material.albedo_color = tint
+	material.normal_enabled = true
+	material.normal_texture = load(base + "nor_gl.jpg")
+	material.orm_texture = load(base + "arm.jpg")
+	material.uv1_triplanar = true
+	material.uv1_scale = Vector3.ONE * tiles_per_metre
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	return material
 
 
 static func _material(colour: Color, roughness: float) -> StandardMaterial3D:
