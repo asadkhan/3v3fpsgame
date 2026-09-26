@@ -16,3 +16,15 @@ position = Vector3(1.45, 0.55, 0)
 [node name="Sight" type="Marker3D" parent="Model"]
 position = Vector3(0.3, 0.78, 0)
 
+[node name="HandR" type="Marker3D" parent="Model"]
+position = Vector3(-0.2, 0.0, 0)
+metadata/grip = "pistol"
+metadata/radius = 0.017
+metadata/hand_scale = 0.85
+
+[node name="HandL" type="Marker3D" parent="Model"]
+position = Vector3(-0.1, -0.14, 0)
+metadata/grip = "pistol"
+metadata/radius = 0.031
+metadata/hand_scale = 0.85
+

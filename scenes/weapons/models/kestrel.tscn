@@ -16,6 +16,16 @@ position = Vector3(3.61, 0.64, 0)
 [node name="Sight" type="Marker3D" parent="Model"]
 position = Vector3(0, 1.02, 0)
 
+[node name="HandR" type="Marker3D" parent="Model"]
+position = Vector3(-0.1, 0.08, 0)
+metadata/grip = "pistol"
+metadata/radius = 0.019
+
+[node name="HandL" type="Marker3D" parent="Model"]
+position = Vector3(2.0, 0.1, 0)
+metadata/grip = "vertical"
+metadata/radius = 0.017
+
 [node name="Grip" parent="Model" instance=ExtResource("2_grip")]
 position = Vector3(2.0, 0.04, 0)
 

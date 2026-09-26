@@ -195,6 +195,8 @@ func equip(p_data: WeaponData, p_shooter: CollisionObject3D) -> void:
 ## The model currently shown, built from [member WeaponData.viewmodel_scene].
 var _model: Node3D = null
 var _model_scene: PackedScene = null
+## The first-person arms holding it, rebuilt with each model.
+var _arms: ViewmodelArms = null
 
 ## Where the model's Sight marker is, in this node's space. See
 ## [method get_sight_position].
@@ -220,6 +222,10 @@ func _apply_model() -> void:
 		_viewmodel.remove_child(_model)
 		_model.queue_free()
 		_model = null
+	if _arms != null:
+		_viewmodel.remove_child(_arms)
+		_arms.queue_free()
+		_arms = null
 	_has_sight = false
 	for part in _placeholder_parts:
 		(part as Node3D).visible = scene == null
@@ -243,6 +249,10 @@ func _apply_model() -> void:
 	if sight != null and is_inside_tree():
 		_sight_position = to_local(sight.global_position)
 		_has_sight = true
+	_arms = ViewmodelArms.new()
+	_arms.name = "Arms"
+	_viewmodel.add_child(_arms)
+	_arms.build(_viewmodel, _model, shooter)
 
 
 ## The sight's position in this node's space (which is the weapon mount's), or
