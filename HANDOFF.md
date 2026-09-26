@@ -213,6 +213,55 @@ take the team colour (Alpha blue-grey, Bravo tan). Local-only and rigid with
 the gun (no hand animation for reload yet). Swap for a skinned arm model later
 if real art arrives - only the markers need to stay.
 
+## World art & rendering
+
+All from **Poly Haven (CC0)**. The fetch script used was a small wrapper around
+`https://api.polyhaven.com/files/<id>`.
+- **Surfaces** `assets/materials/<id>/` (2K diffuse, normal-GL, AO/rough/metal)
+  and `assets/materials/surfaces/*.tres`: `ORMMaterial3D`s, world-space
+  triplanar, so any generated box wears them without UVs.
+  - ground = dry_ground_rocks
+  - plaster = large_sandstone_blocks
+  - rock = rock_face
+  - concrete = cracked_concrete
+  - paving = rectangular_paving
+  - trim = concrete_wall_008
+  - wood = wood_planks
+  - container = rusty_corrugated_iron
+  - steel = metal_plate
+  - Texture `.import`s are set to VRAM-compressed with mipmaps (normal maps
+    flagged). Keep that for new textures, or they stay uncompressed with no
+    mipmaps because they are only ever assigned from code.
+- **Sky / light** `assets/sky/desert_environment.tres`, shared by Meridian and
+  the practice range.
+  - Sky: qwantani_late_afternoon_puresky HDRI.
+  - Rendering: AgX tonemapping, fog, glow, and SSAO/SSIL/volumetric fog/SDFGI
+    per preset.
+  - The sun matches the HDRI's sun azimuth (raised to 30 deg for play).
+- **Props** `assets/props/<id>/<id>_1k.gltf`, placed by
+  `BlockMap._add_prop()`, with an auto-fitted box collider unless wall-mounted.
+  - Crates, barrels, a generator, road barriers, utility boxes and AC units.
+- **Map dressing** (`BlockMap`):
+  - `_add_trim` puts a cap and plinth on every building.
+  - `_dress_crate` and `_dress_container` frame the cover blocks.
+  - `_add_floor_pad` adds paving on the sites and concrete in the spawns.
+  - None of it adds collision except props, so the play space is unchanged.
+- **Graphics presets** `scripts/core/graphics_quality.gd`, setting
+  `video/graphics_quality`, cycled from the pause menu.
+
+  | Preset | Adds |
+  |---|---|
+  | Low | shadows and glow |
+  | Medium | + SSAO |
+  | High | + SSIL and volumetric fog |
+  | Ultra | + SDFGI bounce light |
+
+  - Auto picks Low on integrated or Intel GPUs and High otherwise.
+  - Measured on an Intel UHD laptop: Low 60 fps (vsync), High ~17, Ultra ~12.
+  - SDFGI has its sky light disabled because the HDRI turned shaded ground
+    silver. Ultra still shows some olive tint and light-leak artifacts in
+    shade, so treat it as experimental.
+
 ## Diagnostics pass (2026-09-26)
 
 Two code reviews plus scripted 3-player matches (buy, shields, plant/defuse,

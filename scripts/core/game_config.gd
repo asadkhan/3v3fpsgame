@@ -37,6 +37,8 @@ var _settings: Dictionary = {
 	"player/display_name": {"default": "", "type": TYPE_STRING},
 	"input/aim_toggle": {"default": false, "type": TYPE_BOOL},
 	"video/head_bob": {"default": true, "type": TYPE_BOOL},
+	## [enum GraphicsQuality.Level]; -1 picks from the GPU.
+	"video/graphics_quality": {"default": -1, "type": TYPE_INT},
 }
 
 

@@ -1,0 +1,18 @@
+[gd_resource type="ORMMaterial3D" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/materials/large_sandstone_blocks/large_sandstone_blocks_diff.jpg" id="1_8uns4"]
+[ext_resource type="Texture2D" path="res://assets/materials/large_sandstone_blocks/large_sandstone_blocks_nor_gl.jpg" id="2_r72x3"]
+[ext_resource type="Texture2D" path="res://assets/materials/large_sandstone_blocks/large_sandstone_blocks_arm.jpg" id="3_4rgkl"]
+
+[resource]
+albedo_color = Color(1, 0.97, 0.92, 1)
+albedo_texture = ExtResource("1_8uns4")
+orm_texture = ExtResource("3_4rgkl")
+normal_enabled = true
+normal_scale = 0.7
+normal_texture = ExtResource("2_r72x3")
+uv1_scale = Vector3(0.33333334, 0.33333334, 0.33333334)
+uv1_triplanar = true
+uv1_triplanar_sharpness = 4.0
+uv1_world_triplanar = true
+texture_filter = 5

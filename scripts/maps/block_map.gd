@@ -34,6 +34,10 @@ var _barriers: Array[StaticBody3D] = []
 
 func _ready() -> void:
 	_build()
+	GraphicsQuality.apply(self)
+	GameConfig.setting_changed.connect(func(key: String, _value: Variant) -> void:
+		if key == "video/graphics_quality":
+			GraphicsQuality.apply(self))
 	GameManager.state_changed.connect(_on_phase_changed)
 	_set_barriers_active(GameManager.current_phase == GamePhase.Phase.BUY)
 
@@ -89,6 +93,22 @@ static func _detail_texture() -> NoiseTexture2D:
 
 func _material(key: StringName) -> Material:
 	return _materials.get(key)
+
+
+## The photo-scanned surfaces (Poly Haven, CC0) under
+## [code]assets/materials/surfaces/[/code]: ground, plaster, rock, concrete,
+## trim, wood, container, steel. Each is a world-space triplanar PBR material,
+## so any box can wear it without UVs and the texture never stretches.
+const SURFACE_DIR := "res://assets/materials/surfaces/%s.tres"
+
+
+## Registers the shared surface [param surface] under [param key].
+func _define_surface(key: StringName, surface: String) -> void:
+	_materials[key] = load(SURFACE_DIR % surface)
+
+
+static func surface(surface_name: String) -> Material:
+	return load(SURFACE_DIR % surface_name)
 
 
 # --- Geometry -------------------------------------------------------------
@@ -148,6 +168,127 @@ func _add_stairs(node_name: String, start: Vector3, direction: Vector3, width: f
 		var size := across * width + along.abs() * tread + Vector3(0.0, height, 0.0)
 		var centre := start + along * (tread * (float(i) + 0.5)) + Vector3(0.0, height * 0.5, 0.0)
 		_add_box("%s%d" % [node_name, i + 1], centre, size, material_key)
+
+
+# --- Architectural detail ---------------------------------------------------
+# Visual only - never collision - so the play space stays exactly as authored.
+
+## A concrete cap along the top of a block and a plinth along its foot: what
+## turns a box into a building.
+func _add_trim(min_xz: Vector2, max_xz: Vector2, height: float, base_height: float = 0.0) -> void:
+	var size := Vector3(max_xz.x - min_xz.x, 0.0, max_xz.y - min_xz.y)
+	var centre := Vector3((min_xz.x + max_xz.x) * 0.5, 0.0, (min_xz.y + max_xz.y) * 0.5)
+	var trim := _material(&"trim")
+	var cap := _visual_box(self, centre + Vector3(0, base_height + height + 0.1, 0),
+		size + Vector3(0.24, 0.2, 0.24), trim)
+	cap.name = "Cap"
+	var plinth := _visual_box(self, centre + Vector3(0, base_height + 0.2, 0),
+		size + Vector3(0.08, 0.4, 0.08), _material(&"concrete"))
+	plinth.name = "Plinth"
+
+
+## Dresses a cover block as a large timber crate: plank faces, and a heavier
+## frame along every edge with a cross-brace on the long sides.
+func _dress_crate(body: StaticBody3D, size: Vector3) -> void:
+	var frame := _material(&"wood_frame")
+	_add_edge_frame(body, size, 0.12, frame)
+	for axis in [0, 2]:
+		for s in [-1.0, 1.0]:
+			var face := Vector3.ZERO
+			face[axis] = s * (size[axis] * 0.5 + 0.02)
+			var along := 2 if axis == 0 else 0
+			var length: float = Vector2(size[along], size.y).length() - 0.2
+			var brace := _visual_box(body, face, Vector3(0.1, 0.1, 0.1), frame)
+			var brace_size := Vector3(0.1, length, 0.05) if along == 0 else Vector3(0.05, length, 0.1)
+			var angle: float = atan2(size[along], size.y) * s
+			brace.mesh.size = brace_size
+			if along == 0:
+				brace.rotation.z = angle
+			else:
+				brace.rotation.x = angle
+
+
+## Dresses a cover block as a steel utility module: container-steel faces and
+## a painted steel frame.
+func _dress_container(body: StaticBody3D, size: Vector3) -> void:
+	_add_edge_frame(body, size, 0.1, _material(&"steel"))
+
+
+func _add_edge_frame(body: Node3D, size: Vector3, thickness: float, material: Material) -> void:
+	var h := size * 0.5
+	for x in [-1.0, 1.0]:
+		for z in [-1.0, 1.0]:
+			_visual_box(body, Vector3(x * (h.x - thickness * 0.4), 0, z * (h.z - thickness * 0.4)),
+				Vector3(thickness, size.y + 0.02, thickness), material)
+	for y in [-1.0, 1.0]:
+		for x in [-1.0, 1.0]:
+			_visual_box(body, Vector3(x * (h.x - thickness * 0.4), y * (h.y - thickness * 0.4), 0),
+				Vector3(thickness, thickness, size.z + 0.02), material)
+		for z in [-1.0, 1.0]:
+			_visual_box(body, Vector3(0, y * (h.y - thickness * 0.4), z * (h.z - thickness * 0.4)),
+				Vector3(size.x + 0.02, thickness, thickness), material)
+
+
+## A flat floor finish (concrete pad, etc.) laid just above the ground.
+func _add_floor_pad(min_xz: Vector2, max_xz: Vector2, material_key: StringName) -> void:
+	var pad := MeshInstance3D.new()
+	pad.name = "FloorPad"
+	var plane := PlaneMesh.new()
+	plane.size = max_xz - min_xz
+	pad.mesh = plane
+	pad.material_override = _material(material_key)
+	pad.position = Vector3((min_xz.x + max_xz.x) * 0.5, 0.012, (min_xz.y + max_xz.y) * 0.5)
+	add_child(pad)
+
+
+# --- Props --------------------------------------------------------------------
+
+## A scanned prop model (Poly Haven, CC0, [code]assets/props/[/code]) standing
+## at [param at]. With [param solid], it gets a box collider fitted to its
+## mesh, on the world layer, so it blocks movement and bullets like any wall.
+func _add_prop(prop_name: String, at: Vector3, yaw_degrees: float = 0.0, solid: bool = true,
+		prop_scale: float = 1.0) -> Node3D:
+	var scene := load("res://assets/props/%s/%s_1k.gltf" % [prop_name, prop_name]) as PackedScene
+	if scene == null:
+		push_warning("Missing prop %s" % prop_name)
+		return null
+	var model := scene.instantiate() as Node3D
+	var root: Node3D = model
+	if solid:
+		var body := StaticBody3D.new()
+		body.collision_layer = CollisionLayers.WORLD
+		body.collision_mask = 0
+		body.add_child(model)
+		var bounds := _mesh_bounds(model)
+		var collision := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = bounds.size
+		collision.shape = shape
+		collision.position = bounds.get_center()
+		body.add_child(collision)
+		root = body
+	root.name = prop_name.to_pascal_case()
+	root.position = at
+	root.rotation.y = deg_to_rad(yaw_degrees)
+	root.scale = Vector3.ONE * prop_scale
+	add_child(root)
+	return root
+
+
+static func _mesh_bounds(root: Node3D) -> AABB:
+	var bounds := AABB()
+	var first := true
+	for mesh: MeshInstance3D in root.find_children("*", "MeshInstance3D", true, false):
+		var xform := Transform3D.IDENTITY
+		var at: Node = mesh
+		while at != null and at != root.get_parent():
+			if at is Node3D:
+				xform = (at as Node3D).transform * xform
+			at = at.get_parent()
+		var box: AABB = xform * mesh.mesh.get_aabb()
+		bounds = box if first else bounds.merge(box)
+		first = false
+	return bounds
 
 
 # --- Match features ---------------------------------------------------------

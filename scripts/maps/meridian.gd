@@ -105,27 +105,91 @@ const COVER := [
 
 
 func _build() -> void:
-	_define_material(&"floor", Color(0.42, 0.4, 0.37), 0.95, 0.25)
-	_define_material(&"structure", Color(0.74, 0.67, 0.56), 0.9, 0.3)
-	_define_material(&"outer", Color(0.52, 0.49, 0.45), 0.95, 0.2)
-	_define_material(&"crate", Color(0.56, 0.39, 0.23), 0.8, 0.8)
-	_define_material(&"metal", Color(0.34, 0.41, 0.46), 0.55, 0.8)
-	_define_material(&"platform", Color(0.62, 0.6, 0.56), 0.9, 0.3)
+	# A desert relay outpost: dusty ground, clay-plastered blocks, canyon rock
+	# round the edge, timber crates and steel modules for cover.
+	_define_surface(&"floor", "ground")
+	_define_surface(&"structure", "plaster")
+	_define_surface(&"outer", "rock")
+	_define_surface(&"crate", "wood")
+	_define_surface(&"metal", "container")
+	_define_surface(&"platform", "concrete")
+	_define_surface(&"concrete", "concrete")
+	_define_surface(&"trim", "trim")
+	_define_surface(&"steel", "steel")
+	_define_surface(&"paving", "paving")
+	var frame := (load(BlockMap.SURFACE_DIR % "wood") as Material).duplicate() as BaseMaterial3D
+	frame.albedo_color = Color(0.62, 0.55, 0.48)
+	_materials[&"wood_frame"] = frame
 
 	_build_shell()
 
 	for i in STRUCTURES.size():
 		var entry: Array = STRUCTURES[i]
 		_add_block("Structure%d" % (i + 1), entry[0], entry[1], WALL_HEIGHT, &"structure")
+		_add_trim(entry[0], entry[1], WALL_HEIGHT)
 
 	for i in COVER.size():
 		var entry: Array = COVER[i]
-		_add_block("Cover%d" % (i + 1), entry[0], entry[1], entry[2], entry[3], entry[4])
+		var body := _add_block("Cover%d" % (i + 1), entry[0], entry[1], entry[2], entry[3], entry[4])
+		var size := Vector3(entry[1].x - entry[0].x, entry[2], entry[1].y - entry[0].y)
+		match entry[3]:
+			&"crate":
+				_dress_crate(body, size)
+			&"metal":
+				_dress_container(body, size)
+			&"structure":
+				_add_trim(entry[0], entry[1], entry[2], entry[4])
 
 	_build_levels()
 	_build_spawns()
 	_build_sites_and_signs()
 	_build_dressing()
+	_build_props()
+
+
+## Concrete pads where people stand and fight - the spawns and both sites - so
+## the ground reads as places, not one endless dirt field.
+func _build_floor_finish() -> void:
+	_add_floor_pad(Vector2(-12, 32), Vector2(12, 45), &"concrete")
+	_add_floor_pad(Vector2(-12, -45), Vector2(12, -36), &"concrete")
+	_add_floor_pad(Vector2(-32, -32), Vector2(-10, -8), &"paving")
+	_add_floor_pad(Vector2(10, -32), Vector2(32, -8), &"paving")
+
+
+## Scanned props, all against walls or in spawn corners so no sightline or
+## route changes: supply crates and fuel barrels in the spawns, road barriers
+## along the lane walls, units and boxes on the buildings.
+func _build_props() -> void:
+	_build_floor_finish()
+	# Attacker spawn
+	_add_prop("old_military_crate", Vector3(-10.6, 0.0, 43.8))
+	_add_prop("wooden_military_crate", Vector3(-11.1, 0.0, 41.4), 90.0)
+	_add_prop("wooden_military_crate", Vector3(-11.1, 0.465, 41.4), 84.0)
+	_add_prop("Barrel_01", Vector3(11.2, 0.0, 44.2))
+	_add_prop("Barrel_01", Vector3(10.5, 0.0, 44.4), 40.0)
+	_add_prop("Barrel_01", Vector3(11.3, 0.0, 43.5), 75.0)
+	_add_prop("portable_generator", Vector3(10.9, 0.0, 38.5), -90.0)
+	# Defender spawn
+	_add_prop("old_military_crate", Vector3(-10.6, 0.0, -43.8))
+	_add_prop("portable_generator", Vector3(-10.9, 0.0, -38.5), 90.0)
+	_add_prop("Barrel_01", Vector3(11.2, 0.0, -44.2))
+	_add_prop("Barrel_01", Vector3(10.5, 0.0, -44.4), 20.0)
+	_add_prop("wooden_crate_02", Vector3(11.3, 0.0, -41.0))
+	# Lane walls
+	_add_prop("concrete_road_barrier", Vector3(-31.6, 0.0, 12.0), 90.0)
+	_add_prop("concrete_road_barrier", Vector3(-31.6, 0.0, 13.6), 92.0)
+	_add_prop("concrete_road_barrier", Vector3(31.6, 0.0, 15.0), 90.0)
+	_add_prop("utility_box_01", Vector3(-19.24, 0.0, 22.0), -90.0)
+	_add_prop("utility_box_01", Vector3(19.24, 0.0, 16.0), 90.0)
+	# Site corners
+	_add_prop("Barrel_01", Vector3(-10.7, 0.0, -31.3))
+	_add_prop("Barrel_01", Vector3(10.7, 0.0, -31.3), 50.0)
+	_add_prop("wooden_crate_02", Vector3(31.4, 1.6, -30.0), 0.0)
+	# Wall-mounted units, out of reach
+	_add_prop("exterior_aircon_unit", Vector3(4.0, 3.2, -13.8), 0.0, false)
+	_add_prop("exterior_aircon_unit", Vector3(-4.8, 3.6, 20.0), -90.0, false)
+	_add_prop("exterior_aircon_unit", Vector3(-19.2, 3.4, 2.0), -90.0, false)
+	_add_prop("exterior_aircon_unit", Vector3(19.2, 3.1, -3.0), 90.0, false)
 
 
 ## The relay-station identity: masts on the rooftops (the tallest on the

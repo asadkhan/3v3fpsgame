@@ -138,6 +138,7 @@ const TURRET_SCENE := preload("res://scenes/game/practice_turret.tscn")
 
 
 func _ready() -> void:
+	GraphicsQuality.apply(self)
 	_build_cover()
 	_build_ramp()
 	_build_steps()
@@ -256,7 +257,15 @@ func reset_range() -> void:
 			turret.start_delay = 3.0
 
 
-func _make_material(colour: Color) -> StandardMaterial3D:
+func _make_material(colour: Color) -> Material:
+	# The range wears the same scanned surfaces as Meridian.
+	match colour:
+		COVER_COLOUR:
+			return BlockMap.surface("plaster")
+		TEST_COLOUR:
+			return BlockMap.surface("concrete")
+		RANGE_COLOUR:
+			return BlockMap.surface("wood")
 	var material := StandardMaterial3D.new()
 	material.albedo_color = colour
 	material.roughness = 1.0
