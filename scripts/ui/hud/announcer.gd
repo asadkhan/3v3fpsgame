@@ -11,6 +11,8 @@ var _subtitle: Label
 var _tween: Tween
 var _small: Label
 var _small_tween: Tween
+var _callout: Label
+var _callout_tween: Tween
 
 ## The side this screen belongs to, supplied by [Hud] each frame.
 var local_team: int = Team.Side.NONE
@@ -42,6 +44,12 @@ func _ready() -> void:
 	EventBus.core_planted.connect(_on_core_planted)
 	EventBus.core_defused.connect(_on_core_defused)
 	EventBus.core_detonated.connect(_on_core_detonated)
+	EventBus.player_callout.connect(_on_callout)
+
+	_callout = UITheme.label("", UITheme.SIZE_LARGE + 8, UITheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
+	add_child(_callout)
+	UITheme.pin(_callout, Vector2(0.5, 1.0), -300, 90, 300, 140)
+	_callout.modulate.a = 0.0
 
 
 func show_banner(title: String, subtitle: String = "", colour: Color = UITheme.TEXT, hold: float = 1.8) -> void:
@@ -108,6 +116,27 @@ func _on_phase_changed(_previous: int, current: int) -> void:
 				show_banner("ROUND LOST", GameManager.match_state.score_line(), UITheme.DANGER, 2.5)
 				if not GameManager.match_state.is_match_over():
 					Audio.play(&"round_lose", -4.0, 0.0)
+
+
+## Your own standout moment gets a big line and a sting; nobody else's
+## interrupts your screen (they go to the kill feed).
+func _on_callout(peer_id: int, kind: StringName) -> void:
+	if peer_id != local_peer or local_peer == 0:
+		return
+	var big := kind in [MatchTracker.ACE, MatchTracker.CLUTCH]
+	_callout.text = MatchTracker.callout_text(kind)
+	_callout.add_theme_color_override(&"font_color", UITheme.ACCENT if big else UITheme.TEXT)
+	_callout.add_theme_font_size_override(&"font_size", UITheme.SIZE_HUGE if big else UITheme.SIZE_LARGE + 8)
+	if _callout_tween != null:
+		_callout_tween.kill()
+	_callout.modulate.a = 1.0
+	_callout.pivot_offset = _callout.size * 0.5
+	_callout.scale = Vector2.ONE * 1.25
+	_callout_tween = create_tween()
+	_callout_tween.tween_property(_callout, ^"scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_callout_tween.tween_interval(1.4)
+	_callout_tween.tween_property(_callout, ^"modulate:a", 0.0, 0.4)
+	Audio.play(&"multikill", -2.0 if big else -5.0, 0.0)
 
 
 func _on_core_planted(_planter: int, site: String) -> void:

@@ -126,7 +126,7 @@ func _ready() -> void:
 			# here rather than having the host guess is what stops the spawn
 			# message arriving before there is anywhere to put it.
 			NetworkManager.request_spawn.rpc_id(NetworkManager.SERVER_PEER_ID,
-				NetworkManager.local_display_name())
+				NetworkManager.local_display_name(), Profile.level)
 		return
 
 	_spawn_offline_player()
@@ -403,7 +403,7 @@ func _on_join_succeeded() -> void:
 	_clear_all_players()
 	_use_environment(MATCH_MAP)
 	NetworkManager.request_spawn.rpc_id(NetworkManager.SERVER_PEER_ID,
-				NetworkManager.local_display_name())
+				NetworkManager.local_display_name(), Profile.level)
 
 
 # --- Rounds ---------------------------------------------------------------

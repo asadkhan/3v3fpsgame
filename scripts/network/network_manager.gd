@@ -297,6 +297,7 @@ func host_game(port: int = DEFAULT_PORT, max_players: int = 0) -> Error:
 	# rather than waiting for a connection event is deliberate: ENet never
 	# raises `peer_connected` for the server about itself.
 	register_peer(SERVER_PEER_ID, local_display_name())
+	players.update(SERVER_PEER_ID, {"level": Profile.level})
 
 	print("[Network] Hosting on port %d for up to %d players" % [port, cap])
 	hosting_started.emit(port)
@@ -388,7 +389,7 @@ func _on_peer_connected(id: int) -> void:
 ## host's own player needs no handshake: it is spawned by its own match scene
 ## the moment that scene exists, which is the same condition.
 @rpc("any_peer", "call_remote", "reliable")
-func request_spawn(player_name: String = "") -> void:
+func request_spawn(player_name: String = "", player_level: int = 1) -> void:
 	if not multiplayer.is_server():
 		return
 
@@ -404,9 +405,11 @@ func request_spawn(player_name: String = "") -> void:
 	# The client's chosen name, cleaned. Arrives here rather than at connect
 	# time because ENet's handshake carries no payload.
 	var clean := sanitize_name(player_name)
+	var changes := {"level": clampi(player_level, 1, 999)}
 	if not clean.is_empty():
-		players.update(sender, {"display_name": clean})
-		roster_updated.emit()
+		changes["display_name"] = clean
+	players.update(sender, changes)
+	roster_updated.emit()
 
 	# Phase first, so the client is in the host's phase - with the host's score
 	# and countdown - before its body arrives.
@@ -447,6 +450,14 @@ func _on_server_disconnected() -> void:
 	# with three frozen teammates and a live mouse.
 	leave_game()
 	server_disconnected.emit()
+
+
+## A player's profile level, for display: this machine's own from [Profile],
+## everyone else's from the roster the host sends.
+func level_of(peer_id: int) -> int:
+	if not _is_online or peer_id == local_peer_id:
+		return Profile.level
+	return int(players.get_entry(peer_id).get("level", 1))
 
 
 ## Longest name the game will display.

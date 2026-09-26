@@ -36,6 +36,11 @@ signal shot_fired(shooter_id: int, origin: Vector3, direction: Vector3)
 ## An ability was activated. [param ability_id] matches an entry in [code]res://data/[/code].
 signal ability_used(user_id: int, ability_id: StringName)
 
+## A standout moment for a player: first blood, a multi-kill, an ace, a
+## clutch. [param kind] is one of the [MatchTracker] callout constants. Raised
+## on every machine.
+signal player_callout(peer_id: int, kind: StringName)
+
 # --- Objective ----------------------------------------------------------
 
 ## The Signal Core was planted on [param site]. [param planter_id] is 0 on

@@ -1,9 +1,10 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/game/playtest.gd" id="1_playtest"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="2_hud"]
 [ext_resource type="Script" path="res://scripts/game/objective/signal_core_objective.gd" id="3_objective"]
 [ext_resource type="Script" path="res://scripts/game/spectator_camera.gd" id="4_spectator"]
+[ext_resource type="Script" path="res://scripts/game/match_tracker.gd" id="5_tracker"]
 
 [node name="Playtest" type="Node3D"]
 script = ExtResource("1_playtest")
@@ -15,6 +16,9 @@ _spawn_path = NodePath("../Players")
 
 [node name="Objective" type="Node3D" parent="."]
 script = ExtResource("3_objective")
+
+[node name="Tracker" type="Node" parent="."]
+script = ExtResource("5_tracker")
 
 [node name="Spectator" type="Camera3D" parent="."]
 script = ExtResource("4_spectator")
