@@ -115,6 +115,14 @@ func _build_library() -> void:
 	_library[&"reload_in"] = _click(0.1, 1300.0, 1.0)
 	_library[&"switch"] = _click(0.09, 700.0, 0.6)
 	_library[&"rack"] = _rack()
+	# Battlefield.
+	_library[&"casing"] = _tones([[4200.0, 0.0, 0.3], [6100.0, 0.0, 0.2], [8300.0, 0.0, 0.12]], 0.18, 30.0, 0.35)
+	_library[&"bullet_crack"] = _crack()
+	_library[&"shot_echo"] = _echo_tail(1.4, 0.5)
+	_library[&"distant_boom"] = _distant_boom()
+	_library[&"distant_burst"] = _distant_burst()
+	_library[&"wind"] = _looped(_wind(8.0))
+	_library[&"fire_crackle"] = _looped(_crackle(4.0))
 	# Knife: air, steel, and what it meets.
 	_library[&"knife_swing"] = _whoosh(0.26, 700.0, 2600.0, 0.55)
 	_library[&"knife_heavy"] = _whoosh(0.4, 380.0, 1700.0, 0.7)
@@ -320,6 +328,140 @@ func _shing(seconds: float, gain: float) -> AudioStreamWAV:
 			var partials := sin(TAU * 3120.0 * r) * 0.5 + sin(TAU * 4710.0 * r) * 0.3 + sin(TAU * 6240.0 * r) * 0.2
 			ring = partials * exp(-r * 7.0) * minf(r / 0.005, 1.0)
 		samples[i] = (scrape + ring * 0.5) * gain
+	return _to_stream(samples)
+
+
+func _looped(stream: AudioStreamWAV) -> AudioStreamWAV:
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_begin = 0
+	stream.loop_end = stream.data.size() / 2
+	return stream
+
+
+## A round passing close: a sharp supersonic snap with a short hiss behind it.
+func _crack() -> AudioStreamWAV:
+	var count := int(0.16 * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var hp := 0.0
+	var last := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		var noise := randf_range(-1.0, 1.0)
+		hp = 0.7 * (hp + noise - last)
+		last = noise
+		var snap := hp * exp(-t * 160.0) * 1.4
+		var hiss := hp * exp(-t * 28.0) * 0.25
+		samples[i] = clampf(snap + hiss, -1.0, 1.0) * 0.9
+	return _to_stream(samples)
+
+
+## The shot rolling back off the walls and hills: a dull, low, decaying rumble
+## that starts soft, swells and dies.
+func _echo_tail(seconds: float, gain: float) -> AudioStreamWAV:
+	var count := int(seconds * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var lp := 0.0
+	var lp2 := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		var noise := randf_range(-1.0, 1.0)
+		lp += (noise - lp) * 0.06
+		lp2 += (lp - lp2) * 0.08
+		var env := minf(t / 0.12, 1.0) * exp(-t * 3.2)
+		# Two or three slaps as it comes back off different distances.
+		var slaps := 1.0 + 0.8 * exp(-absf(t - 0.25) * 40.0) + 0.5 * exp(-absf(t - 0.55) * 30.0)
+		samples[i] = lp2 * env * slaps * gain * 6.0
+	return _to_stream(samples)
+
+
+## Artillery a few kilometres off: a deep thump and a long rolling rumble.
+func _distant_boom() -> AudioStreamWAV:
+	var seconds := 3.2
+	var count := int(seconds * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var lp := 0.0
+	var lp2 := 0.0
+	var phase := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		var noise := randf_range(-1.0, 1.0)
+		lp += (noise - lp) * 0.03
+		lp2 += (lp - lp2) * 0.05
+		phase += TAU * (38.0 + 20.0 * exp(-t * 4.0)) / RATE
+		var thump := sin(phase) * exp(-t * 3.5) * 0.7
+		var rumble := lp2 * 9.0 * minf(t / 0.05, 1.0) * exp(-t * 1.1)
+		samples[i] = clampf(thump + rumble, -1.0, 1.0) * 0.8
+	return _to_stream(samples)
+
+
+## A burst of rifle fire from another fight, far across the valley: dulled
+## cracks with their echo smeared together.
+func _distant_burst() -> AudioStreamWAV:
+	var seconds := 2.6
+	var count := int(seconds * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var shots: Array[float] = []
+	var at := 0.05
+	for n in randi_range(4, 9):
+		shots.append(at)
+		at += randf_range(0.08, 0.13)
+	var lp := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		var noise := randf_range(-1.0, 1.0)
+		lp += (noise - lp) * 0.12
+		var v := 0.0
+		for s in shots:
+			if t >= s:
+				var r := t - s
+				v += exp(-r * 45.0) * 1.0 + exp(-r * 5.0) * 0.12
+		samples[i] = clampf(lp * v * 2.2, -1.0, 1.0) * 0.8
+	return _to_stream(samples)
+
+
+## Wind over open ground: slow-moving filtered noise with gusts.
+func _wind(seconds: float) -> AudioStreamWAV:
+	var count := int(seconds * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var lp := 0.0
+	var lp2 := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		var k := t / seconds
+		# Gusts that meet at the loop point.
+		var gust := 0.55 + 0.3 * sin(TAU * k * 2.0) + 0.15 * sin(TAU * k * 5.0 + 1.3)
+		var noise := randf_range(-1.0, 1.0)
+		lp += (noise - lp) * (0.02 + 0.03 * gust)
+		lp2 += (lp - lp2) * 0.3
+		samples[i] = (lp - lp2 * 0.5) * gust * 3.2
+	# Cross-fade the ends so the loop is seamless.
+	var fade := int(0.4 * RATE)
+	for i in fade:
+		var w := float(i) / fade
+		samples[i] = samples[i] * w + samples[count - fade + i] * (1.0 - w)
+	samples.resize(count - fade)
+	return _to_stream(samples)
+
+
+## A wood fire: soft roar with random pops.
+func _crackle(seconds: float) -> AudioStreamWAV:
+	var count := int(seconds * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var lp := 0.0
+	var pop := 0.0
+	for i in count:
+		var noise := randf_range(-1.0, 1.0)
+		lp += (noise - lp) * 0.05
+		if randf() < 0.0009:
+			pop = randf_range(0.4, 1.0)
+		pop *= 0.985
+		samples[i] = lp * 1.4 + noise * pop * 0.5
 	return _to_stream(samples)
 
 

@@ -108,6 +108,14 @@ func _spawn_debris(at: Vector3, normal: Vector3, flesh: bool) -> void:
 	particles.emitting = true
 	get_tree().create_timer(DEBRIS_LIFETIME + 0.2).timeout.connect(particles.queue_free)
 
+	# The cloud the round kicks up, and what it throws off.
+	if flesh:
+		BattleFx.burst(get_parent(), BattleFx.blood_mist(normal), at)
+	else:
+		BattleFx.burst(get_parent(), BattleFx.dust_burst(normal, Color(0.66, 0.6, 0.5)), at + normal * 0.05)
+		if randf() < 0.35:
+			BattleFx.burst(get_parent(), BattleFx.sparks(normal), at)
+
 
 func _process(delta: float) -> void:
 	_age += delta

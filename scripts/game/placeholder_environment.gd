@@ -139,6 +139,15 @@ const TURRET_SCENE := preload("res://scenes/game/practice_turret.tscn")
 
 func _ready() -> void:
 	GraphicsQuality.apply(self)
+	# The same war going on around the range: smoke on the horizon, dust,
+	# distant fire and a couple of scorches on the pad.
+	var atmosphere := BattlefieldAtmosphere.new()
+	atmosphere.name = "Atmosphere"
+	add_child(atmosphere)
+	for column in [[Vector3(-50, 0, -60), 1.6], [Vector3(60, 0, -35), 1.2], [Vector3(-35, 0, 70), 1.4]]:
+		atmosphere.add_smoke_column(column[0], column[1])
+	for scorch in [[Vector3(-4, 0, 8), 3.0], [Vector3(9, 0, -12), 2.4], [Vector3(-16, 0, -3), 2.0]]:
+		atmosphere.add_scorch(scorch[0], scorch[1])
 	_build_cover()
 	_build_ramp()
 	_build_steps()

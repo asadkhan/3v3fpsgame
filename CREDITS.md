@@ -16,8 +16,9 @@ the project.
 - **Mesh2Motion** human base and addon animations
   (https://github.com/Mesh2Motion/mesh2motion-app): player character
   animations (`assets/characters/animations/`).
-- **Poly Haven** (https://polyhaven.com): environment textures, HDRI sky,
-  props, and the service pistol (Wren).
+- **Poly Haven** (https://polyhaven.com): environment textures (including the
+  hessian sandbag burlap), HDRI sky, props (crates, barrels, fire barrel,
+  covered car, tyres, jerrycans and others), and the service pistol (Wren).
 - **"Free CC0 Guns & Explosives Pack"** (https://3dmodelscc0.itch.io/free-cc0-guns-explosives-pack):
   the M4A1 (Kestrel), M3 Grease Gun (Swift), and scoped rifle (Harrier).
 - **"Kabar Combat knife"** by gamekorp (https://opengameart.org/content/kabar-combat-knife): the knife.

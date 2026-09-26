@@ -32,7 +32,14 @@ var _materials: Dictionary = {}
 var _barriers: Array[StaticBody3D] = []
 
 
+## The map's smoke, fire, dust and distant war. See [BattlefieldAtmosphere].
+var atmosphere: BattlefieldAtmosphere = null
+
+
 func _ready() -> void:
+	atmosphere = BattlefieldAtmosphere.new()
+	atmosphere.name = "Atmosphere"
+	add_child(atmosphere)
 	_build()
 	GraphicsQuality.apply(self)
 	GameConfig.setting_changed.connect(func(key: String, _value: Variant) -> void:
@@ -206,6 +213,98 @@ func _dress_crate(body: StaticBody3D, size: Vector3) -> void:
 				brace.rotation.z = angle
 			else:
 				brace.rotation.x = angle
+
+
+## Dresses a cover block as a sandbag emplacement: the box itself is hidden
+## (its collider stays exactly as it was) and bags of burlap are stacked over
+## its footprint, staggered course by course like a real wall - a full outer
+## ring on every course and a filled top. One [MultiMeshInstance3D] per block.
+func _dress_sandbags(body: StaticBody3D, size: Vector3) -> void:
+	var mesh_instance := body.get_node("Mesh") as MeshInstance3D
+	mesh_instance.visible = false
+	var bag := Vector3(0.5, 0.15, 0.28)
+	var transforms: Array[Transform3D] = []
+	var colours: Array[Color] = []
+	var half := size * 0.5
+	var courses := maxi(int(round(size.y / (bag.y * 0.92))), 1)
+	for course in courses:
+		var y := -half.y + bag.y * 0.5 + course * (size.y - bag.y) / maxf(courses - 1, 1)
+		var top := course == courses - 1
+		var stagger := 0.5 if course % 2 == 1 else 0.0
+		# Rows run along x; bags lie lengthways.
+		var rows := maxi(int(size.z / bag.z), 1)
+		var per_row := maxi(int(size.x / bag.x), 1)
+		for row in rows:
+			var z := -half.z + bag.z * 0.5 + row * (size.z - bag.z) / maxf(rows - 1, 1)
+			var edge_row := row == 0 or row == rows - 1
+			for i in per_row + (1 if stagger > 0.0 else 0):
+				var x := -half.x + bag.x * (i + 0.5 - stagger)
+				if x < -half.x + bag.x * 0.3 or x > half.x - bag.x * 0.3:
+					x = clampf(x, -half.x + bag.x * 0.3, half.x - bag.x * 0.3)
+				var edge := edge_row or i == 0 or i >= per_row - 1
+				if not top and not edge:
+					continue
+				var basis := Basis.from_euler(Vector3(randf_range(-0.05, 0.05), randf_range(-0.12, 0.12),
+					randf_range(-0.06, 0.06))).scaled(bag * Vector3(randf_range(0.95, 1.08), randf_range(0.85, 1.1), 1.0))
+				transforms.append(Transform3D(basis, Vector3(x, y, z)))
+				var shade := randf_range(0.82, 1.08)
+				colours.append(Color(shade, shade * randf_range(0.97, 1.02), shade * randf_range(0.92, 1.0)))
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.use_colors = true
+	multimesh.mesh = _sandbag_mesh()
+	multimesh.instance_count = transforms.size()
+	for i in transforms.size():
+		multimesh.set_instance_transform(i, transforms[i])
+		multimesh.set_instance_color(i, colours[i])
+	var instance := MultiMeshInstance3D.new()
+	instance.name = "Sandbags"
+	instance.multimesh = multimesh
+	instance.material_override = _sandbag_material()
+	body.add_child(instance)
+
+
+static var _bag_mesh: Mesh = null
+static var _bag_material: Material = null
+
+
+## A unit sandbag: a squashed, rounded pillow (scaled per bag).
+static func _sandbag_mesh() -> Mesh:
+	if _bag_mesh == null:
+		var sphere := SphereMesh.new()
+		sphere.radius = 0.5
+		sphere.height = 1.0
+		sphere.radial_segments = 14
+		sphere.rings = 7
+		# Flattened ends and sides read as a filled bag rather than a ball.
+		var arrays := sphere.get_mesh_arrays()
+		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		for i in verts.size():
+			var v := verts[i]
+			verts[i] = Vector3(signf(v.x) * pow(absf(v.x) * 2.0, 0.45) * 0.5, v.y, signf(v.z) * pow(absf(v.z) * 2.0, 0.6) * 0.5)
+		arrays[Mesh.ARRAY_VERTEX] = verts
+		var mesh := ArrayMesh.new()
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		_bag_mesh = mesh
+	return _bag_mesh
+
+
+static func _sandbag_material() -> Material:
+	if _bag_material == null:
+		var m := ORMMaterial3D.new()
+		var base := "res://assets/materials/hessian_230/hessian_230_"
+		m.albedo_texture = load(base + "diff.jpg")
+		m.albedo_color = Color(0.86, 0.76, 0.58)
+		m.normal_enabled = true
+		m.normal_texture = load(base + "nor_gl.jpg")
+		m.orm_texture = load(base + "arm.jpg")
+		m.vertex_color_use_as_albedo = true
+		m.uv1_triplanar = true
+		m.uv1_world_triplanar = true
+		m.uv1_scale = Vector3.ONE * 2.5
+		m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+		_bag_material = m
+	return _bag_material
 
 
 ## Dresses a cover block as a steel utility module: container-steel faces and

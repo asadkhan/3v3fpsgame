@@ -134,7 +134,12 @@ func _build() -> void:
 		var size := Vector3(entry[1].x - entry[0].x, entry[2], entry[1].y - entry[0].y)
 		match entry[3]:
 			&"crate":
-				_dress_crate(body, size)
+				# The waist-high positions are sandbag emplacements; the taller
+				# stacks stay timber crates.
+				if entry[2] <= 1.25 and entry[4] == 0.0:
+					_dress_sandbags(body, size)
+				else:
+					_dress_crate(body, size)
 			&"metal":
 				_dress_container(body, size)
 			&"structure":
@@ -185,6 +190,20 @@ func _build_props() -> void:
 	_add_prop("Barrel_01", Vector3(-10.7, 0.0, -31.3))
 	_add_prop("Barrel_01", Vector3(10.7, 0.0, -31.3), 50.0)
 	_add_prop("wooden_crate_02", Vector3(31.4, 1.6, -30.0), 0.0)
+	# War debris: loose, no collision, nothing that changes a route or a line.
+	var loose := [
+		["old_tyre", Vector3(-30.9, 0.0, 16.5), 20.0], ["old_tyre", Vector3(30.8, 0.0, 9.0), 70.0],
+		["rusted_wheel_rim_01", Vector3(-19.5, 0.0, 12.6), 0.0], ["metal_jerrycan", Vector3(11.6, 0.0, 42.5), 30.0],
+		["metal_jerrycan", Vector3(-11.4, 0.0, -41.9), 200.0], ["cement_bag", Vector3(-8.6, 0.0, -31.3), 15.0],
+		["cement_bag", Vector3(8.8, 0.0, -13.4), 80.0], ["cardboard_box_01", Vector3(19.4, 0.0, 25.2), 10.0],
+		["cardboard_box_01", Vector3(-4.6, 0.0, 12.4), 55.0], ["old_tyre", Vector3(4.7, 0.0, -7.6), 0.0],
+	]
+	for item in loose:
+		_add_prop(item[0], item[1], item[2], false)
+	# A burnt-out car shoved against the attacker spawn wall.
+	_add_prop("covered_car", Vector3(-7.0, 0.0, 43.2), 90.0)
+	_build_war_atmosphere()
+
 	# Wall-mounted units, out of reach
 	_add_prop("exterior_aircon_unit", Vector3(4.0, 3.2, -13.8), 0.0, false)
 	_add_prop("exterior_aircon_unit", Vector3(-4.8, 3.6, 20.0), -90.0, false)
@@ -264,3 +283,25 @@ func _build_sites_and_signs() -> void:
 	add_sign("< B", Vector3(4.0, 3.0, -32.05), 180.0, SIGN_COLOUR, 1.4)
 	add_sign("A MAIN", Vector3(-26.95, 3.0, -5.5), 90.0, SIGN_COLOUR, 1.0)
 	add_sign("B MAIN", Vector3(26.95, 3.0, -3.0), -90.0, SIGN_COLOUR, 1.0)
+
+
+## Fires, smoke on the horizon, blast marks: the fight has been going on here
+## for a while.
+func _build_war_atmosphere() -> void:
+	# Fire barrels in the spawns and at the back of each site.
+	for at in [Vector3(9.5, 0.0, 34.0), Vector3(-9.8, 0.0, -37.4), Vector3(-30.9, 0.0, -21.5),
+			Vector3(30.9, 0.0, -18.0)]:
+		var barrel := _add_prop("barrel_stove", at, randf() * 360.0)
+		if barrel != null:
+			var top := _mesh_bounds(barrel.get_child(0) as Node3D)
+			atmosphere.add_fire(at + Vector3(0, top.end.y + 0.05, 0), 0.4)
+	for column in [[Vector3(-58, 0, -72), 1.8], [Vector3(64, 0, -22), 1.4], [Vector3(-56, 0, 48), 1.3],
+			[Vector3(38, 0, 78), 1.6], [Vector3(72, 0, 44), 1.1]]:
+		atmosphere.add_smoke_column(column[0], column[1])
+	for scorch in [[Vector3(-20, 0, -14), 3.5], [Vector3(21, 0, -26), 3.0], [Vector3(1, 0, 4), 4.0],
+			[Vector3(-25, 0, 8), 2.6], [Vector3(24, 0, 20), 3.2], [Vector3(-3, 0, 28), 2.4],
+			[Vector3(6, 0, -34), 2.8], [Vector3(-14, 0, -24), 2.0]]:
+		atmosphere.add_scorch(scorch[0], scorch[1])
+	for stain in [[Vector3(10.4, 0, 38.8), 1.8], [Vector3(-10.3, 0, -38.4), 1.6], [Vector3(-2, 0, 18), 2.2],
+			[Vector3(17, 0, -30), 1.5]]:
+		atmosphere.add_scorch(stain[0], stain[1], true)

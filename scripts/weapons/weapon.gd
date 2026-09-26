@@ -459,8 +459,28 @@ func _try_fire() -> bool:
 
 	_flash_muzzle()
 	_request_recoil()
+	_eject_casing()
 	fired.emit()
 	return true
+
+
+## Throws a spent case out of the right side of the viewmodel, on the machine
+## that can see it.
+func _eject_casing() -> void:
+	if data == null or data.is_melee or _viewmodel == null or not _viewmodel.is_visible_in_tree():
+		return
+	var parent := get_tree().get_first_node_in_group(&"match_scene")
+	if parent == null:
+		parent = get_tree().current_scene
+	if parent == null:
+		return
+	var port := (_sight_position if _has_sight else Vector3(0.1, -0.1, -0.2)) + Vector3(0.025, -0.03, 0.07)
+	var basis := global_basis
+	var velocity := basis * Vector3(randf_range(1.6, 2.4), randf_range(1.2, 1.9), randf_range(0.0, 0.5))
+	if shooter is CharacterBody3D:
+		velocity += (shooter as CharacterBody3D).velocity
+	ShellCasing.spawn(parent, Transform3D(basis, global_transform * port), velocity,
+		data.category == WeaponData.Category.PISTOL)
 
 
 ## The knife's alternate attack: a slower, harder stab. Returns whether it

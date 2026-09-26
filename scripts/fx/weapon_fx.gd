@@ -103,6 +103,7 @@ func _on_shot_fired(origin: Vector3, direction: Vector3) -> void:
 		Audio.play(&"knife_heavy" if _weapon.melee_heavy else &"knife_swing", -2.0, 0.08)
 		return
 	Audio.play(_shot_sound(), -3.0, 0.05)
+	_echo(false)
 	var end := origin + direction * _weapon.data.max_range
 	var space := get_world_3d().direct_space_state
 	if space != null:
@@ -128,6 +129,47 @@ func _shot_sound() -> StringName:
 	return &"shot_burst" if data.fire_mode == WeaponData.FireMode.BURST else &"shot_rifle"
 
 
+var _last_echo_ms: int = -1000
+
+
+## The shot rolling back off the walls: one tail at most every quarter second,
+## so a spray does not become a roar.
+func _echo(remote: bool, at := Vector3.ZERO) -> void:
+	var now := Time.get_ticks_msec()
+	if now - _last_echo_ms < 250:
+		return
+	_last_echo_ms = now
+	if remote:
+		Audio.play_at(&"shot_echo", at, 0.0, 0.1, 160.0)
+	else:
+		get_tree().create_timer(0.06).timeout.connect(func() -> void: Audio.play(&"shot_echo", -13.0, 0.1))
+
+
+## A round that passes close to this machine's player cracks past their head.
+func _crack_past_listener(from: Vector3, to: Vector3) -> void:
+	var me := NetworkManager.get_local_player()
+	if me == null or me == _player or not me.state.is_alive:
+		return
+	var eye := me.get_eye_position()
+	var segment := to - from
+	var t := clampf((eye - from).dot(segment) / maxf(segment.length_squared(), 0.0001), 0.0, 1.0)
+	var closest := from + segment * t
+	var miss := closest.distance_to(eye)
+	if miss < 3.0 and t > 0.02 and t < 0.999:
+		Audio.play_at(&"bullet_crack", closest, lerpf(0.0, -12.0, miss / 3.0), 0.15, 25.0)
+
+
+## A case falling from somebody else's gun.
+func _eject_remote_casing(muzzle: Vector3) -> void:
+	if _weapon == null or _weapon.data == null or _player == null:
+		return
+	var basis := _player.global_basis
+	var velocity := basis * Vector3(randf_range(1.5, 2.2), randf_range(1.0, 1.6), 0.2)
+	var at := muzzle + basis * Vector3(0.0, 0.0, 0.45)
+	ShellCasing.spawn(_effects_parent(), Transform3D(basis, at), velocity,
+		_weapon.data.category == WeaponData.Category.PISTOL)
+
+
 func _is_remote_shooter() -> bool:
 	return _player != null and _player.is_network_remote
 
@@ -148,6 +190,9 @@ func _spawn_tracer(to: Vector3, with_flash: bool) -> void:
 	if with_flash:
 		# Somebody else's shot: heard from where they are, so it can be located.
 		Audio.play_at(_shot_sound(), from, 2.0, 0.05, 110.0)
+		_echo(true, from)
+		_crack_past_listener(from, to)
+		_eject_remote_casing(from)
 	if from.distance_to(to) < 0.5:
 		return
 	var tracer := Tracer.new()

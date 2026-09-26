@@ -73,9 +73,9 @@ func build(team: int) -> void:
 		# mirrors the sky and turns the khaki blue-grey.
 		for i in mesh.mesh.get_surface_count():
 			var material := mesh.mesh.surface_get_material(i) as BaseMaterial3D
-			if material != null:
-				material.metallic = 0.0
-				material.roughness = 0.9
+			if material != null and material.albedo_texture != null:
+				mesh.set_surface_override_material(i, _field_kit(material.albedo_texture, team))
+
 
 	_player = AnimationPlayer.new()
 	_player.name = "AnimationPlayer"
@@ -111,6 +111,43 @@ func build(team: int) -> void:
 		_ik_targets.append(target)
 		_ik_targets.append(pole)
 	_dead = false
+
+
+## Camouflage per side: woodland greens for Alpha, desert tans for Bravo.
+const CAMO := {
+	Team.Side.ALPHA: [Color(0.3, 0.32, 0.2), Color(0.17, 0.19, 0.12), Color(0.4, 0.36, 0.26)],
+	Team.Side.BRAVO: [Color(0.72, 0.6, 0.42), Color(0.55, 0.43, 0.28), Color(0.82, 0.72, 0.55)],
+	Team.Side.NONE: [Color(0.4, 0.4, 0.36), Color(0.28, 0.28, 0.26), Color(0.5, 0.5, 0.46)],
+}
+static var _kit_cache: Dictionary = {}
+
+
+## The worn-kit material ([code]soldier_cloth.gdshader[/code]) over the
+## model's flat atlas: fabric weave, team camouflage, dust towards the boots.
+static func _field_kit(atlas: Texture2D, team: int) -> ShaderMaterial:
+	var key := "%s_%d" % [atlas.resource_path, team]
+	if _kit_cache.has(key):
+		return _kit_cache[key]
+	var material := ShaderMaterial.new()
+	material.shader = load("res://assets/shaders/soldier_cloth.gdshader")
+	material.set_shader_parameter(&"atlas", atlas)
+	material.set_shader_parameter(&"fabric_albedo", load("res://assets/materials/rough_linen/rough_linen_diff.jpg"))
+	material.set_shader_parameter(&"fabric_normal", load("res://assets/materials/rough_linen/rough_linen_nor_gl.jpg"))
+	var noise := NoiseTexture2D.new()
+	noise.seamless = true
+	noise.width = 256
+	noise.height = 256
+	var fast := FastNoiseLite.new()
+	fast.frequency = 0.02
+	fast.fractal_octaves = 3
+	noise.noise = fast
+	material.set_shader_parameter(&"camo_noise", noise)
+	var camo: Array = CAMO.get(team, CAMO[Team.Side.NONE])
+	material.set_shader_parameter(&"camo_a", camo[0])
+	material.set_shader_parameter(&"camo_b", camo[1])
+	material.set_shader_parameter(&"camo_c", camo[2])
+	_kit_cache[key] = material
+	return material
 
 
 static func _shared_library() -> AnimationLibrary:
