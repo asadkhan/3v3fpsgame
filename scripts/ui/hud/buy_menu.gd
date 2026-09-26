@@ -7,6 +7,7 @@ extends PanelContainer
 var _credits: Label
 var _grid: HBoxContainer
 var _cards: Dictionary = {}   # weapon_id -> Button
+var _shield_cards: Dictionary = {}   # shield id -> Button
 var _was_captured: bool = false
 
 var is_open: bool:
@@ -45,6 +46,21 @@ func _ready() -> void:
 		_grid.add_child(card)
 		_cards[data.weapon_id] = card
 
+	var shields := HBoxContainer.new()
+	shields.add_theme_constant_override(&"separation", 12)
+	column.add_child(shields)
+	for shield_id in PlayerLoadout.SHIELD_IDS:
+		var card := Button.new()
+		card.custom_minimum_size = Vector2(210, 70)
+		card.focus_mode = Control.FOCUS_NONE
+		card.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		card.text = "%s  (+%d)\n%d credits" % [PlayerLoadout.shield_name(shield_id).to_upper(),
+			PlayerLoadout.shield_amount(shield_id), PlayerLoadout.shield_price(shield_id)]
+		card.add_theme_color_override(&"font_color", UITheme.SHIELD)
+		card.pressed.connect(_on_shield_pressed.bind(shield_id))
+		shields.add_child(card)
+		_shield_cards[shield_id] = card
+
 	column.add_child(UITheme.label("Sidearm: Wren (always carried, key 2).  Weapons you survive with carry over.  B to close.",
 		UITheme.SIZE_SMALL, UITheme.TEXT_DIM, HORIZONTAL_ALIGNMENT_CENTER))
 
@@ -79,6 +95,17 @@ func update_view(player: Player) -> void:
 		var owned: bool = player.state.primary_id == weapon_id
 		card.disabled = not player.loadout.can_buy(data)
 		card.modulate = UITheme.GOOD if owned else Color.WHITE
+	for shield_id in _shield_cards:
+		var shield_card: Button = _shield_cards[shield_id]
+		shield_card.disabled = not player.loadout.can_buy_shield(shield_id)
+		var have: bool = player.state.shield >= PlayerLoadout.shield_amount(shield_id)
+		shield_card.modulate = UITheme.GOOD if have else Color.WHITE
+
+
+func _on_shield_pressed(shield_id: StringName) -> void:
+	var player := NetworkManager.get_local_player()
+	if player != null:
+		player.loadout.request_buy_shield(shield_id)
 
 
 func _on_card_pressed(weapon_id: StringName) -> void:

@@ -290,6 +290,10 @@ var net_position: Vector3 = Vector3.ZERO:
 
 var net_yaw: float = 0.0
 
+## The owner's view pitch in radians (recoil included), replicated for
+## spectators. See [SpectatorCamera].
+var net_pitch: float = 0.0
+
 ## Recent authoritative positions with the times they arrived.
 var _snapshot_times: PackedFloat32Array = PackedFloat32Array()
 var _snapshot_positions: PackedVector3Array = PackedVector3Array()
@@ -678,7 +682,9 @@ func _configure_replication() -> void:
 	# and remote players visibly stepped at 20 Hz. The setters on these two
 	# properties feed [method record_net_snapshot] instead. Both are world-space,
 	# so they mean the same thing on every machine regardless of parenting.
-	for property in [":net_position", ":net_yaw"]:
+	# [member net_pitch] rides along for spectators: a teammate watching
+	# through your eyes needs to see where you are looking, not just facing.
+	for property in [":net_position", ":net_yaw", ":net_pitch"]:
 		transform_config.add_property(NodePath(property))
 	_transform_sync.replication_config = transform_config
 
@@ -1053,6 +1059,23 @@ var objective_lock: bool = false
 # Chapter 3+ and the network layer talk to the player through these, not by
 # reaching into its internals.
 
+## Gives the screen back to this player's own camera - after spectating, for
+## instance. Does nothing for a body this machine does not drive.
+func make_view_current() -> void:
+	if not is_network_remote:
+		_camera.make_current()
+
+
+## Where a spectator watching this player should put the camera: at the eyes,
+## facing where this player faces and looks. Uses the replicated values, so it
+## is correct for remote bodies, and the live ones for the local body.
+func get_spectator_view() -> Transform3D:
+	var yaw := net_yaw if is_network_remote else rotation.y
+	var pitch := net_pitch if is_network_remote else _head.rotation.x
+	var basis := Basis.from_euler(Vector3(pitch, yaw, 0.0))
+	return Transform3D(basis, _head.global_position)
+
+
 ## Current coarse state, derived rather than stored. Deriving it means it can
 ## never disagree with what the body is actually doing.
 func get_movement_state() -> MovementState:
@@ -1306,6 +1329,8 @@ func _sync_state_from_network() -> void:
 		_apply_team_colour()
 
 	if net_health == state.health and net_alive == state.is_alive:
+		# Shield or scoreboard change only; still worth telling the HUD.
+		health_changed.emit(state.health, state.is_alive)
 		return
 
 	state.health = net_health
@@ -1551,7 +1576,7 @@ func _publish_net_state(broadcast: bool = true) -> void:
 	if not NetworkManager.is_online or not broadcast:
 		return
 	NetworkManager.players.record_health(peer_id, state.health, state.is_alive)
-	_net_state_receive.rpc(net_health, net_alive, net_team, state.kills, state.deaths, state.credits)
+	_net_state_receive.rpc(net_health, net_alive, net_team, state.kills, state.deaths, state.credits, state.shield)
 
 
 ## Applies the host's authoritative word about a body's health, team and death.
@@ -1572,7 +1597,7 @@ func _publish_net_state(broadcast: bool = true) -> void:
 ## authority this chapter exists to take away. Sender identity is the
 ## verifiable thing, and it is verified.
 @rpc("any_peer", "call_remote", "reliable")
-func _net_state_receive(health_value: int, alive: bool, side: int, kills: int, deaths: int, credits: int) -> void:
+func _net_state_receive(health_value: int, alive: bool, side: int, kills: int, deaths: int, credits: int, shield: int) -> void:
 	if multiplayer.get_remote_sender_id() != NetworkManager.SERVER_PEER_ID:
 		return
 
@@ -1580,6 +1605,7 @@ func _net_state_receive(health_value: int, alive: bool, side: int, kills: int, d
 	state.kills = kills
 	state.deaths = deaths
 	state.credits = credits
+	state.shield = shield
 
 	net_health = health_value
 	net_alive = alive
@@ -1864,6 +1890,7 @@ func _physics_process(delta: float) -> void:
 func _write_net_transform() -> void:
 	net_position = global_position
 	net_yaw = rotation.y
+	net_pitch = _head.rotation.x
 
 
 func _read_input() -> void:

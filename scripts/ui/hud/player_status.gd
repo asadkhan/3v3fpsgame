@@ -6,6 +6,8 @@ extends Control
 
 var _health: Label
 var _health_bar: ProgressBar
+var _shield: Label
+var _shield_bar: ProgressBar
 var _name: Label
 var _ability_key: Label
 var _ability_fill: ProgressBar
@@ -47,7 +49,17 @@ func _build_left() -> void:
 	add_child(_credits)
 	_health_bar = _bar(UITheme.TEXT)
 	health_column.add_child(_name)
-	health_column.add_child(_health)
+	var numbers := HBoxContainer.new()
+	numbers.add_theme_constant_override(&"separation", 12)
+	numbers.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	health_column.add_child(numbers)
+	numbers.add_child(_health)
+	_shield = UITheme.label("", UITheme.SIZE_LARGE, UITheme.SHIELD)
+	_shield.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	numbers.add_child(_shield)
+	_shield_bar = _bar(UITheme.SHIELD)
+	_shield_bar.custom_minimum_size = Vector2(0, 4)
+	health_column.add_child(_shield_bar)
 	health_column.add_child(_health_bar)
 
 	var ability := VBoxContainer.new()
@@ -108,13 +120,19 @@ func _bar(colour: Color) -> ProgressBar:
 	return bar
 
 
-func update_view(player: Player) -> void:
+## [param spectating]: [param player] is a teammate being watched, not this
+## machine's own body - so its credits, loadout and ammo are not known here.
+func update_view(player: Player, spectating: bool = false) -> void:
 	visible = player != null
 	if player == null:
 		return
 
 	var health := player.state.health
 	_name.text = "%s  -  %s" % [player.state.display_name, Team.side_name(player.state.team)]
+	var shield := player.state.shield
+	_shield.text = "+%d" % shield if shield > 0 else ""
+	_shield_bar.visible = shield > 0
+	_shield_bar.value = float(shield) / float(maxi(GameManager.match_rules.heavy_shield_amount, 1))
 	_health.text = str(health)
 	_health_bar.value = float(health) / float(PlayerState.MAX_HEALTH)
 	var health_colour := UITheme.TEXT
@@ -136,6 +154,15 @@ func update_view(player: Player) -> void:
 			_ability_fill.value = 1.0
 		var ability_ready := not field.is_active and not field.is_on_cooldown()
 		_ability_key.add_theme_color_override(&"font_color", UITheme.ACCENT if ability_ready else UITheme.TEXT_DIM)
+
+	_credits.visible = not spectating
+	_slots.visible = not spectating
+	if spectating:
+		_weapon_name.text = player.weapon.data.display_name.to_upper() if player.weapon and player.weapon.data else ""
+		_ammo.text = "--"
+		_reserve.text = ""
+		_reload.text = ""
+		return
 
 	_credits.text = "%d CREDITS" % player.state.credits
 	var primary := player.loadout.primary_data()

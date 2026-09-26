@@ -27,6 +27,7 @@ var _match_end: HudMatchEndPanel
 var _pause: HudPauseMenu
 var _objective_prompt: HudObjectivePrompt
 var _buy: HudBuyMenu
+var _spectating: Label
 
 ## The player this machine drives, re-resolved each frame (bodies come and go).
 var _player: Player = null
@@ -54,6 +55,9 @@ func _ready() -> void:
 	_match_end = _add(HudMatchEndPanel.new(), "MatchEndPanel")
 	_pause = _add(HudPauseMenu.new(), "PauseMenu")
 	_buy = _add(HudBuyMenu.new(), "BuyMenu")
+	_spectating = UITheme.label("", UITheme.SIZE_BODY, UITheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
+	UITheme.pin(_spectating, Vector2(0.5, 1.0), -400, -200, 400, -170)
+	_add(_spectating, "SpectatingLabel")
 
 	GameManager.state_changed.connect(_on_phase_changed)
 
@@ -70,11 +74,18 @@ func _process(delta: float) -> void:
 	_announcer.local_team = team
 	_announcer.local_peer = _player.peer_id if _player != null else 0
 
-	_crosshair.visible = _player != null and _player.state.is_alive \
+	var spectator := get_tree().get_first_node_in_group(SpectatorCamera.GROUP) as SpectatorCamera
+	var spectating := spectator != null and spectator.is_spectating()
+	_spectating.visible = spectating
+	if spectating:
+		_spectating.text = "SPECTATING  %s     -     click for next teammate" \
+			% spectator.target.state.display_name.to_upper()
+
+	_crosshair.visible = (spectating or (_player != null and _player.state.is_alive)) \
 		and not GameManager.is_in(GamePhase.Phase.MATCH_END)
 	_vignette.update_view(_player, delta)
 	_top_bar.update_view()
-	_status.update_view(_player)
+	_status.update_view(spectator.target if spectating else _player, spectating)
 	_scoreboard.visible = Input.is_action_pressed(&"scoreboard")
 	_announcer.visible = not _scoreboard.visible and not (_buy != null and _buy.is_open)
 	_lobby.update_view(delta)
@@ -118,11 +129,13 @@ func _track_local_player() -> void:
 	var current := NetworkManager.get_local_player()
 	if current != _player:
 		_player = current
-		_last_health = _player.state.health if _player != null else PlayerState.MAX_HEALTH
+		_last_health = (_player.state.health + _player.state.shield) if _player != null \
+			else PlayerState.MAX_HEALTH
 		return
 	if _player == null:
 		return
-	var health := _player.state.health
+	# Shield counts: losing shield is being hit too.
+	var health := _player.state.health + _player.state.shield
 	if health < _last_health:
 		_vignette.flash(float(_last_health - health))
 	_last_health = health
