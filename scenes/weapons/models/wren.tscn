@@ -1,0 +1,18 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/weapons/quaternius/Pistol_5.fbx" id="1_model"]
+
+[node name="WrenModel" type="Node3D"]
+position = Vector3(0.0, -0.03, -0.05)
+scale = Vector3(0.8, 0.8, 0.8)
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+rotation = Vector3(0, 1.5708, 0)
+scale = Vector3(0.16, 0.16, 0.16)
+
+[node name="Muzzle" type="Marker3D" parent="Model"]
+position = Vector3(1.45, 0.55, 0)
+
+[node name="Sight" type="Marker3D" parent="Model"]
+position = Vector3(0.3, 0.78, 0)
+

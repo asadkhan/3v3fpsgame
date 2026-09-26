@@ -96,6 +96,25 @@ func fire_interval_scale() -> float:
 
 
 ## How far to move the viewmodel from its hip position.
+##
+## With a model that has a Sight marker, the offset is computed so the sight
+## ends up on the centre of the screen at [member WeaponData.ads_sight_distance]
+## in front of the eye - so a new model lines up without hand-tuning. The
+## weapon mount sits at the eye, so centring the sight is just cancelling its
+## sideways and vertical position.
 func viewmodel_offset() -> Vector3:
 	var data := _data()
-	return data.ads_viewmodel_offset * amount if data != null else Vector3.ZERO
+	if data == null:
+		return Vector3.ZERO
+	var sight: Variant = _player.weapon.get_sight_position()
+	if sight != null:
+		var at: Vector3 = sight
+		return Vector3(-at.x, -at.y, -data.ads_sight_distance - at.z) * amount
+	return data.ads_viewmodel_offset * amount
+
+
+## Whether the view is fully through a magnified scope: the model hides and the
+## HUD draws the scope overlay.
+func is_scoped() -> bool:
+	var data := _data()
+	return data != null and data.scope_overlay and amount > 0.92

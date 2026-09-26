@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="WeaponData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="WeaponData" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1_weapon_data"]
+[ext_resource type="PackedScene" path="res://scenes/weapons/models/harrier.tscn" id="2_model"]
 
 [resource]
 script = ExtResource("1_weapon_data")
@@ -24,9 +25,12 @@ recoil_recovery_degrees = 50.0
 viewmodel_kick = 0.05
 move_speed_multiplier = 0.92
 blocks_sprint = false
-ads_zoom = 1.25
+ads_zoom = 1.8
 ads_time = 0.16
 ads_spread_multiplier = 0.4
 ads_recoil_multiplier = 0.8
 ads_move_multiplier = 0.76
 ads_fire_interval_multiplier = 1.0
+viewmodel_scene = ExtResource("2_model")
+scope_overlay = true
+ads_sight_distance = 0.18

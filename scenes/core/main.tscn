@@ -1,9 +1,9 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://b03pgbil6h842"]
 
-[ext_resource type="Script" path="res://scripts/core/main.gd" id="1_main"]
+[ext_resource type="Script" uid="uid://bxhbfuv13a46x" path="res://scripts/core/main.gd" id="1_main"]
 
-[node name="Main" type="Node"]
+[node name="Main" type="Node" unique_id=1384047286]
 script = ExtResource("1_main")
 
-[node name="ScreenHost" type="Node" parent="."]
+[node name="ScreenHost" type="Node" parent="." unique_id=1245444613]
 unique_name_in_owner = true
