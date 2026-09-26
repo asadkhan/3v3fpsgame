@@ -1,0 +1,23 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/weapons/quaternius/AssaultRifle2_1.fbx" id="1_model"]
+[ext_resource type="PackedScene" path="res://assets/weapons/quaternius/Accessories/Grip.fbx" id="2_grip"]
+[ext_resource type="PackedScene" path="res://assets/weapons/quaternius/Accessories/Flashlight.fbx" id="3_light"]
+[node name="KestrelModel" type="Node3D"]
+position = Vector3(0.03, -0.05, -0.09)
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+rotation = Vector3(0, 1.5708, 0)
+scale = Vector3(0.16, 0.16, 0.16)
+
+[node name="Muzzle" type="Marker3D" parent="Model"]
+position = Vector3(3.61, 0.64, 0)
+
+[node name="Sight" type="Marker3D" parent="Model"]
+position = Vector3(0, 1.02, 0)
+
+[node name="Grip" parent="Model" instance=ExtResource("2_grip")]
+position = Vector3(2.0, 0.04, 0)
+
+[node name="Flashlight" parent="Model" instance=ExtResource("3_light")]
+position = Vector3(2.55, 0.62, 0.33)

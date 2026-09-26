@@ -187,6 +187,75 @@ func equip(p_data: WeaponData, p_shooter: CollisionObject3D) -> void:
 	_cooldown_left = 0.0
 	_burst_left = 0
 	_emit_ammo_changed()
+	_apply_model()
+
+
+# --- Model ----------------------------------------------------------------------
+
+## The model currently shown, built from [member WeaponData.viewmodel_scene].
+var _model: Node3D = null
+var _model_scene: PackedScene = null
+
+## Where the model's Sight marker is, in this node's space. See
+## [method get_sight_position].
+var _sight_position: Vector3 = Vector3.ZERO
+var _has_sight: bool = false
+
+## The placeholder block rifle, kept for weapons without a model.
+@onready var _viewmodel: Node3D = $ViewModel if has_node("ViewModel") else null
+var _placeholder_parts: Array[Node] = []
+
+
+## Swaps in the equipped weapon's model and moves the muzzle to its barrel.
+func _apply_model() -> void:
+	var scene := data.viewmodel_scene if data != null else null
+	if scene == _model_scene or _viewmodel == null:
+		return
+	_model_scene = scene
+	if _placeholder_parts.is_empty():
+		for child in _viewmodel.get_children():
+			if child is MeshInstance3D:
+				_placeholder_parts.append(child)
+	if _model != null:
+		_viewmodel.remove_child(_model)
+		_model.queue_free()
+		_model = null
+	_has_sight = false
+	for part in _placeholder_parts:
+		(part as Node3D).visible = scene == null
+	if scene == null:
+		return
+
+	_model = scene.instantiate() as Node3D
+	_viewmodel.add_child(_model)
+	# Shadows off: a viewmodel is drawn close to the camera and would throw a
+	# huge shadow of the gun across the world.
+	for mesh: GeometryInstance3D in _model.find_children("*", "GeometryInstance3D", true, false):
+		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var muzzle := _model.find_child("Muzzle", true, false) as Node3D
+	var sight := _model.find_child("Sight", true, false) as Node3D
+	if muzzle != null and is_inside_tree():
+		var at := to_local(muzzle.global_position)
+		if _muzzle_point != null:
+			_muzzle_point.position = at
+		if _muzzle_flash != null:
+			_muzzle_flash.position = at
+	if sight != null and is_inside_tree():
+		_sight_position = to_local(sight.global_position)
+		_has_sight = true
+
+
+## The sight's position in this node's space (which is the weapon mount's), or
+## null for a weapon without a Sight marker. [PlayerAim] lines it up with the
+## eye.
+func get_sight_position() -> Variant:
+	return _sight_position if _has_sight else null
+
+
+## Hides the model while looking through a scope, when it would fill the view.
+func set_model_hidden(hidden: bool) -> void:
+	if _viewmodel != null:
+		_viewmodel.visible = not hidden
 
 
 # --- Public queries -----------------------------------------------------

@@ -508,6 +508,7 @@ func _ready() -> void:
 		_viewmodel_rest = _weapon_mount.position
 
 	_equip_weapon()
+	weapon_changed.connect(func(_w: Weapon) -> void: _refresh_third_person_weapon())
 
 	# The head's rotation is derived, so it is written once here rather than
 	# waiting for the first physics frame with a stale zero.
@@ -730,6 +731,7 @@ func _apply_remote_appearance() -> void:
 	if _body_mesh != null:
 		_body_mesh.visible = true
 	_apply_team_colour()
+	_refresh_third_person_weapon()
 
 	# Nothing else needs to be done to stop a remote body being simulated: the
 	# physics is skipped entirely in [method _physics_process], so nothing ever
@@ -841,6 +843,12 @@ func _apply_aim() -> void:
 	_camera.fov = GameConfig.field_of_view * view_feel.fov_scale() / aim.zoom()
 	if weapon != null:
 		weapon.fire_interval_scale = aim.fire_interval_scale()
+		weapon.set_model_hidden(aim.is_scoped())
+
+
+## Looking through a magnified scope right now. For the HUD's scope overlay.
+func is_scoped() -> bool:
+	return not is_network_remote and aim.is_scoped()
 
 
 ## How far into aiming down sights this player is, 0 to 1. For the HUD.
@@ -1186,6 +1194,41 @@ func _update_footsteps(delta: float) -> void:
 		Audio.play(&"step", -14.0, 0.12)
 
 
+# --- Third-person weapon ---------------------------------------------------------
+
+## Where the gun sits relative to a remote player's head: low and to the right,
+## as if held at the shoulder. Follows the replicated pitch with the head.
+const THIRD_PERSON_WEAPON_OFFSET := Vector3(0.24, -0.34, -0.12)
+
+var _third_person_weapon: Node3D = null
+var _third_person_scene: PackedScene = null
+
+
+## Puts the held weapon's model in a remote player's hands, so everyone else
+## sees what they are carrying. The local player never sees their own (the
+## first-person viewmodel does that job).
+func _refresh_third_person_weapon() -> void:
+	if not is_network_remote or not is_inside_tree():
+		return
+	var scene: PackedScene = weapon.data.viewmodel_scene if weapon != null and weapon.data != null else null
+	if scene == _third_person_scene and _third_person_weapon != null:
+		return
+	_third_person_scene = scene
+	if _third_person_weapon != null:
+		# Detached first, so the replacement can take the same node name now
+		# rather than being renamed while the old one waits to be freed.
+		_head.remove_child(_third_person_weapon)
+		_third_person_weapon.queue_free()
+		_third_person_weapon = null
+	if scene == null:
+		return
+	_third_person_weapon = scene.instantiate() as Node3D
+	_third_person_weapon.name = "ThirdPersonWeapon"
+	_third_person_weapon.position = THIRD_PERSON_WEAPON_OFFSET
+	_head.add_child(_third_person_weapon)
+	_third_person_weapon.visible = state.is_alive
+
+
 ## Gives the screen back to this player's own camera - after spectating, for
 ## instance. Does nothing for a body this machine does not drive.
 func make_view_current() -> void:
@@ -1498,6 +1541,8 @@ func _begin_death_presentation(source: Node) -> void:
 
 	_is_dying = true
 	aim.reset()
+	if _third_person_weapon != null:
+		_third_person_weapon.visible = false
 	_death_tilt = 0.0
 	_death_eye_start = _head.position.y
 	_apply_view()
@@ -1591,6 +1636,8 @@ func respawn() -> void:
 func _reset_life_presentation() -> void:
 	_is_dying = false
 	aim.reset()
+	if _third_person_weapon != null:
+		_third_person_weapon.visible = true
 	_offline_respawn_left = 0.0
 	_death_tilt = 0.0
 	_recoil_pitch = 0.0

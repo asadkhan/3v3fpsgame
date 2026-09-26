@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="WeaponData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="WeaponData" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1_weapon_data"]
+[ext_resource type="PackedScene" path="res://scenes/weapons/models/wren.tscn" id="2_model"]
 
 [resource]
 script = ExtResource("1_weapon_data")
@@ -30,3 +31,5 @@ ads_spread_multiplier = 0.6
 ads_recoil_multiplier = 0.85
 ads_move_multiplier = 0.85
 ads_fire_interval_multiplier = 1.0
+viewmodel_scene = ExtResource("2_model")
+ads_sight_distance = 0.32

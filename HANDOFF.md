@@ -4,7 +4,7 @@ Persistent project memory between AI coding agents. **Read this first, then
 `README.md`** (the README documents architecture and conventions per chapter).
 Verify claims against the code — this file describes intent as of its last update.
 
-_Last updated: 2026-09-26 — SIGNALFALL theme applied, natural weapon bob, and a full diagnostics pass (20 bugs fixed)._
+_Last updated: 2026-09-26 — real weapon models (Quaternius Ultimate Gun Pack, CC0) with accessories, auto sight alignment, scope overlay, third-person guns._
 
 ## Theme (keep everything consistent with this)
 
@@ -177,6 +177,29 @@ over localhost plus an offline run (Godot 4.7.2 headless, zero errors):
 18. Orphan `round_start_state.gd.uid` removed; README phase diagram, node tree and Kestrel table corrected.
 19. **Host view jumped above the map when a player joined** (user-reported). `player.tscn`'s camera was `current = true`, so each new body stole the view and releasing it passed it to the arena's `OverviewCamera`. Camera is now non-current in the scene; only the local body calls `make_current()`, remote bodies `clear_current(false)`; `Playtest` frees the overview camera. Verified with host + 2 clients, windowed.
 20. Clients freed departing players' bodies themselves, so the host's despawn then errored (`recv_nodes.has(net_id)`) → on a live client the spawner removes them.
+
+## Weapon models
+
+Source: Quaternius **Ultimate Gun Pack** (CC0), FBX, in
+`assets/weapons/quaternius/` (+ `Accessories/`). Models point along +X in
+large units; each weapon has a scene in `scenes/weapons/models/` that turns it
+to -Z, scales it by 0.16 (a rifle is ~0.83 m) and mounts accessories:
+
+| Weapon | Model | Accessories |
+|---|---|---|
+| Wren | Pistol_5 (root scaled 0.8) | - |
+| Swift | SubmachineGun_3 | Flashlight |
+| Harrier | AssaultRifle2_3 | Scope_3 (scope overlay, ADS zoom 1.8) |
+| Kestrel | AssaultRifle2_1 | Grip, Flashlight |
+
+Each scene has a `Muzzle` marker (tracers/flash start) and a `Sight` marker.
+`WeaponData.viewmodel_scene` points at it; `Weapon._apply_model()` swaps it in
+on equip; `PlayerAim.viewmodel_offset()` lines the Sight up with the eye at
+`WeaponData.ads_sight_distance` automatically. `WeaponData.scope_overlay`
+hides the model when fully aimed and shows `HudScopeOverlay`. Remote players
+carry the same model (`Player._refresh_third_person_weapon`, under the head,
+follows replicated pitch). To add a gun: make a model scene with Muzzle +
+Sight markers, point a WeaponData at it, tune the root position for hip framing.
 
 ## Diagnostics pass (2026-09-26)
 

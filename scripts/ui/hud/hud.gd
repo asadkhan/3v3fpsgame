@@ -28,6 +28,7 @@ var _pause: HudPauseMenu
 var _objective_prompt: HudObjectivePrompt
 var _buy: HudBuyMenu
 var _spectating: Label
+var _scope: HudScopeOverlay
 
 ## The player this machine drives, re-resolved each frame (bodies come and go).
 var _player: Player = null
@@ -43,6 +44,7 @@ func _ready() -> void:
 	_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_root)
 
+	_scope = _add(HudScopeOverlay.new(), "ScopeOverlay")
 	_vignette = _add(HudDamageVignette.new(), "DamageVignette")
 	_crosshair = _add(HudCrosshair.new(), "Crosshair")
 	_top_bar = _add(HudTopBar.new(), "TopBar")
@@ -83,6 +85,10 @@ func _process(delta: float) -> void:
 
 	_crosshair.visible = (spectating or (_player != null and _player.state.is_alive)) \
 		and not GameManager.is_in(GamePhase.Phase.MATCH_END)
+	_scope.update_view(_player if not spectating else null)
+	if _scope.visible:
+		# The scope has its own reticle.
+		_crosshair.visible = false
 	_crosshair.aim_amount = _player.get_aim_amount() if _player != null and not spectating else 0.0
 	_vignette.update_view(_player, delta)
 	_top_bar.update_view()

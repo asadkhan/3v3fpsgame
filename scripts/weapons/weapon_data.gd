@@ -194,6 +194,25 @@ enum Category {
 ## line up with the crosshair.
 @export var ads_viewmodel_offset: Vector3 = Vector3(-0.22, 0.03, 0.02)
 
+# --- Presentation -------------------------------------------------------------
+
+## The weapon's model scene (see [code]scenes/weapons/models/[/code]): the mesh
+## turned to point down -Z at real-world scale, with a [code]Muzzle[/code]
+## marker where tracers and the flash start and a [code]Sight[/code] marker
+## that aiming lines up with the eye. Used for the first-person viewmodel and
+## for the gun other players see in this player's hands. Null keeps the
+## placeholder block model.
+@export var viewmodel_scene: PackedScene
+
+## How far in front of the eye the [code]Sight[/code] marker sits when fully
+## aimed, in metres. With a Sight marker this replaces
+## [member ads_viewmodel_offset] - the alignment is computed from the model.
+@export_range(0.05, 0.6, 0.01) var ads_sight_distance: float = 0.26
+
+## Aiming shows a scope overlay (reticle and dark surround) and hides the
+## weapon model once fully aimed - for guns fitted with a magnified scope.
+@export var scope_overlay: bool = false
+
 
 ## Whether this weapon can be picked in a buy menu at all.
 func is_buyable() -> bool:
