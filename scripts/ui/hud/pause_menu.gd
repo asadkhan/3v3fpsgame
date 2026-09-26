@@ -9,6 +9,7 @@ var _sensitivity: HSlider
 var _sensitivity_value: Label
 var _fov: HSlider
 var _fov_value: Label
+var _aim_mode: Button
 
 
 func _ready() -> void:
@@ -44,6 +45,12 @@ func _ready() -> void:
 	_fov.value = GameConfig.field_of_view
 	_fov.value_changed.connect(_on_fov)
 	_refresh_values()
+
+	_aim_mode = Button.new()
+	_aim_mode.focus_mode = Control.FOCUS_NONE
+	_aim_mode.pressed.connect(_on_aim_mode)
+	column.add_child(_aim_mode)
+	_refresh_aim_mode()
 
 	var leave := Button.new()
 	leave.text = "LEAVE MATCH"
@@ -82,6 +89,15 @@ func _on_sensitivity(value: float) -> void:
 func _on_fov(value: float) -> void:
 	GameConfig.field_of_view = value
 	_refresh_values()
+
+
+func _on_aim_mode() -> void:
+	GameConfig.aim_toggle = not GameConfig.aim_toggle
+	_refresh_aim_mode()
+
+
+func _refresh_aim_mode() -> void:
+	_aim_mode.text = "AIM (right mouse):  %s" % ("TOGGLE" if GameConfig.aim_toggle else "HOLD")
 
 
 func _on_resume() -> void:

@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/weapons/rifle.tscn" id="2_rifle"]
@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/hit_marker.tscn" id="4_hitmarker"]
 [ext_resource type="PackedScene" path="res://scenes/game/echo_field.tscn" id="5_echo_field"]
 [ext_resource type="Script" path="res://scripts/player/player_loadout.gd" id="6_loadout"]
+[ext_resource type="Script" path="res://scripts/player/player_aim.gd" id="7_aim"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape_stand"]
 radius = 0.35
@@ -61,3 +62,6 @@ replication_interval = 0.05
 
 [node name="Loadout" type="Node" parent="."]
 script = ExtResource("6_loadout")
+
+[node name="Aim" type="Node" parent="."]
+script = ExtResource("7_aim")

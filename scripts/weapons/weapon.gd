@@ -135,6 +135,10 @@ var _trigger_held: bool = false
 ## client whether its shot was a hit, so the hit marker only flashes for one.
 var last_damage_dealt: float = 0.0
 
+## Multiplies the time between shots. Set every frame by the owning player from
+## how far into aiming down sights it is; 1.0 at the hip.
+var fire_interval_scale: float = 1.0
+
 ## Where the last shot ended, for the tracer and the impact effect.
 var _last_shot_end: Vector3 = Vector3.ZERO
 
@@ -238,8 +242,13 @@ func update_trigger(held: bool, just_pressed: bool, delta: float) -> void:
 ## every frame regardless of trigger state, so a reload finishes and a flash
 ## fades even with the trigger released.
 func _tick(delta: float) -> void:
-	if _cooldown_left > 0.0:
-		_cooldown_left = maxf(_cooldown_left - delta, 0.0)
+	# Allowed to run up to one frame below zero, and that overshoot is carried
+	# into the next shot's cooldown (see [method _try_fire]). Clamping at zero
+	# instead rounds every interval up to a whole number of physics frames:
+	# 0.09 s became 6 frames = 0.1 s, so a 667 RPM rifle fired at 600, and
+	# small fire-rate differences (such as aiming's) vanished entirely. The
+	# one-frame floor stops an idle weapon banking extra shots.
+	_cooldown_left = maxf(_cooldown_left - delta, -delta)
 	if _burst_timer > 0.0:
 		_burst_timer = maxf(_burst_timer - delta, 0.0)
 
@@ -278,7 +287,9 @@ func _try_fire() -> bool:
 		return false
 
 	ammo_in_magazine -= 1
-	_cooldown_left = data.fire_interval
+	# Scaled by aiming on the shots that start a new trigger pull; the rounds
+	# inside a burst keep the weapon's own rhythm.
+	_cooldown_left = data.fire_interval * fire_interval_scale + minf(_cooldown_left, 0.0)
 	if _burst_left > 0:
 		_burst_left -= 1
 		if _burst_left > 0:
@@ -434,8 +445,11 @@ func _finish_reload() -> void:
 ## A disc perpendicular to the aim, offset by the tangent of the cone angle,
 ## which is the standard cheap approximation of a cone. Random rather than a
 ## fixed pattern on purpose: a memorisable spray is another game's signature.
-func apply_spread(direction: Vector3) -> Vector3:
-	if data == null or data.spread_degrees <= 0.0:
+##
+## [param spread_scale] multiplies the cone - the player passes its aiming
+## bonus here, so the weapon itself stays unaware of ADS.
+func apply_spread(direction: Vector3, spread_scale: float = 1.0) -> Vector3:
+	if data == null or data.spread_degrees * spread_scale <= 0.0:
 		return direction
 
 	var up := Vector3.UP
@@ -444,7 +458,7 @@ func apply_spread(direction: Vector3) -> Vector3:
 	var right := direction.cross(up).normalized()
 	var real_up := right.cross(direction).normalized()
 
-	var radius := tan(deg_to_rad(data.spread_degrees))
+	var radius := tan(deg_to_rad(data.spread_degrees * spread_scale))
 	var offset := right * randf_range(-radius, radius) + real_up * randf_range(-radius, radius)
 	return (direction + offset).normalized()
 
