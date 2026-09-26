@@ -8,6 +8,7 @@
 position = Vector3(-0.02, 0.01, -0.16)
 script = ExtResource("1_script")
 material = ExtResource("3_mat")
+metadata/magazine = NodePath("Model/Sniper_Rifle/Magazine")
 
 [node name="Model" parent="." instance=ExtResource("2_model")]
 rotation = Vector3(-0.1826, 0, 0)

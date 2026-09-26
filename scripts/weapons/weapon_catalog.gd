@@ -8,6 +8,7 @@ extends RefCounted
 
 ## Always carried, never bought, never lost.
 const SIDEARM_ID := &"wren"
+const KNIFE_ID := &"knife"
 
 ## Buy-menu order.
 const PATHS := {
@@ -15,6 +16,7 @@ const PATHS := {
 	&"jackal": "res://data/weapons/jackal.tres",
 	&"halberd": "res://data/weapons/halberd.tres",
 	&"kestrel": "res://data/weapons/kestrel.tres",
+	&"knife": "res://data/weapons/knife.tres",
 }
 
 
@@ -27,6 +29,10 @@ static func find(weapon_id: StringName) -> WeaponData:
 
 static func sidearm() -> WeaponData:
 	return find(SIDEARM_ID)
+
+
+static func knife() -> WeaponData:
+	return find(KNIFE_ID)
 
 
 ## Primary weapons a player can buy, in menu order.

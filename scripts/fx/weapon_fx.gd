@@ -99,6 +99,9 @@ func _on_shot_resolved(at: Vector3, normal: Vector3, _victim: Player, zone: int,
 func _on_shot_fired(origin: Vector3, direction: Vector3) -> void:
 	if _weapon == null or _weapon.data == null:
 		return
+	if _weapon.data.is_melee:
+		Audio.play(&"knife_heavy" if _weapon.melee_heavy else &"knife_swing", -2.0, 0.08)
+		return
 	Audio.play(_shot_sound(), -3.0, 0.05)
 	var end := origin + direction * _weapon.data.max_range
 	var space := get_world_3d().direct_space_state
@@ -131,6 +134,11 @@ func _is_remote_shooter() -> bool:
 
 func _spawn_tracer(to: Vector3, with_flash: bool) -> void:
 	if _weapon == null:
+		return
+	if _weapon.data != null and _weapon.data.is_melee:
+		# Somebody else's knife: heard, not traced.
+		if with_flash:
+			Audio.play_at(&"knife_swing", _weapon.global_position, -2.0, 0.08, 25.0)
 		return
 	var from := _weapon.get_muzzle_position()
 	if with_flash:
@@ -167,11 +175,14 @@ func _spawn_impact(at: Vector3, normal: Vector3, zone: int, surface: int) -> voi
 	# It removes itself when it expires, so nothing has to remember to clean up.
 	_effects_parent().add_child(effect)
 	effect.setup(at, normal, zone, surface == Weapon.Surface.ENTITY)
+	var melee := _weapon != null and _weapon.data != null and _weapon.data.is_melee
+	if melee:
+		Audio.play_at(&"knife_hit" if surface == Weapon.Surface.ENTITY else &"knife_wall", at, 0.0, 0.06, 25.0)
 
 	_live += 1
 	effect.tree_exited.connect(_on_effect_freed)
 
-	if surface == Weapon.Surface.WORLD:
+	if surface == Weapon.Surface.WORLD and not melee:
 		var hole := BulletHole.new()
 		hole.setup(at, normal)
 		_effects_parent().add_child(hole)

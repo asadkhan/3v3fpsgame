@@ -114,6 +114,13 @@ func _build_library() -> void:
 	_library[&"reload_out"] = _click(0.08, 900.0, 0.8)
 	_library[&"reload_in"] = _click(0.1, 1300.0, 1.0)
 	_library[&"switch"] = _click(0.09, 700.0, 0.6)
+	_library[&"rack"] = _rack()
+	# Knife: air, steel, and what it meets.
+	_library[&"knife_swing"] = _whoosh(0.26, 700.0, 2600.0, 0.55)
+	_library[&"knife_heavy"] = _whoosh(0.4, 380.0, 1700.0, 0.7)
+	_library[&"knife_draw"] = _shing(0.55, 0.45)
+	_library[&"knife_hit"] = _thump(0.14, 110.0, 30.0, 0.9)
+	_library[&"knife_wall"] = _tones([[2650.0, 0.0, 0.2], [3980.0, 0.0, 0.14], [5310.0, 0.0, 0.08]], 0.3, 16.0, 0.5)
 
 	# Feedback on your own shots.
 	_library[&"hit_body"] = _tones([[1800.0, 0.0, 0.05]], 0.06, 60.0, 0.5)
@@ -271,6 +278,65 @@ func _sweep(from_hz: float, to_hz: float, seconds: float, gain: float) -> AudioS
 		var tremolo := 0.75 + 0.25 * sin(TAU * 18.0 * t)
 		var env := minf(t / 0.02, 1.0) * (1.0 - k)
 		samples[i] = sin(phase) * tremolo * env * gain
+	return _to_stream(samples)
+
+
+## Air torn by a blade: noise through a band that sweeps up and back down,
+## swelling and fading over [param seconds].
+func _whoosh(seconds: float, low_hz: float, high_hz: float, gain: float) -> AudioStreamWAV:
+	var count := int(seconds * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var lp := 0.0
+	var lp2 := 0.0
+	for i in count:
+		var k := float(i) / count
+		var hz := lerpf(low_hz, high_hz, sin(PI * k))
+		var alpha := clampf(TAU * hz / RATE, 0.0, 1.0)
+		var noise := randf_range(-1.0, 1.0)
+		lp += (noise - lp) * alpha
+		lp2 += (lp - lp2) * alpha * 0.5
+		var env := pow(sin(PI * k), 1.6)
+		samples[i] = (lp - lp2) * env * gain * 3.0
+	return _to_stream(samples)
+
+
+## Steel drawn from a sheath: a short scrape, then ringing partials.
+func _shing(seconds: float, gain: float) -> AudioStreamWAV:
+	var count := int(seconds * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var hp := 0.0
+	var last := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		var noise := randf_range(-1.0, 1.0)
+		hp = 0.92 * (hp + noise - last)
+		last = noise
+		var scrape := hp * clampf(t / 0.12, 0.0, 1.0) * exp(-maxf(t - 0.12, 0.0) * 40.0) * 0.35
+		var ring := 0.0
+		if t > 0.1:
+			var r := t - 0.1
+			var partials := sin(TAU * 3120.0 * r) * 0.5 + sin(TAU * 4710.0 * r) * 0.3 + sin(TAU * 6240.0 * r) * 0.2
+			ring = partials * exp(-r * 7.0) * minf(r / 0.005, 1.0)
+		samples[i] = (scrape + ring * 0.5) * gain
+	return _to_stream(samples)
+
+
+## A charging handle: two sharp metal clacks, back and forward.
+func _rack() -> AudioStreamWAV:
+	var seconds := 0.3
+	var count := int(seconds * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	for i in count:
+		var t := float(i) / RATE
+		var v := 0.0
+		for at: float in [0.0, 0.16]:
+			if t >= at:
+				var r := t - at
+				v += (sin(TAU * 1450.0 * r) * 0.5 + randf_range(-1.0, 1.0) * 0.7) * exp(-r * 70.0)
+		samples[i] = v * 0.6
 	return _to_stream(samples)
 
 

@@ -8,6 +8,7 @@
 position = Vector3(0, -0.02, -0.1)
 script = ExtResource("1_script")
 material = ExtResource("3_mat")
+metadata/magazine = NodePath("Model/Body/Magazine")
 
 [node name="Model" parent="." instance=ExtResource("2_model")]
 
