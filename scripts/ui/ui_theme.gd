@@ -19,6 +19,7 @@ const TEXT_DIM := Color(0.66, 0.66, 0.68)
 const ACCENT := Color(1.0, 0.8, 0.3)
 const DANGER := Color(1.0, 0.3, 0.28)
 const GOOD := Color(0.45, 0.95, 0.6)
+const SHIELD := Color(0.45, 0.85, 1.0)
 
 const PANEL := Color(0.06, 0.07, 0.09, 0.78)
 const PANEL_LIGHT := Color(0.12, 0.13, 0.16, 0.9)

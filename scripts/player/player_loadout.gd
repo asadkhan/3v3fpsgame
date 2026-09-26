@@ -111,6 +111,60 @@ func _server_buy(sender: int, weapon_id: StringName) -> void:
 	_player._publish_net_state()
 
 
+# --- Shields ----------------------------------------------------------------
+
+const LIGHT_SHIELD := &"light_shield"
+const HEAVY_SHIELD := &"heavy_shield"
+const SHIELD_IDS: Array[StringName] = [LIGHT_SHIELD, HEAVY_SHIELD]
+
+
+static func shield_amount(shield_id: StringName) -> int:
+	var rules := GameManager.match_rules
+	return rules.heavy_shield_amount if shield_id == HEAVY_SHIELD else rules.light_shield_amount
+
+
+static func shield_price(shield_id: StringName) -> int:
+	var rules := GameManager.match_rules
+	return rules.heavy_shield_price if shield_id == HEAVY_SHIELD else rules.light_shield_price
+
+
+static func shield_name(shield_id: StringName) -> String:
+	return "Heavy Shield" if shield_id == HEAVY_SHIELD else "Light Shield"
+
+
+## A shield can be bought when it would actually raise the current shield.
+func can_buy_shield(shield_id: StringName) -> bool:
+	return shield_id in SHIELD_IDS \
+		and GameManager.is_in(GamePhase.Phase.BUY) \
+		and _player.state.is_alive \
+		and shield_amount(shield_id) > _player.state.shield \
+		and _player.state.credits >= shield_price(shield_id)
+
+
+func request_buy_shield(shield_id: StringName) -> void:
+	if _is_authority():
+		_server_buy_shield(_player.peer_id, shield_id)
+	else:
+		_rpc_buy_shield.rpc_id(NetworkManager.SERVER_PEER_ID, shield_id)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_buy_shield(shield_id: StringName) -> void:
+	if multiplayer.is_server():
+		_server_buy_shield(multiplayer.get_remote_sender_id(), shield_id)
+
+
+func _server_buy_shield(sender: int, shield_id: StringName) -> void:
+	if NetworkManager.is_online and sender != _player.peer_id:
+		return
+	if not can_buy_shield(shield_id):
+		return
+	_player.state.credits -= shield_price(shield_id)
+	_player.state.shield = shield_amount(shield_id)
+	_player._publish_net_state()
+	changed.emit()
+
+
 ## Host only: the player died, so the primary is gone.
 func server_on_death() -> void:
 	if has_primary():

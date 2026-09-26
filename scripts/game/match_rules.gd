@@ -76,6 +76,15 @@ const DEFAULT_PATH := "res://data/match_rules.tres"
 @export_range(0, 10) var loss_streak_cap: int = 2
 
 @export_range(0, 5000, 50) var kill_credits: int = 200
+
+# --- Shields ------------------------------------------------------------------
+# Shield points absorb damage before health. Kept if you survive the round,
+# lost on death, and cleared at half time.
+
+@export_range(0, 100) var light_shield_amount: int = 25
+@export_range(0, 5000, 50) var light_shield_price: int = 400
+@export_range(0, 100) var heavy_shield_amount: int = 50
+@export_range(0, 5000, 50) var heavy_shield_price: int = 1000
 @export_range(0, 5000, 50) var plant_credits: int = 300
 
 

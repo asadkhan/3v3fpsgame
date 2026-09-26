@@ -25,6 +25,10 @@ var team: int = Team.Side.NONE
 var health: int = MAX_HEALTH
 var is_alive: bool = true
 
+## Shield points, absorbed before [member health]. Bought in the buy phase;
+## kept across rounds while alive, lost on death. Not restored by [method respawn].
+var shield: int = 0
+
 ## Credits for the buy menu. Host-authoritative; mirrored to clients.
 var credits: int = 0
 
@@ -61,17 +65,22 @@ func is_on_team(p_team: int) -> bool:
 	return team == p_team
 
 
-## Applies damage and returns how much health was actually removed. A player
-## at 1 health hit for 30 still only loses 1, so the caller can tell the
-## difference between "nearly dead" and "dead".
+## Applies damage and returns how much was actually removed, shield and health
+## together. The shield soaks damage first; whatever is left comes off health.
+## A player at 1 health hit for 30 still only loses 1, so the caller can tell
+## the difference between "nearly dead" and "dead".
 func apply_damage(amount: float) -> float:
 	if not is_alive or amount <= 0.0:
 		return 0.0
+	var incoming := int(round(amount))
+	var absorbed := mini(shield, incoming)
+	shield -= absorbed
 	var before := health
-	health = maxi(0, health - int(round(amount)))
+	health = maxi(0, health - (incoming - absorbed))
 	if health == 0:
 		is_alive = false
-	return float(before - health)
+		shield = 0
+	return float(absorbed + before - health)
 
 
 ## Restores health, never above [constant MAX_HEALTH]. Does not revive.
@@ -104,6 +113,7 @@ func record_death() -> bool:
 		return false
 	_death_recorded = true
 	is_alive = false
+	shield = 0
 	deaths += 1
 	return true
 

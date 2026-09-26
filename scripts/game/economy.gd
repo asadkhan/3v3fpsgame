@@ -36,5 +36,6 @@ static func pay_round(winner: int) -> void:
 static func reset_for_half() -> void:
 	for player in NetworkManager.get_players():
 		player.state.credits = GameManager.match_rules.starting_credits
+		player.state.shield = 0
 		player.loadout.server_clear()
 		player._publish_net_state()

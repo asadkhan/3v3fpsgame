@@ -4,7 +4,7 @@ Persistent project memory between AI coding agents. **Read this first, then
 `README.md`** (the README documents architecture and conventions per chapter).
 Verify claims against the code — this file describes intent as of its last update.
 
-_Last updated: 2026-09-26 — objective (Signal Core), economy + buy menu, half-time side swap._
+_Last updated: 2026-09-26 — shields and teammate spectating added. Abilities beyond Echo Field: out of scope (user decision)._
 
 ---
 
@@ -20,6 +20,9 @@ _Last updated: 2026-09-26 — objective (Signal Core), economy + buy menu, half-
   streak bonus), kills and plants. Four weapons (Wren sidearm free; Jackal,
   Halberd, Kestrel buyable), slots 1/2, primary lost on death. Sides swap after
   `rounds_to_win - 1` rounds with credits and guns reset. First to 5.
+  Shields: Light (+25, 400) / Heavy (+50, 1000), absorb damage before health,
+  kept while alive, lost on death, cleared at half. Dead players spectate a
+  living teammate after a 2 s death cam (click cycles).
 - **Next:** models / VFX / audio / animations (user's plan), then balancing.
 
 ## Chapters
@@ -27,7 +30,7 @@ _Last updated: 2026-09-26 — objective (Signal Core), economy + buy menu, half-
 | Ch | Topic | Status |
 |----|-------|--------|
 | 1-4 | Foundation, controller, combat, multiplayer | ✅ Done |
-| 5 | Tactical round system | ✅ Objective, win conditions, economy, buy, side swap. (Possible later: overtime, shields/armour, weapon drops) |
+| 5 | Tactical round system | ✅ Objective, win conditions, economy, buy, shields, side swap, spectating. (Possible later: overtime, weapon drops) |
 | 6 | Unique mechanics | 🟡 Echo Field works (also detects plant/defuse activity); no echo display yet |
 | 7 | Map | 🟡 Meridian built and playable; needs human playtest tuning; blockout art |
 | 8 | UI / HUD / menus | ✅ Core done incl. buy menu, objective prompts, credits, slots. Missing: full settings screen, minimap |
@@ -91,6 +94,12 @@ _Last updated: 2026-09-26 — objective (Signal Core), economy + buy menu, half-
 - **Sides:** `MatchState.attacking_side()` derives attack/defence from the round
   number (ALPHA attacks first half). Spawns are by role: attackers at
   `AlphaSpawn`, defenders at `BravoSpawn`.
+- **Shields:** `PlayerState.shield` (soaked first in `PlayerState.apply_damage`),
+  amounts/prices in `MatchRules`, bought via `PlayerLoadout.request_buy_shield`,
+  replicated in the state RPC.
+- **Spectating:** `scripts/game/spectator_camera.gd` (node `Spectator` in
+  `playtest.tscn`). Local only; follows `Player.get_spectator_view()` using the
+  replicated `net_position` / `net_yaw` / `net_pitch`. Teammates only.
 - RPC rule used throughout: host→client messages on client-owned nodes are
   `any_peer` + `get_remote_sender_id() == SERVER_PEER_ID`, never `authority`.
 

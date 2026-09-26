@@ -21,3 +21,7 @@ loss_streak_bonus = 500
 loss_streak_cap = 2
 kill_credits = 200
 plant_credits = 300
+light_shield_amount = 25
+light_shield_price = 400
+heavy_shield_amount = 50
+heavy_shield_price = 1000
