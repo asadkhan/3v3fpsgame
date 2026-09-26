@@ -201,6 +201,18 @@ carry the same model (`Player._refresh_third_person_weapon`, under the head,
 follows replicated pitch). To add a gun: make a model scene with Muzzle +
 Sight markers, point a WeaponData at it, tune the root position for hip framing.
 
+**First-person arms** (`scripts/weapons/viewmodel_arms.gd`, `ViewmodelArms`):
+built in code from primitives (no art assets) - sleeves with folds, strap and
+pouch, elbow pads, velcro patch, wrist band with amber tab, and hard-knuckle
+gloves whose fingers wrap the grip. `Weapon._apply_model()` adds them under the
+viewmodel. Each model scene places the hands with `HandR` / `HandL` markers
+(children of `Model`) carrying metadata `grip` (`pistol` / `vertical` / `rail`),
+`radius` (thickness held, metres) and optional `hand_scale`; the shoulders are
+fixed below the camera and each arm reaches its hand with two-bone IK. Sleeves
+take the team colour (Alpha blue-grey, Bravo tan). Local-only and rigid with
+the gun (no hand animation for reload yet). Swap for a skinned arm model later
+if real art arrives - only the markers need to stay.
+
 ## Diagnostics pass (2026-09-26)
 
 Two code reviews plus scripted 3-player matches (buy, shields, plant/defuse,
