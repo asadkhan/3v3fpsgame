@@ -365,8 +365,12 @@ var _shot_budget: float = SHOT_BURST_ALLOWANCE
 ## The furthest the camera can be pushed off the player's true aim by recoil
 ## alone, in degrees. A cap rather than an unbounded accumulator, so a long burst
 ## cannot walk the view somewhere the player cannot pull it back from.
-@export var max_recoil_pitch_degrees: float = 6.0
-@export var max_recoil_yaw_degrees: float = 3.0
+@export var max_recoil_pitch_degrees: float = 12.0
+@export var max_recoil_yaw_degrees: float = 5.0
+
+## Seconds after a shot before the camera starts settling back (at least 1.6
+## fire intervals), so a spray climbs instead of fighting its own recovery.
+const RECOIL_RECOVERY_DELAY := 0.12
 
 ## How long the camera takes to fall to the floor after death, in seconds.
 @export var death_camera_fall_seconds: float = 1.1
@@ -388,6 +392,13 @@ var _look_pitch: float = 0.0
 ## Current recoil offset, in degrees, applied on top of [member _look_pitch].
 var _recoil_pitch: float = 0.0
 var _recoil_yaw: float = 0.0
+var _since_recoil: float = 99.0
+## Per-shot camera shake: a decaying random roll and nudge, in degrees.
+var _shake: float = 0.0
+var _shake_roll: float = 0.0
+var _shake_pitch: float = 0.0
+## The gun rearing up in the hands, 1 right after a shot, back to 0.
+var _viewmodel_rear: float = 0.0
 
 ## How far through the death camera fall the player is, 0 to 1.
 var _death_tilt: float = 0.0
@@ -826,14 +837,21 @@ func _update_viewmodel_kick(delta: float) -> void:
 		return
 
 	_viewmodel_kick = maxf(_viewmodel_kick - delta * VIEWMODEL_KICK_RECOVERY, 0.0)
+	_viewmodel_rear = maxf(_viewmodel_rear - delta * 7.0, 0.0)
 	var distance := 0.0
+	var rear_degrees := 0.0
 	if weapon != null and weapon.data != null:
 		distance = weapon.data.viewmodel_kick
+		rear_degrees = weapon.data.viewmodel_kick_degrees
 	# Positive z is back towards the camera, which is what "kicking" means.
 	# Aimed, the kick is smaller - the steadier hold is part of what aiming buys.
-	var kick := _viewmodel_kick * distance * aim.recoil_scale()
-	_weapon_mount.position = _viewmodel_rest + aim.viewmodel_offset() + Vector3(0.0, 0.0, kick) 		+ view_feel.weapon_offset()
-	_weapon_mount.rotation = view_feel.weapon_rotation()
+	var steady := aim.recoil_scale()
+	var kick := _viewmodel_kick * distance * steady
+	# The muzzle rears up and settles on an eased curve: sharp, then slow.
+	var rear := deg_to_rad(rear_degrees) * _viewmodel_rear * _viewmodel_rear * steady
+	_weapon_mount.position = _viewmodel_rest + aim.viewmodel_offset() + Vector3(0.0, rear * 0.03, kick) \
+		+ view_feel.weapon_offset()
+	_weapon_mount.rotation = view_feel.weapon_rotation() + Vector3(rear, 0.0, -rear * 0.25)
 
 
 ## Applies the aim to everything outside the weapon's own numbers: the camera's
@@ -870,6 +888,7 @@ func _on_weapon_fired() -> void:
 	# Before this call existed `spread_degrees` was authored on every weapon and
 	# read by nothing, so every gun was perfectly accurate.
 	var direction := weapon.apply_spread(get_look_direction(), aim.spread_scale())
+	direction = weapon.apply_spray(direction, aim.recoil_scale())
 	shot_fired.emit(origin, direction)
 
 	# Offline, this player is the whole authority and the raycast runs right
@@ -1078,6 +1097,12 @@ func _confirm_shot(point: Vector3, normal: Vector3, zone: int, victim_peer_id: i
 func _on_recoil_requested(_pitch_degrees: float, _yaw_degrees: float) -> void:
 	var steady := aim.recoil_scale()
 	add_recoil(_pitch_degrees * steady, _yaw_degrees * steady)
+	_since_recoil = 0.0
+	_viewmodel_rear = 1.0
+	var shake := weapon.data.camera_shake * steady if weapon != null and weapon.data != null else 0.0
+	_shake = 1.0
+	_shake_roll = randf_range(-1.0, 1.0) * shake
+	_shake_pitch = randf_range(0.3, 1.0) * shake
 	_apply_view()
 	_viewmodel_kick = 1.0
 
@@ -1948,21 +1973,39 @@ func _apply_view() -> void:
 	if _is_dying:
 		pitch = lerpf(pitch, deg_to_rad(78.0), _death_tilt)
 
-	# Recoil subtracts: a positive kick lifts the camera, and a positive x
-	# rotation looks down in Godot's right-handed Y-up basis.
-	_head.rotation.x = clampf(pitch - deg_to_rad(_recoil_pitch), -deg_to_rad(100.0), deg_to_rad(100.0))
-	_head.rotation.z = lerpf(_head.rotation.z, deg_to_rad(_recoil_yaw) * 0.6, 0.5)
-	_head.rotation.y = deg_to_rad(_recoil_yaw) * 0.4
+	# Recoil adds: a positive x rotation turns -Z towards +Y, i.e. looks up.
+	# (This used to subtract, which kicked every gun's view downwards.)
+	var shake := _shake * _shake * 0.5
+	_head.rotation.x = clampf(pitch + deg_to_rad(_recoil_pitch + _shake_pitch * shake),
+		-deg_to_rad(100.0), deg_to_rad(100.0))
+	_head.rotation.z = lerpf(_head.rotation.z, deg_to_rad(_recoil_yaw * 0.15 + _shake_roll * shake), 0.5)
+	# The whole horizontal kick turns the view, so the pattern's sway is where
+	# the crosshair goes.
+	_head.rotation.y = -deg_to_rad(_recoil_yaw)
 
 
 ## Recovers recoil, advances the death fall, and drives the weapon.
 func _update_combat(delta: float) -> void:
 	# Recoil recovery runs even while dead, so a player killed mid-burst does
 	# not leave the view stuck off-aim when they respawn.
-	if _recoil_pitch > 0.0:
-		_recoil_pitch = maxf(_recoil_pitch - recoil_recovery_degrees * delta, 0.0)
-	if _recoil_yaw != 0.0:
-		_recoil_yaw = move_toward(_recoil_yaw, 0.0, recoil_recovery_degrees * delta)
+	# The camera settles back once the trigger rests, at the weapon's own rate:
+	# a heavy rifle takes longer to come back down than an SMG.
+	_since_recoil += delta
+	var recovery := recoil_recovery_degrees
+	if weapon != null and weapon.data != null:
+		recovery = weapon.data.recoil_recovery_degrees
+	var hold := RECOIL_RECOVERY_DELAY
+	if weapon != null and weapon.data != null:
+		hold = maxf(hold, weapon.data.fire_interval * 1.6)
+	if _since_recoil > hold:
+		# Eased: fast while far off, gentle at the end.
+		var speed := recovery * (0.35 + 0.65 * clampf(_recoil_pitch / 4.0, 0.0, 1.0))
+		if _recoil_pitch > 0.0:
+			_recoil_pitch = maxf(_recoil_pitch - speed * delta, 0.0)
+		if _recoil_yaw != 0.0:
+			_recoil_yaw = move_toward(_recoil_yaw, 0.0, speed * delta)
+	if _shake > 0.0:
+		_shake = maxf(_shake - delta * 9.0, 0.0)
 
 	if _is_dying and _death_tilt < 1.0:
 		_death_tilt = minf(_death_tilt + delta / maxf(death_camera_fall_seconds, 0.01), 1.0)

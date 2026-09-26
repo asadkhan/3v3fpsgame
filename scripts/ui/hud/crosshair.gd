@@ -25,9 +25,18 @@ var aim_amount: float = 0.0:
 			queue_redraw()
 
 
+## Spray bloom in degrees from the held weapon; the lines open with it, so
+## the crosshair shows how much the spray has spread.
+var bloom: float = 0.0:
+	set(value):
+		if absf(value - bloom) > 0.01:
+			bloom = value
+			queue_redraw()
+
+
 func _draw() -> void:
 	var c := (size * 0.5).floor()
-	var gap := lerpf(GAP, GAP * 0.45, aim_amount)
+	var gap := lerpf(GAP, GAP * 0.45, aim_amount) + bloom * 6.0
 	var length := lerpf(LENGTH, LENGTH * 0.7, aim_amount)
 	var arms := [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]
 	for pass_index in 2:

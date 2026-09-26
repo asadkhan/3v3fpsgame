@@ -177,6 +177,14 @@ var _melee_pending: float = -1.0
 ## offers the hit to the host, and set on the host's copy before it resolves.
 var melee_heavy: bool = false
 
+## How far into a spray the next shot is (0 = the first round, fully accurate).
+## Falls back to 0 over [member WeaponData.recoil_reset_time] off the trigger.
+var spray_index: float = 0.0
+## The part of the recoil pattern the bullets take but the camera does not, in
+## degrees (pitch, yaw) - applied to the next shot's direction.
+var _spray_offset := Vector2.ZERO
+var _since_shot: float = 99.0
+
 
 # --- Lifecycle ----------------------------------------------------------
 
@@ -385,6 +393,10 @@ func _tick(delta: float) -> void:
 	# one-frame floor stops an idle weapon banking extra shots.
 	_cooldown_left = maxf(_cooldown_left - delta, -delta)
 	_draw_left = maxf(_draw_left - delta, 0.0)
+	_since_shot += delta
+	if data != null and spray_index > 0.0 and _since_shot > data.fire_interval * 1.2:
+		var rate := maxf(float(data.recoil_vertical_shots), 3.0) / data.recoil_reset_time
+		spray_index = maxf(spray_index - rate * delta, 0.0)
 	if _melee_pending >= 0.0:
 		_melee_pending -= delta
 		if _melee_pending < 0.0:
@@ -698,13 +710,53 @@ func _flash_muzzle() -> void:
 var _flash_mesh: MeshInstance3D = null
 
 
+## Advances the spray one round: the camera takes its share of the step along
+## the pattern (as a recoil kick), the bullets take the rest (as
+## [member _spray_offset]).
 func _request_recoil() -> void:
 	if data == null:
 		return
-	var pitch := data.recoil_kick_degrees
-	var yaw := randf_range(-data.recoil_yaw_degrees, data.recoil_yaw_degrees)
-	if pitch > 0.0 or yaw != 0.0:
-		recoil_requested.emit(pitch, yaw)
+	var from := data.recoil_pattern(spray_index)
+	spray_index += 1.0
+	_since_shot = 0.0
+	var to := data.recoil_pattern(spray_index)
+	var jitter := randf_range(-data.recoil_yaw_degrees, data.recoil_yaw_degrees)
+	var step := to - from + Vector2(0.0, jitter)
+	var view := data.recoil_view_fraction
+	_spray_offset = from * (1.0 - view)
+	recoil_requested.emit(step.x * view, step.y * view)
+
+
+## Applies the spray to a shot's direction: the pattern's off-camera share and
+## the bloom that grows with every round of the spray. The very first round of
+## a spray goes exactly where the crosshair is, as far as [member
+## WeaponData.spread_degrees] allows.
+func apply_spray(direction: Vector3, spread_scale: float = 1.0) -> Vector3:
+	if data == null:
+		return direction
+	var shot := maxf(spray_index - 1.0, 0.0)
+	var up := Vector3.UP
+	if absf(direction.normalized().dot(up)) > 0.99:
+		up = Vector3.RIGHT
+	var right := direction.cross(up).normalized()
+	var real_up := right.cross(direction).normalized()
+	var offset := _spray_offset * spread_scale
+	var out := direction.normalized() \
+		+ real_up * tan(deg_to_rad(offset.x)) + right * tan(deg_to_rad(offset.y))
+	var bloom := minf(shot * data.spray_bloom, data.spray_bloom_max) * spread_scale
+	if bloom > 0.0:
+		var radius := tan(deg_to_rad(bloom))
+		var angle := randf() * TAU
+		var r := radius * sqrt(randf())
+		out += right * cos(angle) * r + real_up * sin(angle) * r
+	return out.normalized()
+
+
+## Current spray bloom in degrees, for the crosshair.
+func get_bloom() -> float:
+	if data == null:
+		return 0.0
+	return minf(spray_index * data.spray_bloom, data.spray_bloom_max)
 
 
 func _emit_ammo_changed() -> void:

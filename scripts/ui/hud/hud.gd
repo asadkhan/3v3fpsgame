@@ -90,6 +90,7 @@ func _process(delta: float) -> void:
 		# The scope has its own reticle.
 		_crosshair.visible = false
 	_crosshair.aim_amount = _player.get_aim_amount() if _player != null and not spectating else 0.0
+	_crosshair.bloom = _player.weapon.get_bloom() if _player != null and not spectating and _player.weapon != null else 0.0
 	_vignette.update_view(_player, delta)
 	_top_bar.update_view()
 	_status.update_view(spectator.target if spectating else _player, spectating)

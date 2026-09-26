@@ -135,10 +135,30 @@ enum Category {
 ## [method Player.add_recoil].
 @export_range(0.0, 10.0, 0.05) var recoil_kick_degrees: float = 0.7
 
-## Random sideways kick per shot, in degrees. Small, and deliberately random
-## rather than a fixed pattern: a learnable spray pattern is another game's
-## signature, and this game should not have one.
+## Random sideways jitter per shot, in degrees, on top of the pattern.
 @export_range(0.0, 5.0, 0.05) var recoil_yaw_degrees: float = 0.25
+
+## The spray pattern (see [method recoil_pattern]). Learnable on purpose: the
+## first [member recoil_vertical_shots] rounds climb straight up by
+## [member recoil_kick_degrees] each, to at most [member recoil_max_pitch];
+## after that the spray sways side to side by up to [member recoil_sway_degrees]
+## in the same shape every time, so it can be learned and pulled against.
+@export_range(0, 30) var recoil_vertical_shots: int = 6
+@export_range(0.0, 20.0, 0.1) var recoil_max_pitch: float = 5.0
+@export_range(0.0, 10.0, 0.05) var recoil_sway_degrees: float = 1.2
+## How much of the pattern moves the camera; the rest moves the bullets away
+## from the crosshair, so a spray climbs above where the crosshair sits.
+@export_range(0.0, 1.0, 0.05) var recoil_view_fraction: float = 0.55
+## Seconds off the trigger for the pattern to reset to the first shot.
+@export_range(0.05, 2.0, 0.01) var recoil_reset_time: float = 0.35
+## Extra spread per round of a spray, in degrees, up to [member spray_bloom_max]
+## - the first shot is as accurate as [member spread_degrees] allows.
+@export_range(0.0, 2.0, 0.01) var spray_bloom: float = 0.1
+@export_range(0.0, 10.0, 0.05) var spray_bloom_max: float = 1.5
+## How hard the gun rears up in the hands per shot, in degrees, and how much the
+## camera shakes. The heavier the gun, the bigger both.
+@export_range(0.0, 20.0, 0.1) var viewmodel_kick_degrees: float = 3.0
+@export_range(0.0, 2.0, 0.05) var camera_shake: float = 0.3
 
 ## How quickly the camera returns to the player's true aim, in degrees per
 ## second. Fast recovery keeps a burst from permanently walking the view off
@@ -229,6 +249,17 @@ enum Category {
 
 
 ## Whether this weapon can be picked in a buy menu at all.
+## Where the [param shot]-th round of a spray goes (0 is the first), as
+## (pitch up, yaw right) in degrees off the aim.
+func recoil_pattern(shot: float) -> Vector2:
+	var climb := minf(shot, float(recoil_vertical_shots)) * recoil_kick_degrees
+	var over := maxf(shot - float(recoil_vertical_shots), 0.0)
+	var pitch := minf(climb + over * recoil_kick_degrees * 0.12, recoil_max_pitch)
+	# One slow swing each way then back, the same every spray: right first.
+	var yaw := recoil_sway_degrees * sin(over * 0.55) if over > 0.0 else 0.0
+	return Vector2(pitch, yaw)
+
+
 func is_buyable() -> bool:
 	return price > 0
 
