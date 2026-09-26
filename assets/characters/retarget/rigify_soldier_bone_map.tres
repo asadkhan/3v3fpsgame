@@ -1,0 +1,27 @@
+[gd_resource type="BoneMap" load_steps=2 format=3]
+
+[sub_resource type="SkeletonProfileHumanoid" id="1"]
+
+[resource]
+profile = SubResource("1")
+bone_map/Hips = &"DEF-pelvis"
+bone_map/Spine = &"DEF-spine"
+bone_map/Chest = &"DEF-Chest"
+bone_map/Neck = &"DEF-neck"
+bone_map/Head = &"DEF-head"
+bone_map/LeftShoulder = &"DEF-shoulder.L"
+bone_map/LeftUpperArm = &"DEF-arm.L"
+bone_map/LeftLowerArm = &"DEF-lowerarm.L"
+bone_map/LeftHand = &"DEF-hand.L"
+bone_map/LeftUpperLeg = &"DEF-leg.L"
+bone_map/LeftLowerLeg = &"DEF-shin-L"
+bone_map/LeftFoot = &"DEF-foot.L"
+bone_map/LeftToes = &"DEF-toes.L"
+bone_map/RightShoulder = &"DEF-shoulder.R"
+bone_map/RightUpperArm = &"DEF-arm.R"
+bone_map/RightLowerArm = &"DEF-lowerarm.R"
+bone_map/RightHand = &"DEF-hand.R"
+bone_map/RightUpperLeg = &"DEF-leg.R"
+bone_map/RightLowerLeg = &"DEF-shin-R"
+bone_map/RightFoot = &"DEF-foot.R"
+bone_map/RightToes = &"DEF-toes.R"

@@ -141,6 +141,10 @@ func _spawn_tracer(to: Vector3, with_flash: bool) -> void:
 			Audio.play_at(&"knife_swing", _weapon.global_position, -2.0, 0.08, 25.0)
 		return
 	var from := _weapon.get_muzzle_position()
+	if _player != null and _player.is_network_remote:
+		var held: Variant = _player.get_third_person_muzzle()
+		if held != null:
+			from = held
 	if with_flash:
 		# Somebody else's shot: heard from where they are, so it can be located.
 		Audio.play_at(_shot_sound(), from, 2.0, 0.05, 110.0)

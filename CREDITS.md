@@ -1,0 +1,32 @@
+# Credits
+
+Third-party assets used in SIGNALFALL. Everything not listed here was made for
+the project.
+
+## Attribution required (CC BY 3.0)
+
+- **"Military man"** and **"Solider"** by **madtrollstudio**
+  (https://poly.pizza/u/madtrollstudio), via Poly Pizza, licensed under
+  CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/). Used as the player
+  characters (`assets/characters/soldiers/`). The materials are adjusted and the
+  models are retargeted to a humanoid skeleton.
+
+## Public domain (CC0), credited with thanks
+
+- **Mesh2Motion** human base and addon animations
+  (https://github.com/Mesh2Motion/mesh2motion-app): player character
+  animations (`assets/characters/animations/`).
+- **Poly Haven** (https://polyhaven.com): environment textures, HDRI sky,
+  props, and the service pistol (Wren).
+- **"Free CC0 Guns & Explosives Pack"** (https://3dmodelscc0.itch.io/free-cc0-guns-explosives-pack):
+  the M4A1 (Kestrel), M3 Grease Gun (Swift), and scoped rifle (Harrier).
+- **"Kabar Combat knife"** by gamekorp (https://opengameart.org/content/kabar-combat-knife): the knife.
+- **Quaternius Ultimate Gun Pack** (https://quaternius.com): the earlier weapon
+  models and accessories, still in `assets/weapons/quaternius/`.
+
+## Other
+
+- **"First Person Hands with Gloves"** by rrfreelance
+  (https://rrfreelance.itch.io/first-person-hands-with-gloves): the
+  first-person hands. The asset is offered free, but its page states no
+  explicit licence. Confirm with the author before a commercial release.

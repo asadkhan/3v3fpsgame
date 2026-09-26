@@ -743,6 +743,7 @@ func _apply_remote_appearance() -> void:
 		_body_mesh.visible = true
 	_apply_team_colour()
 	_refresh_third_person_weapon()
+	_refresh_model()
 
 	# Nothing else needs to be done to stop a remote body being simulated: the
 	# physics is skipped entirely in [method _physics_process], so nothing ever
@@ -760,6 +761,8 @@ func _apply_remote_appearance() -> void:
 ## side is the cheapest possible answer and it is the reason the registry
 ## assigns a side at all.
 func _apply_team_colour() -> void:
+	if _model != null:
+		_refresh_model()
 	if _body_mesh == null:
 		return
 	var colour: Color = TEAM_COLOURS.get(state.team, TEAM_COLOURS[Team.Side.NONE])
@@ -1218,6 +1221,66 @@ func _update_footsteps(delta: float) -> void:
 		Audio.play(&"step", -14.0, 0.12)
 
 
+# --- Player model -----------------------------------------------------------------
+
+## The rigged soldier other players see ([PlayerModel]); null on the body this
+## machine plays, which is seen from inside.
+var _model: PlayerModel = null
+var _model_last_position := Vector3.ZERO
+var _model_velocity := Vector3.ZERO
+var _model_hidden: bool = false
+
+
+## Builds the soldier for a remote body, or swaps it when the side changes,
+## and retires the placeholder capsule.
+func _refresh_model() -> void:
+	if not is_network_remote or not is_inside_tree():
+		return
+	if _model == null:
+		_model = PlayerModel.new()
+		_model.name = "Model"
+		add_child(_model)
+		_model_last_position = global_position
+	_model.build(state.team)
+	if _body_mesh != null:
+		_body_mesh.visible = false
+	if not state.is_alive:
+		_model.play_death()
+
+
+## Hides this body's soldier - a spectator looking out through its eyes would
+## otherwise see the inside of the helmet.
+func set_model_hidden(hidden: bool) -> void:
+	if hidden == _model_hidden:
+		return
+	_model_hidden = hidden
+	if _model != null:
+		_model.visible = not hidden
+	if _third_person_weapon != null:
+		_third_person_weapon.visible = state.is_alive and not hidden
+
+
+## Feeds the soldier what the network says this body is doing.
+func _update_model(delta: float) -> void:
+	if _model == null or delta <= 0.0:
+		return
+	var raw := (global_position - _model_last_position) / delta
+	_model_last_position = global_position
+	_model_velocity = _model_velocity.lerp(raw, minf(1.0, delta * 12.0))
+	var local := global_basis.inverse() * _model_velocity
+	var airborne := absf(_model_velocity.y) > 1.2
+	_model.update(delta, Vector3(local.x, 0.0, local.z), 1.0 - _stance, airborne, _head.rotation.x,
+		_third_person_weapon if state.is_alive else null, walk_speed)
+
+
+## Where a remote player's shots appear to leave from: the held gun's muzzle.
+func get_third_person_muzzle() -> Variant:
+	if _third_person_weapon == null or not _third_person_weapon.visible:
+		return null
+	var muzzle := _third_person_weapon.find_child("Muzzle", true, false) as Node3D
+	return muzzle.global_position if muzzle != null else null
+
+
 # --- Third-person weapon ---------------------------------------------------------
 
 ## Where the gun sits relative to a remote player's head: low and to the right,
@@ -1582,9 +1645,12 @@ func _begin_death_presentation(source: Node) -> void:
 	# inside it. A corpse has no inside, and a corpse nobody can see is a death
 	# that only happened to the victim - so the mesh comes on here, already
 	# tinted with whatever side this player was on.
+	# A remote body falls as its soldier. The local player never sees its own
+	# body: the camera drops to the floor on its own.
+	if _model != null:
+		_model.play_death()
 	if _body_mesh != null:
-		_body_mesh.visible = true
-		_apply_team_colour()
+		_body_mesh.visible = false
 	if weapon != null:
 		weapon.cancel_reload()
 
@@ -1661,7 +1727,9 @@ func _reset_life_presentation() -> void:
 	_is_dying = false
 	aim.reset()
 	if _third_person_weapon != null:
-		_third_person_weapon.visible = true
+		_third_person_weapon.visible = not _model_hidden
+	if _model != null:
+		_model.revive()
 	_offline_respawn_left = 0.0
 	_death_tilt = 0.0
 	_recoil_pitch = 0.0
@@ -2084,6 +2152,7 @@ func _physics_process(delta: float) -> void:
 			_stance = move_toward(_stance, net_stance, stance_change_speed * delta)
 			_apply_stance()
 		_update_footsteps(delta)
+		_update_model(delta)
 		return
 
 	# Health, team and death are the host's and the host alone. The RPC handling

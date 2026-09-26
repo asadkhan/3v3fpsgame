@@ -41,6 +41,14 @@ func is_spectating() -> bool:
 
 
 func _process(delta: float) -> void:
+	_process_view(delta)
+	# The watched player's own soldier would fill the view from inside.
+	for player in NetworkManager.get_players():
+		if player != null and is_instance_valid(player):
+			player.set_model_hidden(is_spectating() and player == target)
+
+
+func _process_view(delta: float) -> void:
 	var local := NetworkManager.get_local_player()
 	if local == null or local.state.is_alive:
 		_dead_for = 0.0
