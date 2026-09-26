@@ -798,6 +798,7 @@ func _set_weapon_visible(visible_now: bool) -> void:
 	# gun jammed half way back.
 	_viewmodel_kick = 0.0
 	_weapon_mount.position = _viewmodel_rest
+	_weapon_mount.rotation = Vector3.ZERO
 
 
 ## Places the viewmodel: its rest position, moved towards the centre by aiming,
@@ -814,14 +815,15 @@ func _update_viewmodel_kick(delta: float) -> void:
 	# Positive z is back towards the camera, which is what "kicking" means.
 	# Aimed, the kick is smaller - the steadier hold is part of what aiming buys.
 	var kick := _viewmodel_kick * distance * aim.recoil_scale()
-	_weapon_mount.position = _viewmodel_rest + aim.viewmodel_offset() + Vector3(0.0, 0.0, kick)
+	_weapon_mount.position = _viewmodel_rest + aim.viewmodel_offset() + Vector3(0.0, 0.0, kick) 		+ view_feel.weapon_offset()
+	_weapon_mount.rotation = view_feel.weapon_rotation()
 
 
 ## Applies the aim to everything outside the weapon's own numbers: the camera's
 ## zoom and the weapon's fire interval. Movement, spread, recoil and mouse
 ## sensitivity read [member aim] where they are computed.
 func _apply_aim() -> void:
-	_camera.fov = GameConfig.field_of_view / aim.zoom()
+	_camera.fov = GameConfig.field_of_view * view_feel.fov_scale() / aim.zoom()
 	if weapon != null:
 		weapon.fire_interval_scale = aim.fire_interval_scale()
 
@@ -1068,6 +1070,9 @@ func _on_dry_fired() -> void:
 
 ## Aiming down sights. See [PlayerAim].
 @onready var aim: PlayerAim = $Aim
+
+## Weapon sway, bob, sprint pose and landing - cosmetic. See [PlayerViewFeel].
+@onready var view_feel: PlayerViewFeel = $ViewFeel
 
 ## Set by the objective while this player is planting or defusing: movement,
 ## jumping and firing stop, looking around does not.
@@ -1748,6 +1753,7 @@ func _look(motion: InputEventMouseMotion) -> void:
 	# the screen aimed as at the hip.
 	sensitivity /= aim.zoom()
 
+	view_feel.add_look(motion.relative)
 	var delta := motion.relative * sensitivity
 
 	# Yaw on the body so movement follows where the player is facing.
@@ -1909,6 +1915,9 @@ func _physics_process(delta: float) -> void:
 
 	_track_floor(delta)
 	_write_net_transform()
+	view_feel.update(delta, velocity, is_on_floor(), is_sprinting(), aim.amount)
+	_camera.position = view_feel.camera_offset()
+	_camera.rotation.z = view_feel.camera_roll()
 
 
 ## Copies this body's transform into the replicated properties. Only ever

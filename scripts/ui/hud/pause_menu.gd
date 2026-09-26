@@ -10,6 +10,7 @@ var _sensitivity_value: Label
 var _fov: HSlider
 var _fov_value: Label
 var _aim_mode: Button
+var _head_bob: Button
 
 
 func _ready() -> void:
@@ -50,6 +51,14 @@ func _ready() -> void:
 	_aim_mode.focus_mode = Control.FOCUS_NONE
 	_aim_mode.pressed.connect(_on_aim_mode)
 	column.add_child(_aim_mode)
+	_refresh_aim_mode()
+
+	_head_bob = Button.new()
+	_head_bob.focus_mode = Control.FOCUS_NONE
+	_head_bob.pressed.connect(func() -> void:
+		GameConfig.head_bob = not GameConfig.head_bob
+		_refresh_aim_mode())
+	column.add_child(_head_bob)
 	_refresh_aim_mode()
 
 	var leave := Button.new()
@@ -98,6 +107,8 @@ func _on_aim_mode() -> void:
 
 func _refresh_aim_mode() -> void:
 	_aim_mode.text = "AIM (right mouse):  %s" % ("TOGGLE" if GameConfig.aim_toggle else "HOLD")
+	if _head_bob != null:
+		_head_bob.text = "CAMERA BOB:  %s" % ("ON" if GameConfig.head_bob else "OFF")
 
 
 func _on_resume() -> void:
