@@ -1,0 +1,15 @@
+[gd_resource type="StandardMaterial3D" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/weapons/cc0/m4a1/M4A1_Base_Color.png" id="1_qs6te"]
+[ext_resource type="Texture2D" path="res://assets/weapons/cc0/m4a1/M4A1_Metallic.png" id="2_2qpwq"]
+[ext_resource type="Texture2D" path="res://assets/weapons/cc0/m4a1/M4A1_Normal.png" id="3_v3mc5"]
+[ext_resource type="Texture2D" path="res://assets/weapons/cc0/m4a1/M4A1_Roughness.png" id="4_o6ne3"]
+
+[resource]
+albedo_texture = ExtResource("1_qs6te")
+metallic = 1.0
+metallic_texture = ExtResource("2_2qpwq")
+roughness_texture = ExtResource("4_o6ne3")
+normal_enabled = true
+normal_texture = ExtResource("3_v3mc5")
+texture_filter = 5

@@ -32,4 +32,4 @@ ads_recoil_multiplier = 0.85
 ads_move_multiplier = 0.8
 ads_fire_interval_multiplier = 1.1
 viewmodel_scene = ExtResource("2_model")
-ads_sight_distance = 0.34
+ads_sight_distance = 0.12

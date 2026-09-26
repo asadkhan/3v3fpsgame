@@ -1,33 +1,28 @@
 [gd_scene format=3]
 
-[ext_resource type="PackedScene" path="res://assets/weapons/quaternius/AssaultRifle2_1.fbx" id="1_model"]
-[ext_resource type="PackedScene" path="res://assets/weapons/quaternius/Accessories/Grip.fbx" id="2_grip"]
-[ext_resource type="PackedScene" path="res://assets/weapons/quaternius/Accessories/Flashlight.fbx" id="3_light"]
-[node name="KestrelModel" type="Node3D"]
-position = Vector3(0.03, -0.05, -0.09)
+[ext_resource type="Script" path="res://scripts/weapons/weapon_model.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://assets/weapons/cc0/m4a1/M4A1.fbx" id="2_model"]
+[ext_resource type="Material" path="res://assets/weapons/cc0/m4a1/m4a1.tres" id="3_mat"]
 
-[node name="Model" parent="." instance=ExtResource("1_model")]
-rotation = Vector3(0, 1.5708, 0)
-scale = Vector3(0.16, 0.16, 0.16)
+[node name="KestrelModel" type="Node3D"]
+position = Vector3(0, -0.02, -0.12)
+script = ExtResource("1_script")
+material = ExtResource("3_mat")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
 
 [node name="Muzzle" type="Marker3D" parent="Model"]
-position = Vector3(3.61, 0.64, 0)
+position = Vector3(0, 0.004, -0.535)
 
 [node name="Sight" type="Marker3D" parent="Model"]
-position = Vector3(0, 1.02, 0)
+position = Vector3(0, 0.082, 0.07)
 
 [node name="HandR" type="Marker3D" parent="Model"]
-position = Vector3(-0.1, 0.08, 0)
+position = Vector3(0, -0.075, 0.085)
 metadata/grip = "pistol"
-metadata/radius = 0.019
+metadata/radius = 0.018
 
 [node name="HandL" type="Marker3D" parent="Model"]
-position = Vector3(2.0, 0.1, 0)
-metadata/grip = "vertical"
-metadata/radius = 0.017
-
-[node name="Grip" parent="Model" instance=ExtResource("2_grip")]
-position = Vector3(2.0, 0.04, 0)
-
-[node name="Flashlight" parent="Model" instance=ExtResource("3_light")]
-position = Vector3(2.55, 0.62, 0.33)
+position = Vector3(0, 0.02, -0.22)
+metadata/grip = "rail"
+metadata/radius = 0.03

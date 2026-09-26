@@ -1,29 +1,28 @@
 [gd_scene format=3]
 
-[ext_resource type="PackedScene" path="res://assets/weapons/quaternius/SubmachineGun_3.fbx" id="1_model"]
-[ext_resource type="PackedScene" path="res://assets/weapons/quaternius/Accessories/Flashlight.fbx" id="2_light"]
-[node name="SwiftModel" type="Node3D"]
-position = Vector3(0.02, -0.04, -0.07)
+[ext_resource type="Script" path="res://scripts/weapons/weapon_model.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://assets/weapons/cc0/grease_gun/Grease_Gun.fbx" id="2_model"]
+[ext_resource type="Material" path="res://assets/weapons/cc0/grease_gun/grease_gun.tres" id="3_mat"]
 
-[node name="Model" parent="." instance=ExtResource("1_model")]
-rotation = Vector3(0, 1.5708, 0)
-scale = Vector3(0.16, 0.16, 0.16)
+[node name="SwiftModel" type="Node3D"]
+position = Vector3(0, -0.02, -0.1)
+script = ExtResource("1_script")
+material = ExtResource("3_mat")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
 
 [node name="Muzzle" type="Marker3D" parent="Model"]
-position = Vector3(2.12, 0.47, 0)
+position = Vector3(0, 0.0, -0.338)
 
 [node name="Sight" type="Marker3D" parent="Model"]
-position = Vector3(0.2, 0.85, 0)
+position = Vector3(0, 0.045, 0.2)
 
 [node name="HandR" type="Marker3D" parent="Model"]
-position = Vector3(-0.2, 0.0, 0)
+position = Vector3(0, -0.09, 0.15)
 metadata/grip = "pistol"
-metadata/radius = 0.019
-
-[node name="HandL" type="Marker3D" parent="Model"]
-position = Vector3(1.35, 0.05, 0)
-metadata/grip = "vertical"
 metadata/radius = 0.018
 
-[node name="Flashlight" parent="Model" instance=ExtResource("2_light")]
-position = Vector3(1.45, 0.42, 0.3)
+[node name="HandL" type="Marker3D" parent="Model"]
+position = Vector3(0, -0.07, -0.09)
+metadata/grip = "vertical"
+metadata/radius = 0.02

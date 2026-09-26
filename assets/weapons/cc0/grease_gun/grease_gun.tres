@@ -1,0 +1,15 @@
+[gd_resource type="StandardMaterial3D" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/weapons/cc0/grease_gun/Grease_Gun_Base_Color.png" id="1_pauvg"]
+[ext_resource type="Texture2D" path="res://assets/weapons/cc0/grease_gun/Grease_Gun_Metallic.png" id="2_lxgsu"]
+[ext_resource type="Texture2D" path="res://assets/weapons/cc0/grease_gun/Grease_Gun_Normal_DirectX.png" id="3_yh3mk"]
+[ext_resource type="Texture2D" path="res://assets/weapons/cc0/grease_gun/Grease_Gun_Roughness.png" id="4_ydy68"]
+
+[resource]
+albedo_texture = ExtResource("1_pauvg")
+metallic = 1.0
+metallic_texture = ExtResource("2_lxgsu")
+roughness_texture = ExtResource("4_ydy68")
+normal_enabled = true
+normal_texture = ExtResource("3_yh3mk")
+texture_filter = 5
