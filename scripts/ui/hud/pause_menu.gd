@@ -47,7 +47,7 @@ func _ready() -> void:
 	_volume.step = 0.01
 	_volume.value = GameConfig.master_volume
 	_volume.value_changed.connect(func(value: float) -> void:
-		GameConfig.master_volume = value
+		GameConfig.set_setting("audio/master_volume", value, false)
 		_refresh_values())
 
 	var fov_row := _slider_row(column, "Field of view")
@@ -85,6 +85,7 @@ func _ready() -> void:
 
 
 func _slider_row(parent: Control, title: String) -> Array:
+	# Saved once the drag ends, not on every step of it.
 	var header := HBoxContainer.new()
 	parent.add_child(header)
 	var name_label := UITheme.label(title, UITheme.SIZE_SMALL, UITheme.TEXT)
@@ -94,6 +95,7 @@ func _slider_row(parent: Control, title: String) -> Array:
 	header.add_child(value_label)
 	var slider := HSlider.new()
 	slider.focus_mode = Control.FOCUS_NONE
+	slider.drag_ended.connect(func(_changed: bool) -> void: GameConfig.save_settings())
 	parent.add_child(slider)
 	return [slider, value_label]
 
@@ -106,12 +108,12 @@ func _refresh_values() -> void:
 
 
 func _on_sensitivity(value: float) -> void:
-	GameConfig.mouse_sensitivity = value
+	GameConfig.set_setting("input/mouse_sensitivity", value, false)
 	_refresh_values()
 
 
 func _on_fov(value: float) -> void:
-	GameConfig.field_of_view = value
+	GameConfig.set_setting("video/field_of_view", value, false)
 	_refresh_values()
 
 

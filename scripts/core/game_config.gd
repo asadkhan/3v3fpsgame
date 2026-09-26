@@ -99,13 +99,18 @@ func get_setting(key: String, fallback: Variant = null) -> Variant:
 
 ## Writes a setting, fires [signal setting_changed] and saves to disk.
 ## Returns false if the key is unknown.
-func set_setting(key: String, value: Variant) -> bool:
+##
+## [param save] false defers the disk write - for a slider being dragged, which
+## changes the value dozens of times a second. Call [method save_settings] when
+## it settles.
+func set_setting(key: String, value: Variant, save: bool = true) -> bool:
 	if not _settings.has(key):
 		push_warning("GameConfig: unknown setting '%s'" % key)
 		return false
 	_settings[key]["value"] = value
 	setting_changed.emit(key, value)
-	save_settings()
+	if save:
+		save_settings()
 	return true
 
 

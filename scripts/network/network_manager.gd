@@ -449,7 +449,12 @@ func _on_server_disconnected() -> void:
 	# ordinary thing to do during development, and it must not leave a client
 	# with three frozen teammates and a live mouse.
 	leave_game()
+	last_disconnect_reason = "The host left the match."
 	server_disconnected.emit()
+	# There is no match without a host. Staying in the phase would hand this
+	# client an offline authority that plays empty rounds forever; back to the
+	# menu instead, where the reason is shown.
+	GameManager.return_to_menu()
 
 
 ## A player's profile level, for display: this machine's own from [Profile],
@@ -458,6 +463,10 @@ func level_of(peer_id: int) -> int:
 	if not _is_online or peer_id == local_peer_id:
 		return Profile.level
 	return int(players.get_entry(peer_id).get("level", 1))
+
+
+## Why the last session ended, shown once on the main menu. Cleared there.
+var last_disconnect_reason: String = ""
 
 
 ## Longest name the game will display.

@@ -29,7 +29,7 @@ var core_planted: bool = false
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UITheme.pin(self, Vector2(0.5, 0.0), -300, 10, 300, 100)
+	UITheme.pin(self, Vector2(0.5, 0.0), -300, 10, 300, 110)
 
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -48,9 +48,10 @@ func _ready() -> void:
 	var centre := VBoxContainer.new()
 	centre.custom_minimum_size = Vector2(130, 0)
 	centre.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	centre.add_theme_constant_override(&"separation", -4)
+	centre.add_theme_constant_override(&"separation", 0)
+	centre.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(centre)
-	_clock = UITheme.label("--", UITheme.SIZE_LARGE + 6, UITheme.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+	_clock = UITheme.label("--", UITheme.SIZE_LARGE + 2, UITheme.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 	_phase = UITheme.label("", UITheme.SIZE_SMALL, UITheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
 	_round = UITheme.label("", UITheme.SIZE_SMALL, UITheme.TEXT_DIM, HORIZONTAL_ALIGNMENT_CENTER)
 	centre.add_child(_clock)
@@ -74,7 +75,7 @@ func _score_box(parent: Control, colour: Color) -> Array:
 	parent.add_child(panel)
 	var column := VBoxContainer.new()
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	column.add_theme_constant_override(&"separation", -6)
+	column.add_theme_constant_override(&"separation", -2)
 	panel.add_child(column)
 	var label := UITheme.label("0", UITheme.SIZE_LARGE + 4, colour, HORIZONTAL_ALIGNMENT_CENTER)
 	column.add_child(label)

@@ -72,7 +72,11 @@ func play_at(sound_name: StringName, position: Vector3, volume_db: float = 0.0,
 	var stream: AudioStream = _library.get(sound_name)
 	if stream == null or _world_voices >= MAX_WORLD_VOICES:
 		return
-	var scene := get_tree().current_scene
+	# Parented to the match scene when there is one, so a sound cut off by the
+	# match ending stops with it.
+	var scene := get_tree().get_first_node_in_group(&"match_scene")
+	if scene == null:
+		scene = get_tree().current_scene
 	if scene == null:
 		return
 	var player := AudioStreamPlayer3D.new()

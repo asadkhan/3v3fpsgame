@@ -140,7 +140,7 @@ func _spawn_tracer(to: Vector3, with_flash: bool) -> void:
 		return
 	var tracer := Tracer.new()
 	tracer.setup(from, to, with_flash)
-	get_tree().current_scene.add_child(tracer)
+	_effects_parent().add_child(tracer)
 
 
 ## The one place an impact actually gets drawn: the spark and debris, plus a
@@ -165,7 +165,7 @@ func _spawn_impact(at: Vector3, normal: Vector3, zone: int, surface: int) -> voi
 	# Added to the world rather than to this node, so the effect stays where it
 	# was spawned instead of being dragged through the room as the player walks.
 	# It removes itself when it expires, so nothing has to remember to clean up.
-	get_tree().current_scene.add_child(effect)
+	_effects_parent().add_child(effect)
 	effect.setup(at, normal, zone, surface == Weapon.Surface.ENTITY)
 
 	_live += 1
@@ -174,7 +174,14 @@ func _spawn_impact(at: Vector3, normal: Vector3, zone: int, surface: int) -> voi
 	if surface == Weapon.Surface.WORLD:
 		var hole := BulletHole.new()
 		hole.setup(at, normal)
-		get_tree().current_scene.add_child(hole)
+		_effects_parent().add_child(hole)
+
+
+## The match scene, so effects are freed with it rather than lingering on the
+## permanent router after a match ends.
+func _effects_parent() -> Node:
+	var match_scene := get_tree().get_first_node_in_group(&"match_scene")
+	return match_scene if match_scene != null else get_tree().current_scene
 
 
 func _on_effect_freed() -> void:

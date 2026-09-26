@@ -1,10 +1,27 @@
-# HANDOFF — 3v3 Tactical FPS
+# HANDOFF — SIGNALFALL (3v3 tactical FPS)
 
 Persistent project memory between AI coding agents. **Read this first, then
 `README.md`** (the README documents architecture and conventions per chapter).
 Verify claims against the code — this file describes intent as of its last update.
 
-_Last updated: 2026-09-26 — game-feel and retention pass: view feel, shot visuals, synthesized audio, stats/callouts/progression. Abilities beyond Echo Field: out of scope (user decision)._
+_Last updated: 2026-09-26 — SIGNALFALL theme applied, natural weapon bob, and a full diagnostics pass (20 bugs fixed)._
+
+## Theme (keep everything consistent with this)
+
+**SIGNALFALL** - a near-future signal war at a sun-bleached desert relay
+station. Attackers carry a **Signal Core** to overload the relay; defenders
+hold it. The **Echo Field** is signal recon. The map is **Meridian**.
+- **Palette:** warm sandstone world; **amber** (`UITheme.ACCENT`) = signal,
+  objective, highlights; **cyan** (`UITheme.TECH`) = tech (crosshair, shields,
+  Echo Field, barriers, spawn trim); team blue/red only for sides.
+- **Type:** Bahnschrift (`UITheme.font()`, system-font fallbacks), also on world signs.
+- **Naming:** weapons are birds of prey - Wren (pistol), Swift (SMG, id
+  `jackal`), Harrier (burst rifle, id `halberd`), Kestrel (rifle). Internal ids
+  kept to avoid churn. Title/tagline: `UITheme.GAME_TITLE` / `GAME_TAGLINE`.
+- **Map dressing:** `BlockMap._add_relay_mast / _add_pylon / _add_light_strip /
+  _outline_roof` (masts with blinking beacons, site pylons, roof trim).
+- The project name is now "Signalfall", so saves live in
+  `%APPDATA%/Godot/app_userdata/Signalfall/`.
 
 ---
 
@@ -160,6 +177,21 @@ over localhost plus an offline run (Godot 4.7.2 headless, zero errors):
 18. Orphan `round_start_state.gd.uid` removed; README phase diagram, node tree and Kestrel table corrected.
 19. **Host view jumped above the map when a player joined** (user-reported). `player.tscn`'s camera was `current = true`, so each new body stole the view and releasing it passed it to the arena's `OverviewCamera`. Camera is now non-current in the scene; only the local body calls `make_current()`, remote bodies `clear_current(false)`; `Playtest` frees the overview camera. Verified with host + 2 clients, windowed.
 20. Clients freed departing players' bodies themselves, so the host's despawn then errored (`recv_nodes.has(net_id)`) → on a live client the spawner removes them.
+
+## Diagnostics pass (2026-09-26)
+
+Two code reviews plus scripted 3-player matches (buy, shields, plant/defuse,
+detonation, side swap, spectating, rematch, leave, host quit, late join).
+Fixed: shared capsule resource (crouch shrank everyone's hitbox), crouch not
+replicated (`net_stance`), over-strict host fire-rate check (now a token
+bucket), spectator error on teammate disconnect, clients looping rounds after
+the host quit (now back to menu with a reason), late joiners (starting credits,
+dead if mid-round), late join during a plant, sidearm refill, echo fields
+missing shots, team kills counted, stale stats after rematch, XP farmable via
+skipping to MATCH_END / lost on quick rematch, MVP with zero score, buy menu vs
+Esc, dev-panel keyboard focus, effects outliving the match, half-time reset
+faking damage/purchase sounds, BBCode injection via names, settings written on
+every slider tick. Final runs: zero errors on every machine.
 
 ## Known issues / unfinished
 

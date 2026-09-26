@@ -34,15 +34,80 @@ func _ready() -> void:
 	%QuitButton.pressed.connect(_on_quit_pressed)
 
 	_address_edit.text = NetworkManager.DEFAULT_ADDRESS
-	_status_label.text = ""
+	_status_label.text = NetworkManager.last_disconnect_reason
+	NetworkManager.last_disconnect_reason = ""
 
 	theme = UITheme.build()
-	%Title.add_theme_font_size_override(&"font_size", UITheme.SIZE_HUGE)
+	%Title.text = UITheme.GAME_TITLE
+	%Title.add_theme_font_size_override(&"font_size", UITheme.SIZE_HUGE + 16)
 	%Title.add_theme_color_override(&"font_color", UITheme.ACCENT)
-	%Subtitle.add_theme_color_override(&"font_color", UITheme.TEXT_DIM)
-	%Subtitle.add_theme_font_size_override(&"font_size", UITheme.SIZE_SMALL)
+	%Title.add_theme_constant_override(&"outline_size", 10)
+	%Subtitle.text = UITheme.GAME_TAGLINE
+	%Subtitle.add_theme_color_override(&"font_color", UITheme.TECH)
+	%Subtitle.add_theme_font_size_override(&"font_size", UITheme.SIZE_BODY)
+	_build_backdrop()
 	_name_edit.text = NetworkManager.local_display_name()
 	_build_profile_card()
+
+
+const BACKDROP_MAP := preload("res://scenes/maps/meridian.tscn")
+
+## Seconds per full orbit of the backdrop camera.
+const ORBIT_SECONDS := 90.0
+
+var _orbit_camera: Camera3D
+var _orbit_angle: float = 0.6
+
+
+## A live view of the map behind the menu: Meridian in its own world, with a
+## camera circling high above it, dimmed on the left where the text sits. Sets
+## the tone - this is the place you are about to fight over - before a single
+## button is pressed.
+func _build_backdrop() -> void:
+	var container := SubViewportContainer.new()
+	container.name = "Backdrop"
+	container.stretch = true
+	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(container)
+	move_child(container, 0)
+
+	var viewport := SubViewport.new()
+	viewport.own_world_3d = true
+	viewport.msaa_3d = Viewport.MSAA_2X
+	container.add_child(viewport)
+	viewport.add_child(BACKDROP_MAP.instantiate())
+	_orbit_camera = Camera3D.new()
+	_orbit_camera.fov = 55.0
+	viewport.add_child(_orbit_camera)
+	_orbit_camera.make_current()
+	_update_orbit()
+
+	# The old flat background becomes a readability gradient over the view:
+	# dark on the left under the menu, clear on the right.
+	var gradient := Gradient.new()
+	gradient.set_color(0, Color(0.02, 0.02, 0.04, 0.92))
+	gradient.set_color(1, Color(0.02, 0.02, 0.04, 0.15))
+	gradient.add_point(0.55, Color(0.02, 0.02, 0.04, 0.55))
+	var texture := GradientTexture2D.new()
+	texture.gradient = gradient
+	texture.fill_from = Vector2(0.0, 0.5)
+	texture.fill_to = Vector2(1.0, 0.5)
+	$Background.texture = texture
+	move_child($Background, 1)
+
+
+func _process(delta: float) -> void:
+	if _orbit_camera == null:
+		return
+	_orbit_angle += TAU * delta / ORBIT_SECONDS
+	_update_orbit()
+
+
+func _update_orbit() -> void:
+	var radius := 58.0
+	_orbit_camera.position = Vector3(cos(_orbit_angle) * radius, 30.0, sin(_orbit_angle) * radius)
+	_orbit_camera.look_at(Vector3(0.0, 0.0, -6.0), Vector3.UP)
 
 
 ## Your level, title, progress to the next level and career numbers - the

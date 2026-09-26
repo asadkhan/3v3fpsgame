@@ -104,14 +104,11 @@ func _process(delta: float) -> void:
 	_top_bar.core_planted = objective != null and objective.is_planted() \
 		and GameManager.is_in(GamePhase.Phase.ROUND_ACTIVE)
 
-	# A purchase confirmed by the host shows up as credits dropping by exactly
-	# the price of something - which is what tells it apart from the half-time
-	# reset, the other thing that lowers credits during the buy phase.
-	if _player != null:
-		var spent := _last_credits - _player.state.credits
-		if spent > 0 and GameManager.is_in(GamePhase.Phase.BUY) and _is_a_price(spent):
-			Audio.play(&"buy", -6.0, 0.0)
-		_last_credits = _player.state.credits
+	# The buy menu cannot be clicked once the pointer is captured again (Esc
+	# while it is open), so it closes rather than sitting on screen while the
+	# mouse fires the gun.
+	if _buy.is_open and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		_buy.close(_player)
 
 	_slow_left -= delta
 	if _slow_left <= 0.0:
@@ -146,28 +143,22 @@ func _track_local_player() -> void:
 		_player = current
 		_last_health = (_player.state.health + _player.state.shield) if _player != null \
 			else PlayerState.MAX_HEALTH
+		_last_health_only = _player.state.health if _player != null else PlayerState.MAX_HEALTH
 		return
 	if _player == null:
 		return
 	# Shield counts: losing shield is being hit too.
 	var health := _player.state.health + _player.state.shield
-	if health < _last_health:
+	var health_only := _player.state.health
+	var real_hit := health_only < _last_health_only or GameManager.is_in(GamePhase.Phase.ROUND_ACTIVE)
+	if health < _last_health and real_hit:
 		_vignette.flash(float(_last_health - health))
 		Audio.play(&"hurt", -6.0, 0.08)
 	_last_health = health
+	_last_health_only = health_only
 
 var _last_health: int = PlayerState.MAX_HEALTH
-var _last_credits: int = 0
-
-
-func _is_a_price(amount: int) -> bool:
-	for data in WeaponCatalog.buyable():
-		if data.price == amount:
-			return true
-	for shield_id in PlayerLoadout.SHIELD_IDS:
-		if PlayerLoadout.shield_price(shield_id) == amount:
-			return true
-	return false
+var _last_health_only: int = PlayerState.MAX_HEALTH
 
 
 func _on_phase_changed(_previous: int, current: int) -> void:

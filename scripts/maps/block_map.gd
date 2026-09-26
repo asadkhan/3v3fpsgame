@@ -233,7 +233,122 @@ func add_sign(text: String, at: Vector3, yaw_degrees: float, colour: Color, pixe
 	label.outline_modulate = Color(0.05, 0.05, 0.07, 0.9)
 	label.shaded = false
 	label.double_sided = false
+	label.font = UITheme.font()
 	add_child(label)
+
+
+# --- Set dressing (the relay-station look) -------------------------------------
+# Visual only, no collision unless noted: masts sit on rooftops nobody can
+# reach, strips are trim. Placeholder art until the art pass, built to the
+# SIGNALFALL palette (amber signal, cyan tech).
+
+var _beacons: Array[StandardMaterial3D] = []
+var _beacon_time: float = 0.0
+
+
+func _emissive(colour: Color, energy: float) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = colour.darkened(0.3)
+	material.emission_enabled = true
+	material.emission = colour
+	material.emission_energy_multiplier = energy
+	return material
+
+
+func _visual_box(parent: Node3D, centre: Vector3, size: Vector3, material: Material) -> MeshInstance3D:
+	var mesh := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = size
+	mesh.mesh = box
+	mesh.material_override = material
+	mesh.position = centre
+	parent.add_child(mesh)
+	return mesh
+
+
+## A relay mast standing on a rooftop at [param base]: a pole, cross-arms, a
+## dish and a blinking red beacon on top.
+func _add_relay_mast(base: Vector3, height: float) -> void:
+	var mast := Node3D.new()
+	mast.name = "RelayMast"
+	mast.position = base
+	add_child(mast)
+	var steel := StandardMaterial3D.new()
+	steel.albedo_color = Color(0.32, 0.34, 0.37)
+	steel.metallic = 0.6
+	steel.roughness = 0.5
+	_visual_box(mast, Vector3(0, height * 0.5, 0), Vector3(0.18, height, 0.18), steel)
+	for i in 3:
+		var y := height * (0.45 + 0.18 * i)
+		var arm := _visual_box(mast, Vector3(0, y, 0), Vector3(1.6 - 0.4 * i, 0.07, 0.07), steel)
+		arm.rotation.y = 0.5 * i
+	var dish := MeshInstance3D.new()
+	var cone := CylinderMesh.new()
+	cone.top_radius = 0.55
+	cone.bottom_radius = 0.1
+	cone.height = 0.3
+	dish.mesh = cone
+	dish.material_override = steel
+	dish.position = Vector3(0.35, height * 0.72, 0)
+	dish.rotation = Vector3(0, 0, -1.2)
+	mast.add_child(dish)
+	var beacon_material := _emissive(Color(1.0, 0.2, 0.15), 4.0)
+	_beacons.append(beacon_material)
+	_visual_box(mast, Vector3(0, height + 0.12, 0), Vector3(0.22, 0.22, 0.22), beacon_material)
+
+
+## A signal pylon: a slim pillar with glowing bands and a small light, used to
+## mark a site so it can be recognised from a distance. Solid.
+func _add_pylon(base: Vector3, colour: Color, height: float = 3.4) -> void:
+	var body := _add_box("Pylon", base + Vector3(0, height * 0.5, 0), Vector3(0.5, height, 0.5), &"metal")
+	var glow := _emissive(colour, 3.0)
+	for i in 3:
+		_visual_box(body, Vector3(0, -height * 0.5 + 0.9 + i * 0.9, 0), Vector3(0.56, 0.08, 0.56), glow)
+	var light := OmniLight3D.new()
+	light.light_color = colour
+	light.light_energy = 1.2
+	light.omni_range = 5.0
+	light.position = Vector3(0, height * 0.5 - 0.3, 0)
+	body.add_child(light)
+
+
+## A thin glowing strip between two points - roofline and trim lighting.
+func _add_light_strip(from: Vector3, to: Vector3, colour: Color, energy: float = 2.0) -> void:
+	var length := from.distance_to(to)
+	if length < 0.01:
+		return
+	var strip := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(0.07, 0.07, length)
+	strip.mesh = box
+	strip.material_override = _emissive(colour, energy)
+	strip.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(strip)
+	var direction := (to - from) / length
+	var up := Vector3.UP if absf(direction.y) < 0.99 else Vector3.RIGHT
+	strip.global_transform = Transform3D(Basis.looking_at(direction, up), (from + to) * 0.5)
+
+
+## Strips around the top edge of a block footprint.
+func _outline_roof(min_xz: Vector2, max_xz: Vector2, y: float, colour: Color) -> void:
+	var a := Vector3(min_xz.x, y, min_xz.y)
+	var b := Vector3(max_xz.x, y, min_xz.y)
+	var c := Vector3(max_xz.x, y, max_xz.y)
+	var d := Vector3(min_xz.x, y, max_xz.y)
+	_add_light_strip(a, b, colour)
+	_add_light_strip(b, c, colour)
+	_add_light_strip(c, d, colour)
+	_add_light_strip(d, a, colour)
+
+
+func _process(delta: float) -> void:
+	if _beacons.is_empty():
+		return
+	# One slow blink for every beacon on the map, like aircraft warning lights.
+	_beacon_time += delta
+	var on := fmod(_beacon_time, 1.6) < 0.25
+	for material in _beacons:
+		material.emission_energy_multiplier = 5.0 if on else 0.3
 
 
 func _on_phase_changed(_previous: int, current: int) -> void:

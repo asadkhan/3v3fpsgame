@@ -60,6 +60,8 @@ func _ready() -> void:
 	_address_edit.text = _load_address()
 	_address_edit.text_submitted.connect(_on_address_submitted)
 
+	for button in [_host_button, _join_button, _leave_button]:
+		button.focus_mode = Control.FOCUS_NONE
 	_host_button.pressed.connect(_on_host_pressed)
 	_join_button.pressed.connect(_on_join_pressed)
 	_leave_button.pressed.connect(_on_leave_pressed)
@@ -110,7 +112,15 @@ func _on_leave_pressed() -> void:
 ## so pressing Enter is the difference between a working two-instance test and
 ## a person alt-tabbing to click a button.
 func _on_address_submitted(_text: String) -> void:
+	_address_edit.release_focus()
 	_on_join_pressed()
+
+
+## The address field must not hold the keyboard once the player is back in
+## the game: WASD would type into it and Enter (start match) would submit it.
+func _process(_delta: float) -> void:
+	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and _address_edit.has_focus():
+		_address_edit.release_focus()
 
 
 # --- Signals --------------------------------------------------------------

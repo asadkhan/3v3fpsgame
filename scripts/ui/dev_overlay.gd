@@ -183,6 +183,7 @@ func _build_transition_buttons(phase: int) -> void:
 		if not GameManager.can_transition(next_phase):
 			continue
 		var button := Button.new()
+		button.focus_mode = Control.FOCUS_NONE
 		button.text = GamePhase.phase_name(next_phase)
 		button.pressed.connect(_on_transition_pressed.bind(next_phase))
 		_transition_box.add_child(button)
