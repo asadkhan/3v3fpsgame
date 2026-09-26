@@ -1,30 +1,48 @@
 [gd_scene format=3]
 
-[ext_resource type="PackedScene" path="res://assets/weapons/quaternius/Pistol_5.fbx" id="1_model"]
+[ext_resource type="PackedScene" path="res://assets/weapons/polyhaven/service_pistol/service_pistol_2k.gltf" id="1_model"]
 
 [node name="WrenModel" type="Node3D"]
-position = Vector3(0.0, -0.03, -0.05)
-scale = Vector3(0.8, 0.8, 0.8)
+position = Vector3(0, -0.03, -0.05)
 
 [node name="Model" parent="." instance=ExtResource("1_model")]
 rotation = Vector3(0, 1.5708, 0)
-scale = Vector3(0.16, 0.16, 0.16)
+
+[node name="service_pistol_magazine_loaded" parent="Model" index="2"]
+visible = false
+
+[node name="service_pistol_magazine_empty" parent="Model" index="3"]
+visible = false
+
+[node name="service_pistol_bullet" parent="Model" index="4"]
+visible = false
+
+[node name="service_pistol_pistol_b" parent="Model" index="7"]
+visible = false
+
+[node name="service_pistol_slide_b" parent="Model" index="8"]
+visible = false
+
+[node name="service_pistol_hammer_b" parent="Model" index="9"]
+visible = false
+
+[node name="service_pistol_trigger_b" parent="Model" index="10"]
+visible = false
 
 [node name="Muzzle" type="Marker3D" parent="Model"]
-position = Vector3(1.45, 0.55, 0)
+position = Vector3(0.175, 0.066, 0)
 
 [node name="Sight" type="Marker3D" parent="Model"]
-position = Vector3(0.3, 0.78, 0)
+position = Vector3(-0.02, 0.083, 0)
 
 [node name="HandR" type="Marker3D" parent="Model"]
-position = Vector3(-0.2, 0.0, 0)
+position = Vector3(-0.026, -0.005, 0)
 metadata/grip = "pistol"
 metadata/radius = 0.017
-metadata/hand_scale = 0.85
+metadata/hand_scale = 0.9
 
 [node name="HandL" type="Marker3D" parent="Model"]
-position = Vector3(-0.1, -0.14, 0)
+position = Vector3(-0.016, -0.03, 0)
 metadata/grip = "pistol"
 metadata/radius = 0.031
-metadata/hand_scale = 0.85
-
+metadata/hand_scale = 0.9
