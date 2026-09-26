@@ -35,6 +35,7 @@ var _settings: Dictionary = {
 	"video/field_of_view": {"default": 90.0, "type": TYPE_FLOAT},
 	"video/fullscreen": {"default": false, "type": TYPE_BOOL},
 	"player/display_name": {"default": "", "type": TYPE_STRING},
+	"input/aim_toggle": {"default": false, "type": TYPE_BOOL},
 }
 
 
@@ -65,6 +66,11 @@ var field_of_view: float:
 var fullscreen: bool:
 	get: return get_setting("video/fullscreen")
 	set(value): set_setting("video/fullscreen", value)
+
+## Right mouse toggles aiming instead of holding it.
+var aim_toggle: bool:
+	get: return get_setting("input/aim_toggle")
+	set(value): set_setting("input/aim_toggle", value)
 
 ## The name shown to other players. Empty until the player picks one; see
 ## [method NetworkManager.local_display_name] for the fallback.

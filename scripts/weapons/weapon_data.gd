@@ -164,6 +164,36 @@ enum Category {
 ## should be a decision in the data rather than an if-statement in the player.
 @export var blocks_sprint: bool = false
 
+# --- Aiming down sights -------------------------------------------------------
+# A precision option, not a requirement: a light zoom that tightens the spread
+# and steadies the recoil, paid for with slower movement (and, on some weapons,
+# a slightly slower fire rate). Hip fire stays viable. Each value is a
+# multiplier applied at full aim, blended in over [member ads_time].
+
+## Field-of-view magnification while aimed. 1.0 = no zoom.
+@export_range(1.0, 4.0, 0.05) var ads_zoom: float = 1.2
+
+## Seconds to go from hip to fully aimed (and back).
+@export_range(0.0, 1.0, 0.01) var ads_time: float = 0.15
+
+## Spread while aimed, as a fraction of [member spread_degrees].
+@export_range(0.0, 1.0, 0.05) var ads_spread_multiplier: float = 0.5
+
+## Recoil kick while aimed, as a fraction of the hip kick.
+@export_range(0.0, 1.0, 0.05) var ads_recoil_multiplier: float = 0.8
+
+## Movement speed while aimed, on top of [member move_speed_multiplier].
+@export_range(0.1, 1.0, 0.01) var ads_move_multiplier: float = 0.76
+
+## Time between shots while aimed, as a multiple of [member fire_interval].
+## Above 1.0 fires slower.
+@export_range(0.5, 2.0, 0.01) var ads_fire_interval_multiplier: float = 1.0
+
+## Where the weapon moves while aimed, relative to its hip position: towards
+## the centre of the screen and slightly closer. Tuned per model so its sights
+## line up with the crosshair.
+@export var ads_viewmodel_offset: Vector3 = Vector3(-0.22, 0.03, 0.02)
+
 
 ## Whether this weapon can be picked in a buy menu at all.
 func is_buyable() -> bool:

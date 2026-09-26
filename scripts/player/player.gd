@@ -800,12 +800,11 @@ func _set_weapon_visible(visible_now: bool) -> void:
 	_weapon_mount.position = _viewmodel_rest
 
 
-## Recovers the viewmodel's recoil kick. Purely cosmetic, and driven from here
-## rather than from the weapon because the mount is a node on the player.
+## Places the viewmodel: its rest position, moved towards the centre by aiming,
+## plus the recovering recoil kick. Purely cosmetic, and driven from here rather
+## than from the weapon because the mount is a node on the player.
 func _update_viewmodel_kick(delta: float) -> void:
-	if _weapon_mount == null:
-		return
-	if _viewmodel_kick <= 0.0:
+	if _weapon_mount == null or not _weapon_mount.visible:
 		return
 
 	_viewmodel_kick = maxf(_viewmodel_kick - delta * VIEWMODEL_KICK_RECOVERY, 0.0)
@@ -813,7 +812,23 @@ func _update_viewmodel_kick(delta: float) -> void:
 	if weapon != null and weapon.data != null:
 		distance = weapon.data.viewmodel_kick
 	# Positive z is back towards the camera, which is what "kicking" means.
-	_weapon_mount.position = _viewmodel_rest + Vector3(0.0, 0.0, _viewmodel_kick * distance)
+	# Aimed, the kick is smaller - the steadier hold is part of what aiming buys.
+	var kick := _viewmodel_kick * distance * aim.recoil_scale()
+	_weapon_mount.position = _viewmodel_rest + aim.viewmodel_offset() + Vector3(0.0, 0.0, kick)
+
+
+## Applies the aim to everything outside the weapon's own numbers: the camera's
+## zoom and the weapon's fire interval. Movement, spread, recoil and mouse
+## sensitivity read [member aim] where they are computed.
+func _apply_aim() -> void:
+	_camera.fov = GameConfig.field_of_view / aim.zoom()
+	if weapon != null:
+		weapon.fire_interval_scale = aim.fire_interval_scale()
+
+
+## How far into aiming down sights this player is, 0 to 1. For the HUD.
+func get_aim_amount() -> float:
+	return aim.amount
 
 
 # --- Weapon signal handlers ---------------------------------------------
@@ -829,7 +844,7 @@ func _on_weapon_fired() -> void:
 	# host validates and casts exactly the ray the shooter's crosshair produced.
 	# Before this call existed `spread_degrees` was authored on every weapon and
 	# read by nothing, so every gun was perfectly accurate.
-	var direction := weapon.apply_spread(get_look_direction())
+	var direction := weapon.apply_spread(get_look_direction(), aim.spread_scale())
 
 	# Offline, this player is the whole authority and the raycast runs right
 	# here. Online, the host is the authority for what a shot hit, so the ray
@@ -1022,7 +1037,8 @@ func _confirm_shot(point: Vector3, normal: Vector3, zone: int, victim_peer_id: i
 
 
 func _on_recoil_requested(_pitch_degrees: float, _yaw_degrees: float) -> void:
-	add_recoil(_pitch_degrees, _yaw_degrees)
+	var steady := aim.recoil_scale()
+	add_recoil(_pitch_degrees * steady, _yaw_degrees * steady)
 	_apply_view()
 	_viewmodel_kick = 1.0
 
@@ -1049,6 +1065,9 @@ func _on_dry_fired() -> void:
 
 ## Primary + sidearm, switching and buying. See [PlayerLoadout].
 @onready var loadout: PlayerLoadout = $Loadout
+
+## Aiming down sights. See [PlayerAim].
+@onready var aim: PlayerAim = $Aim
 
 ## Set by the objective while this player is planting or defusing: movement,
 ## jumping and firing stop, looking around does not.
@@ -1366,6 +1385,7 @@ func _begin_death_presentation(source: Node) -> void:
 		return
 
 	_is_dying = true
+	aim.reset()
 	_death_tilt = 0.0
 	_death_eye_start = _head.position.y
 	_apply_view()
@@ -1458,6 +1478,7 @@ func respawn() -> void:
 ## without pretending to be the authority for its health.
 func _reset_life_presentation() -> void:
 	_is_dying = false
+	aim.reset()
 	_offline_respawn_left = 0.0
 	_death_tilt = 0.0
 	_recoil_pitch = 0.0
@@ -1723,6 +1744,9 @@ func _look(motion: InputEventMouseMotion) -> void:
 	# An unconfigured sensitivity must not make the camera unusable.
 	if sensitivity <= 0.0:
 		sensitivity = sensitivity_scale
+	# Scaled down with the zoom, so a mouse movement covers the same part of
+	# the screen aimed as at the hip.
+	sensitivity /= aim.zoom()
 
 	var delta := motion.relative * sensitivity
 
@@ -1819,6 +1843,8 @@ func _update_combat(delta: float) -> void:
 func _physics_process(delta: float) -> void:
 	_tick_offline_respawn(delta)
 	_read_input()
+	aim.update(delta)
+	_apply_aim()
 	_update_combat(delta)
 	_update_viewmodel_kick(delta)
 
@@ -1939,7 +1965,7 @@ func _target_speed() -> float:
 		return crouch_speed
 	if _sprint_held and not _sprint_blocked():
 		return sprint_speed
-	return walk_speed * _weapon_speed_multiplier()
+	return walk_speed * _weapon_speed_multiplier() * aim.move_scale()
 
 
 ## The movement penalty of whatever is in the player's hands.

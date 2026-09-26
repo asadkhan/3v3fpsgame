@@ -4,7 +4,7 @@ Persistent project memory between AI coding agents. **Read this first, then
 `README.md`** (the README documents architecture and conventions per chapter).
 Verify claims against the code — this file describes intent as of its last update.
 
-_Last updated: 2026-09-26 — shields and teammate spectating added. Abilities beyond Echo Field: out of scope (user decision)._
+_Last updated: 2026-09-26 — Valorant-style ADS added. Shields and teammate spectating in. Abilities beyond Echo Field: out of scope (user decision)._
 
 ---
 
@@ -23,6 +23,8 @@ _Last updated: 2026-09-26 — shields and teammate spectating added. Abilities b
   Shields: Light (+25, 400) / Heavy (+50, 1000), absorb damage before health,
   kept while alive, lost on death, cleared at half. Dead players spectate a
   living teammate after a 2 s death cam (click cycles).
+  ADS (right mouse, hold or toggle in Esc menu): light zoom, tighter spread,
+  less recoil, slower movement; per-weapon values in the weapon `.tres` files.
 - **Next:** models / VFX / audio / animations (user's plan), then balancing.
 
 ## Chapters
@@ -100,6 +102,13 @@ _Last updated: 2026-09-26 — shields and teammate spectating added. Abilities b
 - **Spectating:** `scripts/game/spectator_camera.gd` (node `Spectator` in
   `playtest.tscn`). Local only; follows `Player.get_spectator_view()` using the
   replicated `net_position` / `net_yaw` / `net_pitch`. Teammates only.
+- **ADS:** `scripts/player/player_aim.gd` (node `Aim` under Player) blends
+  0..1 and exposes multipliers; `Player` applies them to FOV, sensitivity,
+  spread, recoil, speed, fire interval and viewmodel position. Local only (no
+  replication needed). `WeaponData.ads_*` fields; `ads_viewmodel_offset` is the
+  per-model sight alignment to tune when real weapon models arrive.
+- **Fire rate:** weapon cooldown carries sub-frame leftover time (capped at
+  one frame), so fire intervals are exact rather than rounded up to frames.
 - RPC rule used throughout: host→client messages on client-owned nodes are
   `any_peer` + `get_remote_sender_id() == SERVER_PEER_ID`, never `authority`.
 

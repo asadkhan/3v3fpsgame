@@ -221,6 +221,8 @@ func _equip(data: WeaponData, fresh: bool) -> void:
 	if not fresh and _slot_ammo.has(data.weapon_id):
 		weapon.ammo_in_magazine = int(_slot_ammo[data.weapon_id])
 		weapon.ammo_changed.emit(weapon.ammo_in_magazine, weapon.reserve_ammo)
+	# A new weapon comes up at the hip; each gun aims with its own numbers.
+	_player.aim.reset()
 	_player.weapon_changed.emit(weapon)
 	changed.emit()
 

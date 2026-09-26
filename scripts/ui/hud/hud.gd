@@ -83,6 +83,7 @@ func _process(delta: float) -> void:
 
 	_crosshair.visible = (spectating or (_player != null and _player.state.is_alive)) \
 		and not GameManager.is_in(GamePhase.Phase.MATCH_END)
+	_crosshair.aim_amount = _player.get_aim_amount() if _player != null and not spectating else 0.0
 	_vignette.update_view(_player, delta)
 	_top_bar.update_view()
 	_status.update_view(spectator.target if spectating else _player, spectating)
