@@ -41,7 +41,7 @@ const MAX_Z := 45.0
 
 const SITE_COLOUR := Color(1.0, 0.8, 0.3)
 const SIGN_COLOUR := Color(0.96, 0.93, 0.86)
-const BARRIER_COLOUR := Color(0.55, 0.85, 1.0)
+const BARRIER_COLOUR := UITheme.TECH
 
 ## Full-height structures: [min corner (x, z), max corner (x, z)].
 const STRUCTURES := [
@@ -125,6 +125,29 @@ func _build() -> void:
 	_build_levels()
 	_build_spawns()
 	_build_sites_and_signs()
+	_build_dressing()
+
+
+## The relay-station identity: masts on the rooftops (the tallest on the
+## central block - "the relay" the attackers are trying to overload), signal
+## pylons marking each site, and roofline light strips - amber over the heart
+## of the map, cyan over the spawns.
+func _build_dressing() -> void:
+	_add_relay_mast(Vector3(0.0, WALL_HEIGHT, -23.0), 9.0)
+	_add_relay_mast(Vector3(-22.0, WALL_HEIGHT, 39.0), 5.0)
+	_add_relay_mast(Vector3(22.0, WALL_HEIGHT, 38.0), 4.0)
+	_add_relay_mast(Vector3(-20.0, WALL_HEIGHT, -41.0), 4.5)
+	_add_relay_mast(Vector3(21.0, WALL_HEIGHT, -40.0), 5.5)
+	_add_relay_mast(Vector3(-12.0, WALL_HEIGHT, 1.0), 3.5)
+
+	_add_pylon(Vector3(-31.2, 0.0, -31.2), SITE_COLOUR)
+	_add_pylon(Vector3(31.2, 0.0, -8.8), SITE_COLOUR)
+
+	_outline_roof(Vector2(-9, -32), Vector2(9, -14), WALL_HEIGHT + 0.04, UITheme.ACCENT)
+	_outline_roof(Vector2(-32, 32), Vector2(-12, 45), WALL_HEIGHT + 0.04, UITheme.TECH)
+	_outline_roof(Vector2(12, 32), Vector2(32, 45), WALL_HEIGHT + 0.04, UITheme.TECH)
+	_outline_roof(Vector2(-32, -45), Vector2(-12, -36), WALL_HEIGHT + 0.04, UITheme.TECH)
+	_outline_roof(Vector2(12, -45), Vector2(32, -36), WALL_HEIGHT + 0.04, UITheme.TECH)
 
 
 ## Floor and the outer wall ring.

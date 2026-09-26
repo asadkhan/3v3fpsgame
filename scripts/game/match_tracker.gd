@@ -174,7 +174,9 @@ func _on_phase_changed(_previous: int, current: int) -> void:
 			for player in NetworkManager.get_players():
 				_dirty[player.peer_id] = true
 			_flush()
-		GamePhase.Phase.MATCH_END:
+		GamePhase.Phase.MATCH_END, GamePhase.Phase.LOBBY:
+			# LOBBY after MATCH_END is a rematch: the host has just reset every
+			# player's numbers, and clients need to hear it now, not a round later.
 			for player in NetworkManager.get_players():
 				_dirty[player.peer_id] = true
 			_flush()

@@ -51,9 +51,15 @@ func _on_callout(peer_id: int, kind: StringName) -> void:
 
 func _name_bbcode(player: Player, fallback_id: int = 0) -> String:
 	if player == null:
-		return NetworkManager.players.display_name_of(fallback_id)
+		return _escape(NetworkManager.players.display_name_of(fallback_id))
 	var colour := UITheme.team_colour(player.state.team)
-	return "[color=#%s]%s[/color]" % [colour.to_html(false), player.state.display_name]
+	return "[color=#%s]%s[/color]" % [colour.to_html(false), _escape(player.state.display_name)]
+
+
+## Player names are typed by players; a "[" in one must print as a bracket,
+## not open a tag that restyles every line of the feed for everyone.
+static func _escape(text: String) -> String:
+	return text.replace("[", "[lb]")
 
 
 func _add_entry(bbcode: String, highlight: bool) -> void:

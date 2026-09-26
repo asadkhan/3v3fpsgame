@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_weapon_data")
 weapon_id = &"jackal"
-display_name = "Jackal"
+display_name = "Swift"
 category = 1
 damage = 22.0
 headshot_multiplier = 2.0

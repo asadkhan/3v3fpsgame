@@ -298,6 +298,10 @@ var net_yaw: float = 0.0
 ## spectators. See [SpectatorCamera].
 var net_pitch: float = 0.0
 
+## The owner's stance, 0 crouched .. 1 standing, replicated so every machine
+## sizes this body's hitbox and eye height the same way.
+var net_stance: float = 1.0
+
 ## Recent authoritative positions with the times they arrived.
 var _snapshot_times: PackedFloat32Array = PackedFloat32Array()
 var _snapshot_positions: PackedVector3Array = PackedVector3Array()
@@ -327,6 +331,10 @@ const MAX_SHOT_ORIGIN_ERROR := 2.0
 ## same interval against a different one, so without a little tolerance a
 ## legitimate shot gets refused roughly whenever the two clocks disagree.
 const SHOT_CLOCK_TOLERANCE_MS := 15
+
+## How many shots may arrive back to back before the fire-rate check bites.
+const SHOT_BURST_ALLOWANCE := 2.0
+var _shot_budget: float = SHOT_BURST_ALLOWANCE
 
 # --- Combat (Chapter 3) -------------------------------------------------
 
@@ -688,7 +696,10 @@ func _configure_replication() -> void:
 	# so they mean the same thing on every machine regardless of parenting.
 	# [member net_pitch] rides along for spectators: a teammate watching
 	# through your eyes needs to see where you are looking, not just facing.
-	for property in [":net_position", ":net_yaw", ":net_pitch"]:
+	# [member net_stance] carries crouching: without it the host would cast a
+	# crouched client's shots from standing eye height and keep a standing
+	# hitbox for them.
+	for property in [":net_position", ":net_yaw", ":net_pitch", ":net_stance"]:
 		transform_config.add_property(NodePath(property))
 	_transform_sync.replication_config = transform_config
 
@@ -937,14 +948,22 @@ func _resolve_shot(sender: int, origin: Vector3, direction: Vector3) -> void:
 	# client already enforces that, and it is the client that owns the magazine.
 	# It is here so the host is not a free damage button for a modified client
 	# that removed the check locally.
+	#
+	# A token bucket rather than a minimum gap between arrivals: packets bunch
+	# up (a frame that ran two physics steps, ordinary network jitter), so two
+	# honest shots can arrive a few milliseconds apart. The bucket refills at
+	# the weapon's fire rate and holds at most [constant SHOT_BURST_ALLOWANCE]
+	# shots, so bunching is fine but a sustained rate above the weapon's is not.
 	var now := Time.get_ticks_msec()
-	var interval_ms := 0
+	var interval_ms := 60.0
 	if weapon != null and weapon.data != null:
-		interval_ms = int(weapon.data.fire_interval * 1000.0)
-	if now - _last_validated_shot_ms < interval_ms - SHOT_CLOCK_TOLERANCE_MS:
+		interval_ms = maxf(weapon.data.fire_interval * 1000.0 - SHOT_CLOCK_TOLERANCE_MS, 20.0)
+	_shot_budget = minf(SHOT_BURST_ALLOWANCE, _shot_budget + float(now - _last_validated_shot_ms) / interval_ms)
+	_last_validated_shot_ms = now
+	if _shot_budget < 1.0:
 		_rejected_shots += 1
 		return
-	_last_validated_shot_ms = now
+	_shot_budget -= 1.0
 
 	# The origin is checked and then discarded. This is the important one: a
 	# client that could choose its own ray origin could fire from inside a wall
@@ -1642,11 +1661,12 @@ func die(source: Node = null) -> void:
 		var killer := source as Player
 		var killer_id := EventBus.INVALID_PEER
 		if killer != null and killer != self:
-			killer.state.record_kill()
-			if killer.state.team != state.team:
-				Economy.add_credits(killer.state, GameManager.match_rules.kill_credits)
-			killer._publish_net_state()
+			# Named in the kill feed either way; credited only for an enemy.
 			killer_id = killer.peer_id
+			if killer.state.team != state.team:
+				killer.state.record_kill()
+				Economy.add_credits(killer.state, GameManager.match_rules.kill_credits)
+				killer._publish_net_state()
 		# The bought weapon is lost with the life.
 		loadout.server_on_death()
 		var headshot := _last_hit_zone == Damageable.HitZone.HEAD
@@ -1959,6 +1979,11 @@ func _physics_process(delta: float) -> void:
 	if is_network_remote:
 		_net_clock += delta
 		_advance_remote_interpolation(delta)
+		# Follow the owner's crouch, so the hitbox, head zone and the eye the
+		# host fires this player's shots from all match what they are doing.
+		if not _is_dying and not is_equal_approx(_stance, net_stance):
+			_stance = move_toward(_stance, net_stance, stance_change_speed * delta)
+			_apply_stance()
 		_update_footsteps(delta)
 		return
 
@@ -2016,6 +2041,7 @@ func _write_net_transform() -> void:
 	net_position = global_position
 	net_yaw = rotation.y
 	net_pitch = _head.rotation.x
+	net_stance = _stance
 
 
 func _read_input() -> void:
@@ -2322,4 +2348,3 @@ func _report_shooting_to_echo_fields() -> void:
 			var dist := global_position.distance_to(field.global_position)
 			if dist <= field.detection_radius:
 				field.report_activity(EchoField.ECHO_SHOOTING, global_position, state.team)
-				break

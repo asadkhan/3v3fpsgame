@@ -49,9 +49,11 @@ func held_data() -> WeaponData:
 
 ## A fresh life: full magazines, best weapon in hand.
 func refill() -> void:
-	_slot_ammo.clear()
 	held_slot = SLOT_PRIMARY if has_primary() else SLOT_SIDEARM
 	_equip(held_data(), true)
+	# Cleared after the equip, which files the outgoing weapon's magazine away;
+	# otherwise a sidearm you survived holding keeps last round's ammo.
+	_slot_ammo.clear()
 
 
 ## The owner switching weapons (keys 1 / 2).
@@ -162,7 +164,18 @@ func _server_buy_shield(sender: int, shield_id: StringName) -> void:
 	_player.state.credits -= shield_price(shield_id)
 	_player.state.shield = shield_amount(shield_id)
 	_player._publish_net_state()
+	if NetworkManager.is_online and _player.peer_id != multiplayer.get_unique_id():
+		_net_shield_bought.rpc_id(_player.peer_id)
+	else:
+		_play_buy_sound()
 	changed.emit()
+
+
+## Host to the buyer: your shield purchase went through.
+@rpc("any_peer", "call_remote", "reliable")
+func _net_shield_bought() -> void:
+	if multiplayer.get_remote_sender_id() == NetworkManager.SERVER_PEER_ID:
+		_play_buy_sound()
 
 
 ## Host only: the player died, so the primary is gone.
@@ -203,7 +216,13 @@ func _apply_primary(weapon_id: StringName, just_bought: bool) -> void:
 		held_slot = SLOT_PRIMARY
 		_slot_ammo.erase(weapon_id)
 		_equip(held_data(), true)
+		_play_buy_sound()
 	changed.emit()
+
+
+func _play_buy_sound() -> void:
+	if not _player.is_network_remote:
+		Audio.play(&"buy", -6.0, 0.0)
 
 
 # --- Internals --------------------------------------------------------------

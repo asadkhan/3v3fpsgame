@@ -5,9 +5,11 @@ extends PanelContainer
 ## towards the player's profile level - then a rematch (host) or back to the
 ## menu (anyone).
 ##
-## XP is recorded once per match, a moment after MATCH_END so the host's final
-## stats have arrived. Only real matches pay out: online, with both sides
-## populated. The practice range never does.
+## XP is recorded once per match, as soon as MATCH_END arrives: the host sends
+## everyone's final stats before it announces the phase, so they are already
+## here. Only real matches pay out: online, both sides populated, and actually
+## won by someone - a host skipping to the result screen from the lobby does
+## not count. The practice range never does.
 
 var _result: Label
 var _score: Label
@@ -21,7 +23,6 @@ var _hint: Label
 var _rematch: Button
 
 var _recorded: bool = false
-var _record_timer: float = -1.0
 var _xp_anim: Tween
 
 
@@ -97,11 +98,22 @@ func rematch() -> void:
 func _on_phase_changed(_previous: int, current: int) -> void:
 	if current == GamePhase.Phase.MATCH_END:
 		_recorded = false
-		_record_timer = 0.6
 		_xp_total.text = ""
 		_xp_lines.text = ""
 		_level_label.text = ""
 		_level_bar.value = 0.0
+		# Deferred so every other listener (the tracker's final flush on the
+		# host) has run first; immediate otherwise, so a quick rematch or leave
+		# cannot skip it.
+		_record_now.call_deferred()
+
+
+func _record_now() -> void:
+	if _recorded:
+		return
+	_recorded = true
+	var local := NetworkManager.get_local_player()
+	_record_xp(local.state.team if local != null else Team.Side.NONE)
 
 
 func update_view(local_team: int, delta: float = 0.0) -> void:
@@ -123,25 +135,31 @@ func update_view(local_team: int, delta: float = 0.0) -> void:
 	_hint.text = "" if GameManager.is_authority() else "Waiting for the host to start a rematch..."
 	_rebuild_table()
 
-	if not _recorded and _record_timer >= 0.0:
-		_record_timer -= delta
-		if _record_timer <= 0.0:
-			_recorded = true
-			_record_xp(local_team)
-
 
 func _set_result(text: String, colour: Color) -> void:
 	_result.text = text
 	_result.add_theme_color_override(&"font_color", colour)
 
 
+## The highest combat score in the match, or null when nobody scored. Ties go
+## to more kills, then to the lower peer id, so every machine picks the same
+## player.
 func _mvp_player() -> Player:
 	var best: Player = null
 	for player in NetworkManager.get_players():
-		if best == null or player.state.combat_score() > best.state.combat_score() \
-				or (player.state.combat_score() == best.state.combat_score() and player.state.kills > best.state.kills):
+		if player.state.combat_score() <= 0:
+			continue
+		if best == null or _outranks(player, best):
 			best = player
 	return best
+
+
+static func _outranks(a: Player, b: Player) -> bool:
+	if a.state.combat_score() != b.state.combat_score():
+		return a.state.combat_score() > b.state.combat_score()
+	if a.state.kills != b.state.kills:
+		return a.state.kills > b.state.kills
+	return a.peer_id < b.peer_id
 
 
 var _table_left: float = 0.0
@@ -193,7 +211,8 @@ func _row(values: Array, colour: Color) -> Control:
 ## Pays this match's XP into the profile and animates the level bar.
 func _record_xp(local_team: int) -> void:
 	var local := NetworkManager.get_local_player()
-	var eligible := NetworkManager.is_online and local != null and local_team != Team.Side.NONE
+	var eligible := NetworkManager.is_online and local != null and local_team != Team.Side.NONE \
+		and GameManager.match_state.is_match_over() and GameManager.match_state.round_number >= 1
 	if eligible:
 		var present := {}
 		for player in NetworkManager.get_players():

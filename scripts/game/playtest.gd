@@ -93,6 +93,7 @@ var player: Player = null
 
 
 func _ready() -> void:
+	add_to_group(&"match_scene")
 	_use_environment(MATCH_MAP if NetworkManager.is_online else PRACTICE_RANGE)
 	_configure_spawner()
 
@@ -268,6 +269,27 @@ func _on_peer_registered(peer_id: int, team_side: int, player_name: String) -> v
 	# the host learns about its own body here instead.
 	if body != null and peer_id == NetworkManager.local_peer_id:
 		player = body
+	if body != null:
+		_prepare_joiner(body)
+
+
+## Host only. A player arriving in a match that is already going: give them
+## this half's starting credits, and if a round is in progress, bring them in
+## dead - joining mid-round must not be able to swing an elimination. They
+## spawn normally at the next buy phase. Published after a short delay so the
+## client has the body before the state arrives.
+func _prepare_joiner(body: Player) -> void:
+	var phase := GameManager.current_phase
+	if phase in [GamePhase.Phase.LOBBY, GamePhase.Phase.WARMUP, GamePhase.Phase.MATCH_END]:
+		return
+	body.state.credits = GameManager.match_rules.starting_credits
+	if phase in [GamePhase.Phase.ROUND_ACTIVE, GamePhase.Phase.ROUND_END]:
+		body.state.health = 0
+		body.state.is_alive = false
+		body._begin_death_presentation(null)
+	get_tree().create_timer(1.0).timeout.connect(func() -> void:
+		if is_instance_valid(body):
+			body._publish_net_state())
 
 
 ## Runs on [b]every[/b] machine, by the spawner, with the same data the host

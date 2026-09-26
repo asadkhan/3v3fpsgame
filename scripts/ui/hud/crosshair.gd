@@ -6,7 +6,7 @@ extends Control
 const GAP := 5.0
 const LENGTH := 7.0
 const THICKNESS := 2.0
-const COLOUR := Color(0.55, 1.0, 0.85, 0.95)
+const COLOUR := Color(UITheme.TECH, 0.95)
 const OUTLINE := Color(0, 0, 0, 0.75)
 
 

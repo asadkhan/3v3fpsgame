@@ -32,6 +32,11 @@ var _planted: bool = false
 
 func enter(_previous: GameState) -> void:
 	_start_countdown(get_rules().round_seconds)
+	# A client joining mid-round learns the core is planted before it enters
+	# this phase; pick that up from the objective rather than missing it.
+	var objective := game_manager.get_tree().get_first_node_in_group(SignalCoreObjective.GROUP) as SignalCoreObjective
+	if objective != null and objective.is_planted():
+		_planted = true
 	EventBus.player_died.connect(_on_player_died)
 	EventBus.core_planted.connect(_on_core_planted)
 	EventBus.core_defused.connect(_on_core_defused)

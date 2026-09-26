@@ -51,6 +51,10 @@ func _process(delta: float) -> void:
 	if _dead_for < DEATH_CAM_SECONDS:
 		return
 
+	# A freed target (the watched teammate disconnected) must be dropped before
+	# it reaches the typed parameter below, which would reject it every frame.
+	if target != null and not is_instance_valid(target):
+		target = null
 	if not _is_valid_target(target, local):
 		target = _cycle(local, 0)
 	if target == null:

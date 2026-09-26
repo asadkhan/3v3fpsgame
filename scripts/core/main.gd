@@ -109,6 +109,11 @@ var _dev_network_ui: CanvasLayer = null
 
 func _ready() -> void:
 	GameManager.state_changed.connect(_on_state_changed)
+	# Every button in the game clicks, wherever and whenever it is created - one
+	# hook here rather than a line in every menu.
+	get_tree().node_added.connect(func(node: Node) -> void:
+		if node is BaseButton:
+			(node as BaseButton).pressed.connect(func() -> void: Audio.play(&"ui_click", -8.0)))
 
 	if DEV_OVERLAY_ENABLED:
 		_dev_overlay = DEV_OVERLAY.instantiate()

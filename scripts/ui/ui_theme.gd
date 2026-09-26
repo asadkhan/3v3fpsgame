@@ -3,6 +3,13 @@ extends RefCounted
 ## The game's visual language for 2D UI, in one place: colours, text sizes and
 ## the [Theme] every menu and the HUD are built with.
 ##
+## [b]The SIGNALFALL identity.[/b] A near-future signal war at a sun-bleached
+## desert relay. Two working colours carry the whole game: [b]amber[/b] is
+## "signal" - the core, tracers, highlights, anything to act on - and
+## [b]cyan[/b] is "tech" - the crosshair, shields, the Echo Field, barriers.
+## Team blue and red are only ever used for sides. The world is warm sandstone
+## so both read clearly against it.
+##
 ## Built in code rather than as a hand-edited [code].tres[/code] so the whole
 ## palette is readable in one file and a colour change is one constant.
 ## [method build] is cached, so every screen shares the same [Theme] object.
@@ -14,12 +21,19 @@ extends RefCounted
 const ALPHA := Color(0.3, 0.72, 1.0)
 const BRAVO := Color(1.0, 0.36, 0.3)
 
+## The game's name, in one place.
+const GAME_TITLE := "SIGNALFALL"
+const GAME_TAGLINE := "3v3 TACTICAL SHOOTER"
+
 const TEXT := Color(0.95, 0.94, 0.9)
 const TEXT_DIM := Color(0.66, 0.66, 0.68)
-const ACCENT := Color(1.0, 0.8, 0.3)
+## Signal amber - the accent for everything important.
+const ACCENT := Color(1.0, 0.72, 0.28)
+## Tech cyan - crosshair, shields, Echo Field, barriers.
+const TECH := Color(0.36, 0.86, 1.0)
 const DANGER := Color(1.0, 0.3, 0.28)
 const GOOD := Color(0.45, 0.95, 0.6)
-const SHIELD := Color(0.45, 0.85, 1.0)
+const SHIELD := TECH
 
 const PANEL := Color(0.06, 0.07, 0.09, 0.78)
 const PANEL_LIGHT := Color(0.12, 0.13, 0.16, 0.9)
@@ -33,6 +47,21 @@ const SIZE_LARGE := 28
 const SIZE_HUGE := 56
 
 static var _theme: Theme = null
+static var _font: Font = null
+
+
+## The house typeface: Bahnschrift - a condensed, engineered sans that reads
+## instantly at small sizes and suits the tactical tone - falling back to
+## common system sans-serifs where it is not installed.
+static func font() -> Font:
+	if _font != null:
+		return _font
+	var system := SystemFont.new()
+	system.font_names = PackedStringArray(["Bahnschrift", "DIN Alternate", "Segoe UI", "Roboto", "Arial"])
+	system.font_weight = 500
+	system.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
+	_font = system
+	return _font
 
 
 static func team_colour(side: int) -> Color:
@@ -51,6 +80,7 @@ static func build() -> Theme:
 	if _theme != null:
 		return _theme
 	var theme := Theme.new()
+	theme.default_font = font()
 	theme.default_font_size = SIZE_BODY
 
 	theme.set_color(&"font_color", &"Label", TEXT)
