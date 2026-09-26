@@ -4,3 +4,8 @@
 
 # Downloaded archives (the extracted assets are what the project uses)
 *.zip
+
+# Mixamo character source (115 MB, over the GitHub limit). The game loads
+# ch15_soldier.scn, saved from it; re-save that if the FBX changes.
+assets/characters/mixamo/ch15_soldier.fbx
+assets/characters/mixamo/ch15_soldier.fbx.import

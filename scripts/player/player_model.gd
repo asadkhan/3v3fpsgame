@@ -3,43 +3,82 @@ extends Node3D
 ## The body other players see: a rigged soldier, animated from what the network
 ## says this player is doing.
 ##
-## Characters: "Military man" (Alpha) and "Solider" (Bravo) by madtrollstudio,
-## CC BY 3.0, via Poly Pizza. Animations: Mesh2Motion human base and addon sets,
-## CC0. Both are retargeted onto Godot's humanoid skeleton at import (bone maps
-## in [code]assets/characters/retarget/[/code]), so every animation plays on
-## either soldier.
+## Character and animations: Mixamo's "Ch15" operator (urban camo, plate
+## carrier, helmet, goggles, mask) with Mixamo rifle animations, downloaded by
+## the project owner from mixamo.com. Falls back to the earlier soldiers
+## ("Military man" / "Solider" by madtrollstudio, CC BY 3.0, with Mesh2Motion
+## CC0 animations) if the Mixamo files are missing. Everything is retargeted
+## onto Godot's humanoid skeleton at import (bone maps in
+## [code]assets/characters/retarget/[/code]), so any animation plays on any
+## character.
 ##
-## Layers, bottom to top:
-## - legs: a 2D blend of idle, jog, backpedal, strafes and sprint by the body's
-##   velocity in its own frame; the same for crouching; an in-air pose.
-## - upper body: a two-handed forward hold, overridden onto the spine and arms.
+## Animations are addressed by role ([constant ROLES]): the set in use maps each
+## role to a clip. Layers, bottom to top:
+## - legs: a 2D blend of idle, run, backpedal and strafes by the body's velocity
+##   in its own frame; the same for crouching; an in-air pose.
+## - upper body: for the fallback set, whose clips hold no rifle, a two-handed
+##   hold overridden onto the spine and arms. The Mixamo clips already hold one.
 ## - [PlayerModelAim]: bends spine and neck with the aim pitch.
 ## - two-bone IK: each hand onto the held gun's [code]HandR[/code] /
 ##   [code]HandL[/code] marker, so the gun is really held whatever it is.
-## Death plays one of four falls and holds the last frame.
+## Death plays one of the falls and holds the last frame.
 
-const MODELS := {
+const MIXAMO_DIR := "res://assets/characters/mixamo/"
+const MIXAMO_MODEL := MIXAMO_DIR + "ch15_soldier.scn"
+## role -> [file, loops, strip travel]. Strip travel: the clip was exported
+## with root motion, so its forward drift is removed and the body's own
+## (networked) movement carries it instead.
+const MIXAMO_ANIMS := {
+	&"idle": ["rifle_idle", true, false],
+	&"run": ["rifle_run", true, true],
+	&"back": ["backwards_rifle_walk", true, true],
+	&"strafe_l": ["strafe_left", true, true],
+	&"strafe_r": ["strafe_right", true, true],
+	&"crouch_idle": ["idle_crouching", true, false],
+	&"crouch_walk": ["rifle_crouch_walk", true, true],
+	&"air": ["rifle_jump", true, false],
+	&"death_a": ["rifle_death", false, false],
+	&"death_b": ["death_from_the_front", false, false],
+	&"death_c": ["death_from_back_headshot", false, false],
+	&"hold": ["rifle_idle", true, false],
+}
+
+const FALLBACK_MODELS := {
 	Team.Side.ALPHA: "res://assets/characters/soldiers/military_man.glb",
 	Team.Side.BRAVO: "res://assets/characters/soldiers/soldier.glb",
 	Team.Side.NONE: "res://assets/characters/soldiers/military_man.glb",
 }
-const ANIMATION_FILES := [
+const FALLBACK_FILES := [
 	"res://assets/characters/animations/m2m_base.glb",
 	"res://assets/characters/animations/m2m_addon.glb",
 ]
-const LOOPING := [&"Idle_A", &"Jog", &"Sprint", &"Walk", &"Walk_Backwards", &"Strafe_left",
-	&"Strafe_right", &"Crouch_Idle", &"Crouch_Walk", &"Jump_air", &"Pistol_Aim_Neutral", &"Pistol_Idle"]
-const DEATHS := [&"Death_B", &"Death_C", &"Death_D"]
-## Bones the upper-body hold overrides.
+const FALLBACK_ANIMS := {
+	&"idle": [&"Idle_A", true, false], &"run": [&"Jog", true, false], &"back": [&"Walk_Backwards", true, false],
+	&"strafe_l": [&"Strafe_left", true, false], &"strafe_r": [&"Strafe_right", true, false],
+	&"crouch_idle": [&"Crouch_Idle", true, false], &"crouch_walk": [&"Crouch_Walk", true, false],
+	&"air": [&"Jump_air", true, false], &"death_a": [&"Death_B", false, false],
+	&"death_b": [&"Death_C", false, false], &"death_c": [&"Death_D", false, false],
+	&"hold": [&"Pistol_Aim_Neutral", true, false],
+}
+const DEATHS := [&"death_a", &"death_b", &"death_c"]
+## Bones the upper-body hold overrides (fallback set only).
 const UPPER_BONES := [&"Spine", &"Chest", &"UpperChest", &"Neck", &"Head",
 	&"LeftShoulder", &"LeftUpperArm", &"LeftLowerArm", &"LeftHand",
 	&"RightShoulder", &"RightUpperArm", &"RightLowerArm", &"RightHand"]
-## The speed the Jog clip is played at 1x, metres per second.
-const JOG_SPEED := 4.2
+## Team colour washed over the Mixamo operator's urban camo: cool grey-blue
+## for Alpha, sand for Bravo.
+const TEAM_TINT := {
+	Team.Side.ALPHA: Color(0.82, 0.88, 1.0),
+	Team.Side.BRAVO: Color(1.0, 0.86, 0.66),
+	Team.Side.NONE: Color(1, 1, 1),
+}
 ## Scale that puts the model's eyes at the player's eye height (1.62 m).
-const MODEL_SCALE := 0.97
+const MODEL_SCALE := 0.98
 
 static var _library: AnimationLibrary = null
+static var _mixamo: int = -1
+## Metres per second the run clip covers at 1x, measured from its root motion.
+static var _run_speed: float = 3.3
 
 var skeleton: Skeleton3D = null
 var _model: Node3D = null
@@ -52,6 +91,12 @@ var _dead: bool = false
 var _team: int = -99
 
 
+static func uses_mixamo() -> bool:
+	if _mixamo < 0:
+		_mixamo = 1 if ResourceLoader.exists(MIXAMO_MODEL) else 0
+	return _mixamo == 1
+
+
 ## Builds (or rebuilds, on a team change) the soldier for [param team].
 func build(team: int) -> void:
 	if team == _team and _model != null:
@@ -60,22 +105,26 @@ func build(team: int) -> void:
 	if _model != null:
 		remove_child(_model)
 		_model.queue_free()
-	var scene := load(MODELS.get(team, MODELS[Team.Side.NONE])) as PackedScene
-	_model = scene.instantiate() as Node3D
-	# The glTF faces +Z; the player faces -Z.
+	var path: String = MIXAMO_MODEL if uses_mixamo() else FALLBACK_MODELS.get(team, FALLBACK_MODELS[Team.Side.NONE])
+	_model = (load(path) as PackedScene).instantiate() as Node3D
+	# Imported characters face +Z; the player faces -Z.
 	_model.rotation.y = PI
 	_model.scale = Vector3.ONE * MODEL_SCALE
 	add_child(_model)
 	skeleton = _model.get_node("%GeneralSkeleton") as Skeleton3D
+	# The character's own preview animations are not ours to play.
+	for own: AnimationPlayer in _model.find_children("*", "AnimationPlayer", true, false):
+		own.queue_free()
 	for mesh: MeshInstance3D in _model.find_children("*", "MeshInstance3D", true, false):
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-		# Cloth and webbing: the source marks everything 40% metallic, which
-		# mirrors the sky and turns the khaki blue-grey.
 		for i in mesh.mesh.get_surface_count():
 			var material := mesh.mesh.surface_get_material(i) as BaseMaterial3D
-			if material != null and material.albedo_texture != null:
+			if material == null:
+				continue
+			if uses_mixamo():
+				mesh.set_surface_override_material(i, _tinted(material, team))
+			elif material.albedo_texture != null:
 				mesh.set_surface_override_material(i, _field_kit(material.albedo_texture, team))
-
 
 	_player = AnimationPlayer.new()
 	_player.name = "AnimationPlayer"
@@ -111,6 +160,23 @@ func build(team: int) -> void:
 		_ik_targets.append(target)
 		_ik_targets.append(pole)
 	_dead = false
+
+
+static var _tint_cache: Dictionary = {}
+
+
+## The operator's own textured material with the team colour washed over it,
+## matte like cloth rather than the importer's default.
+static func _tinted(source: BaseMaterial3D, team: int) -> BaseMaterial3D:
+	var key := "%d_%d" % [source.get_instance_id(), team]
+	if not _tint_cache.has(key):
+		var material := source.duplicate() as BaseMaterial3D
+		material.albedo_color = TEAM_TINT.get(team, Color.WHITE)
+		material.metallic = 0.0
+		material.roughness = 0.88
+		material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+		_tint_cache[key] = material
+	return _tint_cache[key]
 
 
 ## Camouflage per side: woodland greens for Alpha, desert tans for Bravo.
@@ -154,21 +220,54 @@ static func _shared_library() -> AnimationLibrary:
 	if _library != null:
 		return _library
 	_library = AnimationLibrary.new()
-	var wanted: Array = LOOPING + DEATHS
-	for path in ANIMATION_FILES:
-		var source := (load(path) as PackedScene).instantiate()
-		for ap: AnimationPlayer in source.find_children("*", "AnimationPlayer", true, false):
-			for anim_name in ap.get_animation_list():
-				if anim_name in wanted and not _library.has_animation(anim_name):
-					_library.add_animation(anim_name, _skeleton_only(ap.get_animation(anim_name)))
-		source.free()
-	for anim_name in LOOPING:
-		if _library.has_animation(anim_name):
-			_library.get_animation(anim_name).loop_mode = Animation.LOOP_LINEAR
-	for anim_name in DEATHS:
-		if _library.has_animation(anim_name):
-			_library.get_animation(anim_name).loop_mode = Animation.LOOP_NONE
+	if uses_mixamo():
+		for role: StringName in MIXAMO_ANIMS:
+			var entry: Array = MIXAMO_ANIMS[role]
+			var source := (load(MIXAMO_DIR + String(entry[0]) + ".fbx") as PackedScene).instantiate()
+			var ap := source.find_children("*", "AnimationPlayer", true, false)[0] as AnimationPlayer
+			var anim := _skeleton_only(ap.get_animation(&"mixamo_com"))
+			if entry[2]:
+				var travelled := _strip_travel(anim)
+				if role == &"run":
+					_run_speed = maxf(travelled / anim.length, 0.5)
+			anim.loop_mode = Animation.LOOP_LINEAR if entry[1] else Animation.LOOP_NONE
+			_library.add_animation(role, anim)
+			source.free()
+	else:
+		var sources: Dictionary = {}
+		for path in FALLBACK_FILES:
+			var source := (load(path) as PackedScene).instantiate()
+			for ap: AnimationPlayer in source.find_children("*", "AnimationPlayer", true, false):
+				for anim_name in ap.get_animation_list():
+					if not sources.has(anim_name):
+						sources[anim_name] = _skeleton_only(ap.get_animation(anim_name))
+			source.free()
+		_run_speed = 4.2
+		for role: StringName in FALLBACK_ANIMS:
+			var entry: Array = FALLBACK_ANIMS[role]
+			if sources.has(entry[0]):
+				var anim: Animation = (sources[entry[0]] as Animation).duplicate(true)
+				anim.loop_mode = Animation.LOOP_LINEAR if entry[1] else Animation.LOOP_NONE
+				_library.add_animation(role, anim)
 	return _library
+
+
+## Removes the hips' steady travel across the ground from a root-motion clip,
+## keeping its sway and bob, and returns how far it had travelled.
+static func _strip_travel(anim: Animation) -> float:
+	var track := anim.find_track(NodePath("%GeneralSkeleton:Hips"), Animation.TYPE_POSITION_3D)
+	if track < 0 or anim.track_get_key_count(track) < 2:
+		return 0.0
+	var count := anim.track_get_key_count(track)
+	var first: Vector3 = anim.track_get_key_value(track, 0)
+	var last: Vector3 = anim.track_get_key_value(track, count - 1)
+	var drift := Vector3(last.x - first.x, 0.0, last.z - first.z)
+	var length := maxf(anim.length, 0.001)
+	for k in count:
+		var t := anim.track_get_key_time(track, k) / length
+		var v: Vector3 = anim.track_get_key_value(track, k)
+		anim.track_set_key_value(track, k, Vector3(v.x - first.x - drift.x * t, v.y, v.z - first.z - drift.z * t))
+	return drift.length()
 
 
 ## A copy of [param source] with only the skeleton's tracks: the source files
@@ -190,9 +289,8 @@ func _build_tree() -> AnimationTree:
 	loco.blend_mode = AnimationNodeBlendSpace2D.BLEND_MODE_INTERPOLATED
 	loco.min_space = Vector2(-2, -2)
 	loco.max_space = Vector2(2, 2)
-	for point in [[&"Idle_A", Vector2.ZERO], [&"Jog", Vector2(0, 1)], [&"Sprint", Vector2(0, 1.6)],
-			[&"Walk_Backwards", Vector2(0, -1)], [&"Strafe_left", Vector2(-1, 0)],
-			[&"Strafe_right", Vector2(1, 0)]]:
+	for point in [[&"idle", Vector2.ZERO], [&"run", Vector2(0, 1)],
+			[&"back", Vector2(0, -1)], [&"strafe_l", Vector2(-1, 0)], [&"strafe_r", Vector2(1, 0)]]:
 		loco.add_blend_point(_clip(point[0]), point[1], -1, "p%d" % loco.get_blend_point_count())
 	root.add_node(&"loco", loco, Vector2(0, 0))
 	var loco_speed := AnimationNodeTimeScale.new()
@@ -202,8 +300,8 @@ func _build_tree() -> AnimationTree:
 	var crouch := AnimationNodeBlendSpace2D.new()
 	crouch.min_space = Vector2(-2, -2)
 	crouch.max_space = Vector2(2, 2)
-	for point in [[&"Crouch_Idle", Vector2.ZERO], [&"Crouch_Walk", Vector2(0, 1)],
-			[&"Crouch_Walk", Vector2(0, -1)], [&"Crouch_Walk", Vector2(1, 0)], [&"Crouch_Walk", Vector2(-1, 0)]]:
+	for point in [[&"crouch_idle", Vector2.ZERO], [&"crouch_walk", Vector2(0, 1)],
+			[&"crouch_walk", Vector2(0, -1)], [&"crouch_walk", Vector2(1, 0)], [&"crouch_walk", Vector2(-1, 0)]]:
 		crouch.add_blend_point(_clip(point[0]), point[1], -1, "p%d" % crouch.get_blend_point_count())
 	root.add_node(&"crouch", crouch, Vector2(0, 200))
 
@@ -212,13 +310,13 @@ func _build_tree() -> AnimationTree:
 	root.connect_node(&"crouch_mix", 0, &"loco_speed")
 	root.connect_node(&"crouch_mix", 1, &"crouch")
 
-	root.add_node(&"air_clip", _clip(&"Jump_air"), Vector2(400, 300))
+	root.add_node(&"air_clip", _clip(&"air"), Vector2(400, 300))
 	var air := AnimationNodeBlend2.new()
 	root.add_node(&"air", air, Vector2(600, 100))
 	root.connect_node(&"air", 0, &"crouch_mix")
 	root.connect_node(&"air", 1, &"air_clip")
 
-	root.add_node(&"hold_clip", _clip(&"Pistol_Aim_Neutral"), Vector2(600, 300))
+	root.add_node(&"hold_clip", _clip(&"hold"), Vector2(600, 300))
 	var upper := AnimationNodeBlend2.new()
 	upper.filter_enabled = true
 	for bone in UPPER_BONES:
@@ -252,12 +350,13 @@ func update(delta: float, local_velocity: Vector3, crouch: float, airborne: bool
 	_smooth(&"parameters/loco/blend_position", blend, delta * 10.0)
 	_smooth(&"parameters/crouch/blend_position", blend * 1.4, delta * 10.0)
 	var speed := flat.length()
-	_tree.set(&"parameters/loco_speed/scale", clampf(speed / JOG_SPEED, 0.6, 1.4) if speed > 0.3 else 1.0)
+	_tree.set(&"parameters/loco_speed/scale", clampf(speed / _run_speed, 0.6, 1.7) if speed > 0.3 else 1.0)
 	_smooth_f(&"parameters/crouch_mix/blend_amount", clampf(crouch, 0.0, 1.0), delta * 8.0)
 	_smooth_f(&"parameters/air/blend_amount", 1.0 if airborne else 0.0, delta * 6.0)
 	var two_handed := gun != null and gun.find_child("HandL", true, false) != null
-	# One-handed (the knife): the free arm swings with the legs instead.
-	_smooth_f(&"parameters/upper/blend_amount", 1.0 if two_handed else 0.0, delta * 8.0)
+	# The fallback clips hold no rifle, so a two-handed hold goes over them;
+	# one-handed (the knife), the free arm swings with the legs instead.
+	_smooth_f(&"parameters/upper/blend_amount", 1.0 if two_handed and not uses_mixamo() else 0.0, delta * 8.0)
 	_aim.pitch = pitch
 
 	_place_hands(gun, two_handed)
@@ -303,7 +402,7 @@ func play_death(clip_override: StringName = &"") -> void:
 	_aim.pitch = 0.0
 	var clip: StringName = clip_override if clip_override != &"" else DEATHS[randi() % DEATHS.size()]
 	if not _player.has_animation(clip):
-		clip = &"Death_D"
+		clip = &"death_c"
 	# Not looping (set on load), so it holds the last frame.
 	_player.play(clip, 0.1)
 

@@ -27,6 +27,11 @@ the project.
 
 ## Other
 
+- **Mixamo** (https://www.mixamo.com, Adobe): the player character "Ch15" and
+  its rifle animations, downloaded by the project owner. Mixamo's terms allow
+  royalty-free use in games but not redistribution of the raw files on their
+  own.
+
 - **"First Person Hands with Gloves"** by rrfreelance
   (https://rrfreelance.itch.io/first-person-hands-with-gloves): the
   first-person hands. The asset is offered free, but its page states no
