@@ -166,6 +166,17 @@ const MUZZLE_FLASH_ENERGY := 3.0
 
 var _flash_left: float = 0.0
 
+## Keyframed viewmodel animation (draw, reload, inspect, knife swings).
+var _animator: ViewmodelAnimator = null
+## Seconds of the draw animation left; the weapon cannot fire until it is done.
+var _draw_left: float = 0.0
+## A melee swing that has started but not yet connected: seconds until it does,
+## or negative for none.
+var _melee_pending: float = -1.0
+## Whether the swing in flight is the heavy one. Read by the player when it
+## offers the hit to the host, and set on the host's copy before it resolves.
+var melee_heavy: bool = false
+
 
 # --- Lifecycle ----------------------------------------------------------
 
@@ -186,8 +197,10 @@ func equip(p_data: WeaponData, p_shooter: CollisionObject3D) -> void:
 	reserve_ammo = data.magazine_size * maxi(starting_reserve_magazines, 1)
 	_cooldown_left = 0.0
 	_burst_left = 0
+	_melee_pending = -1.0
 	_emit_ammo_changed()
 	_apply_model()
+	_draw_left = _animator.play_draw() if _animator != null else 0.0
 
 
 # --- Model ----------------------------------------------------------------------
@@ -229,7 +242,13 @@ func _apply_model() -> void:
 	_has_sight = false
 	for part in _placeholder_parts:
 		(part as Node3D).visible = scene == null
+	if _animator == null:
+		_animator = ViewmodelAnimator.new()
+		_animator.name = "Animator"
+		add_child(_animator)
+		_animator.cue.connect(_on_animation_cue)
 	if scene == null:
+		_animator.setup(_viewmodel, null, null, data)
 		return
 
 	_model = scene.instantiate() as Node3D
@@ -253,6 +272,31 @@ func _apply_model() -> void:
 	_arms.name = "Arms"
 	_viewmodel.add_child(_arms)
 	_arms.build(_viewmodel, _model, shooter)
+	_animator.setup(_viewmodel, _model, _arms, data)
+
+
+## Plays the sound a clip marks, on the machine that can see the viewmodel.
+func _on_animation_cue(cue: StringName) -> void:
+	if _viewmodel == null or not _viewmodel.is_visible_in_tree():
+		return
+	match cue:
+		&"mag_out":
+			Audio.play(&"reload_out", -6.0)
+		&"mag_in":
+			Audio.play(&"reload_in", -4.0)
+		&"rack":
+			Audio.play(&"rack", -8.0)
+		&"shing":
+			Audio.play(&"knife_draw", -6.0)
+
+
+## Starts the inspect animation, if nothing else is happening.
+func inspect() -> void:
+	if data == null or _animator == null or is_reloading or _draw_left > 0.0:
+		return
+	if _animator.is_playing() and not _animator.is_playing(&"inspect"):
+		return
+	_animator.play_inspect()
 
 
 ## The sight's position in this node's space (which is the weapon mount's), or
@@ -281,9 +325,9 @@ func set_model_hidden(hidden: bool) -> void:
 ## answer was always no - the counter had just been set to the burst size - so
 ## burst fire never fired at all.
 func can_fire() -> bool:
-	if data == null or is_reloading:
+	if data == null or is_reloading or _draw_left > 0.0:
 		return false
-	if ammo_in_magazine <= 0:
+	if ammo_in_magazine <= 0 and not data.is_melee:
 		return false
 	return _cooldown_left <= 0.0
 
@@ -340,6 +384,11 @@ func _tick(delta: float) -> void:
 	# small fire-rate differences (such as aiming's) vanished entirely. The
 	# one-frame floor stops an idle weapon banking extra shots.
 	_cooldown_left = maxf(_cooldown_left - delta, -delta)
+	_draw_left = maxf(_draw_left - delta, 0.0)
+	if _melee_pending >= 0.0:
+		_melee_pending -= delta
+		if _melee_pending < 0.0:
+			fired.emit()
 	if _burst_timer > 0.0:
 		_burst_timer = maxf(_burst_timer - delta, 0.0)
 
@@ -379,6 +428,13 @@ func _try_fire() -> bool:
 			dry_fired.emit()
 		return false
 
+	if data.is_melee:
+		_cooldown_left = data.fire_interval
+		_start_melee(false)
+		return true
+
+	if _animator != null and _animator.is_playing(&"inspect"):
+		_animator.stop()
 	ammo_in_magazine -= 1
 	# Scaled by aiming on the shots that start a new trigger pull; the rounds
 	# inside a burst keep the weapon's own rhythm.
@@ -393,6 +449,27 @@ func _try_fire() -> bool:
 	_request_recoil()
 	fired.emit()
 	return true
+
+
+## The knife's alternate attack: a slower, harder stab. Returns whether it
+## started.
+func try_heavy() -> bool:
+	if data == null or not data.is_melee or not can_fire():
+		return false
+	_cooldown_left = data.heavy_interval
+	_start_melee(true)
+	return true
+
+
+## Starts a swing; it connects (emits [signal fired]) partway through.
+func _start_melee(heavy: bool) -> void:
+	melee_heavy = heavy
+	_melee_pending = data.heavy_hit_delay if heavy else data.melee_hit_delay
+	if _animator != null:
+		if heavy:
+			_animator.play_stab()
+		else:
+			_animator.play_slash()
 
 
 ## Performs the hitscan along an already-validated aim ray.
@@ -469,7 +546,12 @@ func _apply_damage_to(result: Dictionary, origin: Vector3, direction: Vector3) -
 	var distance := origin.distance_to(point)
 	var zone := Damageable.resolve_zone(target, point, collider)
 	var amount := data.damage_at_distance(distance)
-	if zone == Damageable.HitZone.HEAD:
+	if data.is_melee:
+		# A blade does what it does wherever it lands - except from behind.
+		amount = data.heavy_damage if melee_heavy else data.damage
+		if _is_behind(target, direction):
+			amount *= data.backstab_multiplier
+	elif zone == Damageable.HitZone.HEAD:
 		amount *= data.headshot_multiplier
 
 	var dealt := Damageable.deal_damage(target, amount, shooter, zone)
@@ -493,15 +575,30 @@ func _apply_damage_to(result: Dictionary, origin: Vector3, direction: Vector3) -
 	hit_confirmed.emit(killed, zone, health_left)
 
 
+## Whether a hit along [param direction] comes from behind [param target]: the
+## two face the same way, ignoring pitch.
+static func _is_behind(target: Object, direction: Vector3) -> bool:
+	if not target.has_method(&"get_look_direction"):
+		return false
+	var facing: Vector3 = target.call(&"get_look_direction")
+	facing.y = 0.0
+	var along := Vector3(direction.x, 0.0, direction.z)
+	if facing.length_squared() < 0.0001 or along.length_squared() < 0.0001:
+		return false
+	return facing.normalized().dot(along.normalized()) > 0.5
+
+
 ## Starts a reload if one is needed and allowed. Returns whether it started.
 func try_reload() -> bool:
-	if data == null or is_reloading or is_full():
+	if data == null or data.is_melee or is_reloading or is_full():
 		return false
 	if not infinite_reserve and reserve_ammo <= 0:
 		return false
 
 	is_reloading = true
 	_reload_left = data.reload_time
+	if _animator != null:
+		_animator.play_reload(data.reload_time)
 	reload_started.emit(data.reload_time)
 	return true
 
@@ -513,6 +610,8 @@ func cancel_reload() -> void:
 		return
 	is_reloading = false
 	_reload_left = 0.0
+	if _animator != null and _animator.is_playing(&"reload"):
+		_animator.stop()
 	reload_finished.emit()
 
 

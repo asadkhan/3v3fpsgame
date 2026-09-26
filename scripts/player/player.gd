@@ -879,7 +879,7 @@ func _on_weapon_fired() -> void:
 	# player still gets instant feedback for their own action; what they do not
 	# get is the right to decide it hit something.
 	if NetworkManager.is_online:
-		request_shot_from_network(origin, direction)
+		request_shot_from_network(origin, direction, weapon.melee_heavy)
 		return
 
 	weapon.hitscan(origin, direction)
@@ -901,32 +901,33 @@ func _on_weapon_fired() -> void:
 ## playing by different rules from everyone else, and the only way to find out
 ## that the validating rules were wrong would be to notice the host behaving
 ## differently.
-func request_shot_from_network(origin: Vector3, direction: Vector3) -> void:
+func request_shot_from_network(origin: Vector3, direction: Vector3, heavy: bool = false) -> void:
 	# The host cannot RPC itself - Godot refuses a `call_remote` RPC addressed
 	# to the local peer ("RPC on yourself is not allowed"), which is what left
 	# the host unable to hit anything online. It calls the same validating
 	# function directly instead, naming itself as the sender, so it still
 	# plays by exactly the rules a client does.
 	if multiplayer.is_server():
-		_resolve_shot(multiplayer.get_unique_id(), origin, direction)
+		_resolve_shot(multiplayer.get_unique_id(), origin, direction, heavy)
 		return
-	resolve_incoming_shot.rpc_id(NetworkManager.SERVER_PEER_ID, origin, direction)
+	resolve_incoming_shot.rpc_id(NetworkManager.SERVER_PEER_ID, origin, direction, heavy)
 
 
 ## The network entry point of a shot: a client asking the host to resolve it.
 ##
 ## Runs on the server, or it does nothing at all.
 @rpc("any_peer", "call_remote", "reliable")
-func resolve_incoming_shot(origin: Vector3, direction: Vector3) -> void:
+func resolve_incoming_shot(origin: Vector3, direction: Vector3, heavy: bool = false) -> void:
 	if not multiplayer.is_server():
 		return
-	_resolve_shot(multiplayer.get_remote_sender_id(), origin, direction)
+	_resolve_shot(multiplayer.get_remote_sender_id(), origin, direction, heavy)
 
 
 ## The authoritative end of a shot, on the host. [param sender] is the peer that
 ## asked - read from the transport for a client, and the host's own id for the
-## host's player.
-func _resolve_shot(sender: int, origin: Vector3, direction: Vector3) -> void:
+## host's player. [param heavy] is a knife's stab rather than its slash; it only
+## changes the damage, and only a melee weapon reads it.
+func _resolve_shot(sender: int, origin: Vector3, direction: Vector3, heavy: bool = false) -> void:
 	# A client may only speak for its own body. Without this, any peer could
 	# fire on any other peer's behalf - including making somebody else's player
 	# shoot, which would then be validated against a ray origin the attacker
@@ -990,6 +991,7 @@ func _resolve_shot(sender: int, origin: Vector3, direction: Vector3) -> void:
 	# `Damageable.deal_damage` on whatever it found, and the host's copy of
 	# every player's `apply_damage` is the one that counts.
 	direction = direction.normalized()
+	weapon.melee_heavy = heavy
 	var result := weapon.hitscan(authoritative_origin, direction)
 	_report_shooting_to_echo_fields()
 
@@ -1102,15 +1104,12 @@ func _play_hit_feedback(zone: int, killed: bool) -> void:
 
 
 func _on_reload_started(duration: float) -> void:
+	# The sounds are cued by the reload animation, in step with the magazine.
 	reloading_changed.emit(true, duration)
-	if not is_network_remote:
-		Audio.play(&"reload_out", -6.0)
 
 
 func _on_reload_finished() -> void:
 	reloading_changed.emit(false, 0.0)
-	if not is_network_remote and weapon != null and weapon.is_full():
-		Audio.play(&"reload_in", -5.0)
 
 
 func _on_dry_fired() -> void:
@@ -1880,6 +1879,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"weapon_sidearm"):
 		loadout.switch_to(PlayerLoadout.SLOT_SIDEARM)
 		return
+	if event.is_action_pressed(&"weapon_knife"):
+		loadout.switch_to(PlayerLoadout.SLOT_KNIFE)
+		return
+	if event.is_action_pressed(&"inspect") and state.is_alive and weapon != null:
+		weapon.inspect()
+		return
 
 	# Echo Field deployment (Chapter 6)
 	if event.is_action_pressed(&"echo_field") and state.is_alive:
@@ -1997,6 +2002,10 @@ func _update_combat(delta: float) -> void:
 
 	if can_trigger and Input.is_action_just_pressed(&"reload"):
 		weapon.try_reload()
+	# A blade has no sights: right mouse is its heavy stab.
+	if can_trigger and weapon.data != null and weapon.data.is_melee \
+			and Input.is_action_just_pressed(&"aim"):
+		weapon.try_heavy()
 
 
 # --- Movement ----------------------------------------------------------

@@ -4,11 +4,14 @@
 
 [node name="WrenModel" type="Node3D"]
 position = Vector3(0, -0.03, -0.05)
+metadata/magazine = NodePath("Model/service_pistol_magazine_loaded")
+metadata/magazine_hidden = true
 
 [node name="Model" parent="." instance=ExtResource("1_model")]
 rotation = Vector3(0, 1.5708, 0)
 
 [node name="service_pistol_magazine_loaded" parent="Model" index="2"]
+position = Vector3(0, 0, 0)
 visible = false
 
 [node name="service_pistol_magazine_empty" parent="Model" index="3"]

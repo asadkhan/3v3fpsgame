@@ -168,11 +168,15 @@ func update_view(player: Player, spectating: bool = false) -> void:
 	var primary := player.loadout.primary_data()
 	var primary_text := ("1  %s" % primary.display_name.to_upper()) if primary != null else "1  -"
 	var sidearm_text := "2  %s" % WeaponCatalog.sidearm().display_name.to_upper()
-	if player.loadout.held_slot == PlayerLoadout.SLOT_PRIMARY and primary != null:
-		primary_text = "[%s]" % primary_text
-	else:
-		sidearm_text = "[%s]" % sidearm_text
-	_slots.text = "%s     %s" % [primary_text, sidearm_text]
+	var knife_text := "3  KNIFE"
+	match player.loadout.held_slot:
+		PlayerLoadout.SLOT_KNIFE:
+			knife_text = "[%s]" % knife_text
+		PlayerLoadout.SLOT_PRIMARY when primary != null:
+			primary_text = "[%s]" % primary_text
+		_:
+			sidearm_text = "[%s]" % sidearm_text
+	_slots.text = "%s     %s     %s" % [primary_text, sidearm_text, knife_text]
 
 	var weapon := player.weapon
 	if weapon == null or weapon.data == null:
@@ -182,6 +186,12 @@ func update_view(player: Player, spectating: bool = false) -> void:
 		_reload.text = ""
 		return
 	_weapon_name.text = weapon.data.display_name.to_upper()
+	if weapon.data.is_melee:
+		_ammo.text = "-"
+		_reserve.text = ""
+		_reload.text = ""
+		_ammo.add_theme_color_override(&"font_color", UITheme.TEXT)
+		return
 	_ammo.text = str(weapon.ammo_in_magazine)
 	_reserve.text = " / %d" % weapon.data.magazine_size if weapon.infinite_reserve \
 		else " / %d" % weapon.reserve_ammo

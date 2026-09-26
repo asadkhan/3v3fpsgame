@@ -57,6 +57,7 @@ func _can_aim() -> bool:
 		and _player.input_enabled and _player.state.is_alive and not _player.objective_lock \
 		and _player.is_mouse_captured() \
 		and weapon != null and weapon.data != null and not weapon.is_reloading \
+		and not weapon.data.is_melee \
 		and not Input.is_action_pressed(&"sprint")
 
 

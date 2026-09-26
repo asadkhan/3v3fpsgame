@@ -61,7 +61,7 @@ func _ready() -> void:
 		shields.add_child(card)
 		_shield_cards[shield_id] = card
 
-	column.add_child(UITheme.label("Sidearm: Wren (always carried, key 2).  Weapons you survive with carry over.  B to close.",
+	column.add_child(UITheme.label("Sidearm: Wren (key 2)   Knife (key 3)   Inspect: Y.  Weapons you survive with carry over.  B to close.",
 		UITheme.SIZE_SMALL, UITheme.TEXT_DIM, HORIZONTAL_ALIGNMENT_CENTER))
 
 

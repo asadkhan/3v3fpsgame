@@ -18,6 +18,7 @@ extends Node
 
 const SLOT_PRIMARY := 0
 const SLOT_SIDEARM := 1
+const SLOT_KNIFE := 2
 
 ## Something about the loadout changed - bought, lost, or switched.
 signal changed
@@ -40,6 +41,8 @@ func primary_data() -> WeaponData:
 
 ## The weapon in the player's hands right now.
 func held_data() -> WeaponData:
+	if held_slot == SLOT_KNIFE:
+		return WeaponCatalog.knife()
 	if held_slot == SLOT_PRIMARY:
 		var data := primary_data()
 		if data != null:
@@ -56,7 +59,7 @@ func refill() -> void:
 	_slot_ammo.clear()
 
 
-## The owner switching weapons (keys 1 / 2).
+## The owner switching weapons (keys 1 / 2 / 3).
 func switch_to(slot: int) -> void:
 	if slot == held_slot or not _player.state.is_alive:
 		return

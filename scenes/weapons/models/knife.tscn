@@ -1,0 +1,25 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_model.gd" id="1_gffxc"]
+[ext_resource type="Material" path="res://assets/weapons/cc0/kabar/kabar.tres" id="2_oy318"]
+[ext_resource type="PackedScene" path="res://assets/weapons/cc0/kabar/kabar.fbx" id="3_sjr1q"]
+
+[node name="KnifeModel" type="Node3D" unique_id=503376768]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.02, 0, 0)
+script = ExtResource("1_gffxc")
+material = ExtResource("2_oy318")
+
+[node name="Grip" type="Node3D" parent="." unique_id=476895413]
+transform = Transform3D(0.9928257, -0.119570315, -3.7252903e-09, 0.07440193, 0.61777997, 0.78282315, -0.09360242, -0.777207, 0.6222441, 0, 0, 0)
+
+[node name="HandR" type="Marker3D" parent="Grip" unique_id=1939982276]
+metadata/grip = "custom"
+metadata/radius = 0.018
+
+[node name="Spin" type="Node3D" parent="Grip" unique_id=1318828837]
+
+[node name="Model" type="Node3D" parent="Grip/Spin" unique_id=327446226 instance=ExtResource("3_sjr1q")]
+transform = Transform3D(0, -0.1, 0, -0.1, 0, 0, 0, 0, -0.1, 0, 0.083, 0)
+
+[node name="Muzzle" type="Marker3D" parent="." unique_id=1091554756]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.023914063, 0.123555996, -0.1554414)

@@ -213,6 +213,20 @@ enum Category {
 ## weapon model once fully aimed - for guns fitted with a magnified scope.
 @export var scope_overlay: bool = false
 
+@export_group("Melee")
+## A blade rather than a gun: no ammo, no reload, no tracer. The primary attack
+## ([member damage], [member fire_interval]) is a quick slash; the alternate
+## (right mouse) is a heavy stab. Both reach [member max_range] and land
+## partway through the swing, not on the click.
+@export var is_melee: bool = false
+@export var heavy_damage: float = 80.0
+@export var heavy_interval: float = 1.0
+## Seconds from the click to the blade connecting.
+@export var melee_hit_delay: float = 0.12
+@export var heavy_hit_delay: float = 0.36
+## Damage multiplier from behind (the victim facing away from the attacker).
+@export var backstab_multiplier: float = 2.0
+
 
 ## Whether this weapon can be picked in a buy menu at all.
 func is_buyable() -> bool:

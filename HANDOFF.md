@@ -240,6 +240,77 @@ take the team colour (Alpha blue-grey, Bravo tan). Sleeves, straps and gloves us
 the gun (no hand animation for reload yet). Swap for a skinned arm model later
 if real art arrives - only the markers need to stay.
 
+## Viewmodel animation & knife
+
+**Animation** - `scripts/weapons/viewmodel_animator.gd` (`ViewmodelAnimator`,
+owned by `Weapon`).
+- Keyframed procedural clips, eased with smoothstep. No imported skeletal
+  animation: FPS animation only fits the rig it was made for, and this
+  viewmodel is assembled from separate gun, hand and sleeve models.
+- The channels each clip can drive:
+
+  | Channel | What it moves |
+  |---|---|
+  | `pos` / `rot` | the gun, about a pivot by the grip |
+  | `hand` | the left hand leaving the grip for the magazine |
+  | `mag` | how far the magazine drops |
+  | `open` | how far the right hand opens |
+  | `spin` / `lift` | the knife flip and toss |
+
+- Cues at set times play sounds:
+  - `mag_out` and `mag_in` play `reload_out` / `reload_in`.
+  - `rack` plays the charging handle.
+  - `shing` plays the knife draw.
+- The clips on every gun:
+  - draw (~0.34 s, and the gun cannot fire until it ends)
+  - reload (timed to `reload_time`: tilt, mag out, mag in, slap, rack)
+  - inspect (Y key, two angles)
+- The clips on the knife:
+  - flip-in draw
+  - alternating slash (left mouse)
+  - heavy stab (right mouse)
+  - toss-and-catch inspect
+- Firing cancels an inspect.
+- Each model scene names its magazine with root metadata `magazine`
+  (NodePath). Set `magazine_hidden` too if the magazine only shows while out
+  (the Wren).
+
+**Arms** - `ViewmodelArms` is now re-solved every frame. Shoulders stay fixed
+under the camera and two-bone IK follows the animated hands. The animator sets:
+- `left_override` / `left_weight` (the left hand on the magazine)
+- `left_visible`
+- `grip_open[]` (finger curl)
+
+**Knife** - `data/weapons/knife.tres` (id `knife`, slot `SLOT_KNIFE`, key 3).
+- Model: Ka-Bar, OpenGameArt "Kabar Combat knife" by gamekorp, CC0, in
+  `assets/weapons/cc0/kabar/`.
+- Scene `scenes/weapons/models/knife.tscn`, laid out as Grip (hand frame,
+  `grip = "custom"`), then HandR, then Spin, then Model.
+- New `WeaponData` melee fields: `is_melee`, `heavy_damage`, `heavy_interval`,
+  `melee_hit_delay`, `heavy_hit_delay`, `backstab_multiplier`.
+- Numbers:
+  - slash 50 dmg / 0.5 s
+  - stab 80 / 1.05 s
+  - range 2.3 m
+  - x2 from behind (target facing within 60 deg of the attack direction)
+  - no headshot bonus
+- A swing emits `fired` after its hit delay, so it reuses the whole hitscan
+  and network path. `request_shot_from_network` / `resolve_incoming_shot` /
+  `_resolve_shot` carry a `heavy` flag, which the host sets on its copy
+  (`weapon.melee_heavy`) before resolving.
+- The host's rate limit still uses `fire_interval` (0.5 s), which covers
+  both attacks.
+- WeaponFx plays whoosh, flesh-hit and wall-ting sounds, with no tracer or
+  bullet hole.
+- HUD: three slots, and no ammo row for the knife.
+- ADS is disabled on melee.
+- New synthesized sounds in `Audio`: `rack`, `knife_swing`, `knife_heavy`,
+  `knife_draw`, `knife_hit`, `knife_wall`.
+- Inputs: `weapon_knife` (3), `inspect` (Y).
+- Not done yet:
+  - remote players see no swing (their third-person model is static)
+  - the knife's held slot is not in late-join state, the same as other slots
+
 ## World art & rendering
 
 All from **Poly Haven (CC0)**. The fetch script used was a small wrapper around
