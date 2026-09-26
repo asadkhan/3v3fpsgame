@@ -74,6 +74,10 @@ func _show_small(text: String, colour: Color) -> void:
 func _on_phase_changed(_previous: int, current: int) -> void:
 	var round_number := GameManager.match_state.round_number
 	match current:
+		GamePhase.Phase.MATCH_END:
+			var winner := GameManager.match_state.winning_team
+			if local_team != Team.Side.NONE and winner != Team.Side.NONE:
+				Audio.play(&"match_win" if winner == local_team else &"match_lose", -3.0, 0.0)
 		GamePhase.Phase.WARMUP:
 			show_banner("WARMUP", "The match starts shortly", UITheme.ACCENT)
 		GamePhase.Phase.BUY:
@@ -86,7 +90,9 @@ func _on_phase_changed(_previous: int, current: int) -> void:
 				var attacking := local_team == match_state.attacking_side()
 				subtitle = "%s   -   press B to buy" % ("ATTACK: plant the core" if attacking else "DEFEND: stop the plant")
 			show_banner(title, subtitle, UITheme.TEXT, 2.4)
+			Audio.play(&"round_start", -5.0, 0.0)
 		GamePhase.Phase.ROUND_ACTIVE:
+			Audio.play(&"fight", -5.0, 0.0)
 			show_banner("FIGHT", "", UITheme.ACCENT, 0.6)
 		GamePhase.Phase.ROUND_END:
 			var winner := GameManager.match_state.last_round_winner
@@ -96,8 +102,12 @@ func _on_phase_changed(_previous: int, current: int) -> void:
 				show_banner("%s WINS THE ROUND" % Team.side_name(winner), "", UITheme.team_colour(winner), 2.5)
 			elif winner == local_team:
 				show_banner("ROUND WON", GameManager.match_state.score_line(), UITheme.GOOD, 2.5)
+				if not GameManager.match_state.is_match_over():
+					Audio.play(&"round_win", -4.0, 0.0)
 			else:
 				show_banner("ROUND LOST", GameManager.match_state.score_line(), UITheme.DANGER, 2.5)
+				if not GameManager.match_state.is_match_over():
+					Audio.play(&"round_lose", -4.0, 0.0)
 
 
 func _on_core_planted(_planter: int, site: String) -> void:

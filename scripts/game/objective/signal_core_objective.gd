@@ -71,6 +71,15 @@ func _ready() -> void:
 	_build_visual()
 	GameManager.state_changed.connect(_on_phase_changed)
 	EventBus.core_detonated.connect(_on_core_detonated_request)
+	# Sounds, on every machine, where the core is.
+	EventBus.core_planted.connect(func(_id: int, _site: String) -> void:
+		Audio.play_at(&"core_planted", core_position, 2.0, 0.0, 70.0)
+		_beep_left = 0.4)
+	EventBus.core_defused.connect(func(_id: int) -> void:
+		Audio.play_at(&"core_defused", core_position, 2.0, 0.0, 70.0))
+	EventBus.core_detonated.connect(func() -> void:
+		Audio.play_at(&"core_detonate", core_position, 8.0, 0.0, 200.0)
+		Audio.play(&"core_detonate", -8.0, 0.0))
 	NetworkManager.roster_updated.connect(_on_roster_updated)
 
 
@@ -411,12 +420,32 @@ func _build_visual() -> void:
 	_visual.visible = false
 
 
+## Seconds to the planted core's next beep.
+var _beep_left: float = 0.0
+
+
+## The planted core beeps, faster and faster as its clock runs down - the
+## sound every player in the match times their retake or their hold by.
+func _tick_beep(delta: float) -> void:
+	if not GameManager.is_in(GamePhase.Phase.ROUND_ACTIVE) or GameManager.current_state == null:
+		return
+	var remaining := GameManager.current_state.get_time_remaining()
+	var total := maxf(GameManager.match_rules.detonation_seconds, 1.0)
+	_beep_left -= delta
+	if _beep_left > 0.0:
+		return
+	_beep_left = lerpf(0.12, 1.0, clampf(remaining / total, 0.0, 1.0))
+	Audio.play_at(&"core_beep", core_position, 0.0, 0.0, 60.0)
+
+
 func _update_visual(delta: float) -> void:
 	var shown := core_state in [CoreState.DROPPED, CoreState.PLANTED, CoreState.DEFUSED]
 	_visual.visible = shown
 	if not shown:
 		return
 	_visual.global_position = core_position
+	if core_state == CoreState.PLANTED:
+		_tick_beep(delta)
 	_pulse += delta * (7.0 if core_state == CoreState.PLANTED else 2.0)
 	_visual.rotation.y += delta * 1.5
 	var dim := core_state == CoreState.DEFUSED

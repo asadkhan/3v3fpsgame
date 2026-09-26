@@ -1038,6 +1038,7 @@ func _confirm_shot(point: Vector3, normal: Vector3, zone: int, victim_peer_id: i
 	var is_mine := shooter_peer_id == multiplayer.get_unique_id()
 	if is_mine and hit and _hit_marker != null:
 		_hit_marker.flash(zone, killed)
+		_play_hit_feedback(zone, killed)
 	# Always a network result here: this machine did not run the raycast (the
 	# host never receives its own `call_remote` broadcast), so nothing has been
 	# drawn yet - including for this machine's own shots, which previously
@@ -1053,19 +1054,41 @@ func _on_recoil_requested(_pitch_degrees: float, _yaw_degrees: float) -> void:
 
 
 func _on_hit_confirmed(killed: bool, zone: int, _health_left: int) -> void:
+	# Raised wherever the hitscan ran - which, for a client's shot, is the
+	# host's copy of that client. Only the shooter's own machine gets feedback.
+	if is_network_remote:
+		return
 	if _hit_marker != null:
 		_hit_marker.flash(zone, killed)
+	_play_hit_feedback(zone, killed)
+
+
+## The sound half of a hit marker: a tick for a body shot, a bright ding for a
+## headshot, a chime for a kill.
+func _play_hit_feedback(zone: int, killed: bool) -> void:
+	if killed:
+		Audio.play(&"kill", -2.0, 0.0)
+	elif zone == Damageable.HitZone.HEAD:
+		Audio.play(&"hit_head", -3.0, 0.02)
+	else:
+		Audio.play(&"hit_body", -6.0, 0.05)
 
 
 func _on_reload_started(duration: float) -> void:
 	reloading_changed.emit(true, duration)
+	if not is_network_remote:
+		Audio.play(&"reload_out", -6.0)
 
 
 func _on_reload_finished() -> void:
 	reloading_changed.emit(false, 0.0)
+	if not is_network_remote and weapon != null and weapon.is_full():
+		Audio.play(&"reload_in", -5.0)
 
 
 func _on_dry_fired() -> void:
+	if not is_network_remote:
+		Audio.play(&"dry_fire", -6.0)
 	# Nothing visual yet - Chapter 8's job. The signal exists so there is
 	# somewhere obvious to put the click, and so a test can prove an empty
 	# weapon is distinguishable from a working one.
@@ -1089,6 +1112,60 @@ var objective_lock: bool = false
 # --- Public API --------------------------------------------------------
 # Chapter 3+ and the network layer talk to the player through these, not by
 # reaching into its internals.
+
+# --- Footsteps --------------------------------------------------------------
+
+## Metres between footsteps.
+const STEP_STRIDE := 2.3
+
+## Below this speed a player is silent. Walking at full speed or sprinting is
+## heard; crouching and moving while aimed are not - the tactical trade of
+## moving slowly to move quietly.
+const STEP_MIN_SPEED := 4.2
+
+var _step_distance: float = 0.0
+var _step_last_position: Vector3 = Vector3.INF
+var _step_airborne_speed: float = 0.0
+var _step_was_grounded: bool = true
+
+
+## Plays footsteps for every body, measured from how it actually moved - so it
+## works the same for a remote body driven by snapshots. Your own are quiet and
+## flat; everyone else's are positioned, so you can hear where they are.
+func _update_footsteps(delta: float) -> void:
+	var here := global_position
+	if _step_last_position == Vector3.INF or delta <= 0.0:
+		_step_last_position = here
+		return
+	var moved := Vector2(here.x - _step_last_position.x, here.z - _step_last_position.z).length()
+	var vertical_speed := (here.y - _step_last_position.y) / delta
+	_step_last_position = here
+	var speed := moved / delta
+
+	var grounded := is_on_floor() if not is_network_remote else absf(vertical_speed) < 1.5
+	if not is_network_remote:
+		# Landing thump, local only.
+		if not grounded:
+			_step_airborne_speed = maxf(_step_airborne_speed, -velocity.y)
+		elif not _step_was_grounded and _step_airborne_speed > 4.0:
+			Audio.play(&"land", -6.0)
+			_step_airborne_speed = 0.0
+		elif grounded:
+			_step_airborne_speed = 0.0
+	_step_was_grounded = grounded
+
+	# A teleport or respawn is not a run.
+	if not state.is_alive or not grounded or speed < STEP_MIN_SPEED or speed > 20.0:
+		return
+	_step_distance += moved
+	if _step_distance < STEP_STRIDE:
+		return
+	_step_distance = 0.0
+	if is_network_remote:
+		Audio.play_at(&"step", here, -1.0, 0.12, 32.0)
+	else:
+		Audio.play(&"step", -14.0, 0.12)
+
 
 ## Gives the screen back to this player's own camera - after spectating, for
 ## instance. Does nothing for a body this machine does not drive.
@@ -1882,6 +1959,7 @@ func _physics_process(delta: float) -> void:
 	if is_network_remote:
 		_net_clock += delta
 		_advance_remote_interpolation(delta)
+		_update_footsteps(delta)
 		return
 
 	# Health, team and death are the host's and the host alone. The RPC handling
@@ -1927,6 +2005,7 @@ func _physics_process(delta: float) -> void:
 	_track_floor(delta)
 	_write_net_transform()
 	view_feel.update(delta, velocity, is_on_floor(), is_sprinting(), aim.amount)
+	_update_footsteps(delta)
 	_camera.position = view_feel.camera_offset()
 	_camera.rotation.z = view_feel.camera_roll()
 
