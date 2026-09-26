@@ -13,6 +13,7 @@ var _aim_mode: Button
 var _volume: HSlider
 var _volume_value: Label
 var _head_bob: Button
+var _quality: Button
 
 
 func _ready() -> void:
@@ -74,6 +75,16 @@ func _ready() -> void:
 	column.add_child(_head_bob)
 	_refresh_aim_mode()
 
+	_quality = Button.new()
+	_quality.focus_mode = Control.FOCUS_NONE
+	_quality.pressed.connect(func() -> void:
+		# AUTO -> LOW -> MEDIUM -> HIGH -> ULTRA -> AUTO
+		var next: int = GameConfig.get_setting("video/graphics_quality") + 1
+		GameConfig.set_setting("video/graphics_quality", -1 if next > GraphicsQuality.Level.ULTRA else next)
+		_refresh_aim_mode())
+	column.add_child(_quality)
+	_refresh_aim_mode()
+
 	var leave := Button.new()
 	leave.text = "LEAVE MATCH"
 	leave.focus_mode = Control.FOCUS_NONE
@@ -126,6 +137,10 @@ func _refresh_aim_mode() -> void:
 	_aim_mode.text = "AIM (right mouse):  %s" % ("TOGGLE" if GameConfig.aim_toggle else "HOLD")
 	if _head_bob != null:
 		_head_bob.text = "CAMERA BOB:  %s" % ("ON" if GameConfig.head_bob else "OFF")
+	if _quality != null:
+		var chosen: int = GameConfig.get_setting("video/graphics_quality")
+		_quality.text = "GRAPHICS:  %s" % (GraphicsQuality.NAMES[chosen] if chosen != GraphicsQuality.Level.AUTO
+			else "AUTO (%s)" % GraphicsQuality.NAMES[GraphicsQuality.automatic()])
 
 
 func _on_resume() -> void:

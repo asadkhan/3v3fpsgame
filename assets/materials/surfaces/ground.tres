@@ -1,0 +1,17 @@
+[gd_resource type="ORMMaterial3D" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/materials/dry_ground_rocks/dry_ground_rocks_diff.jpg" id="1_bb60r"]
+[ext_resource type="Texture2D" path="res://assets/materials/dry_ground_rocks/dry_ground_rocks_nor_gl.jpg" id="2_ulill"]
+[ext_resource type="Texture2D" path="res://assets/materials/dry_ground_rocks/dry_ground_rocks_arm.jpg" id="3_my17j"]
+
+[resource]
+albedo_texture = ExtResource("1_bb60r")
+orm_texture = ExtResource("3_my17j")
+normal_enabled = true
+normal_scale = 0.7
+normal_texture = ExtResource("2_ulill")
+uv1_scale = Vector3(0.33333334, 0.33333334, 0.33333334)
+uv1_triplanar = true
+uv1_triplanar_sharpness = 4.0
+uv1_world_triplanar = true
+texture_filter = 5
