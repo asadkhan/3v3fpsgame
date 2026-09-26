@@ -16,8 +16,45 @@ extends Node3D
 ## points below and behind the camera, and each arm reaches its hand with
 ## two-bone IK, so a new gun only needs its two markers.
 ##
+## The hands and forearms are a scanned, skinned arm model
+## ([constant ARM_MODEL], fingerless tactical gloves): placed on each marker,
+## mirrored for the left hand, its wrist bent so the forearm runs to the IK
+## elbow and its fingers curled round the grip. The sleeves, straps and upper
+## arms are still built here from primitives, in the team colour. Without the
+## model file the whole hand falls back to primitives too.
+##
 ## Purely cosmetic and local: the whole rig moves rigidly with the viewmodel
 ## (sway, aim, kick), and the sleeves take the owner's team colour.
+
+const ARM_MODEL := "res://assets/characters/fp_arms/firstPersonHandsWithGloves.FBX"
+const ARM_TEXTURES := "res://assets/characters/fp_arms/ArmWithGlove%s.png"
+
+## The arm model's axes in the hand frame (see [method _grip_basis]): its
+## fingers (-Z) point forward, the back of its hand (+Y) faces +X, and its
+## knuckles run index to pinky (+X) down the grip (-Y).
+const MODEL_TO_HAND := Basis(Vector3(0, -1, 0), Vector3(1, 0, 0), Vector3(0, 0, 1))
+## The centre of the loop the curled fingers make, in model space: a held
+## object's axis goes through it. Measured from the curled pose.
+const MODEL_GRIP_CENTRE := Vector3(0.006, -0.013, -0.055)
+## Grip radius the curl angles below are tuned for; thicker grips open the hand.
+const CURL_RADIUS := 0.019
+## Finger curl in degrees per joint (base, middle, tip): wrapped round a grip,
+## and the straighter trigger finger.
+const CURL_GRIP := [62.0, 78.0, 48.0]
+const CURL_TRIGGER := [18.0, 22.0, 12.0]
+const CURL_THUMB := [45.0, 40.0, 30.0]
+## The thumb's joints bend about a different local axis from the fingers'.
+const THUMB_AXIS := Vector3(-1, 0, 0)
+const FINGERS := [
+	["BoneIndexBase", "BoneIndexMid", "BoneIndexEnd"],
+	["BoneMiddleBase", "BoneMiddleMid", "BoneMiddleBaseEnd"],
+	["BoneRingBase", "BoneRingMiddle", "BoneRingEnd"],
+	["BonePinkyBase", "BonePinkyMid", "BonePinkyEnd"],
+]
+const THUMB := ["Bone003", "Bone004", "Bone005"]
+
+static var _arm_scene: PackedScene = null
+static var _skin: StandardMaterial3D = null
 
 ## Shoulders, in the weapon's space: the camera is at the origin looking down -Z.
 const SHOULDER_R := Vector3(0.17, -0.3, 0.06)
@@ -103,20 +140,30 @@ func _build_arm(side: int, shoulder: Vector3, hand: Transform3D, r: float, hand_
 	var glove := Node3D.new()
 	glove.scale = Vector3(side, 1, 1) * hand_scale
 	hand_node.add_child(glove)
-	_build_glove(glove, r / hand_scale, trigger)
+	var scanned := _build_scanned_hand(glove, r / hand_scale, trigger)
+	var fore_length := FORE_LENGTH
+	var wrist: Vector3
+	if scanned.is_empty():
+		_build_glove(glove, r / hand_scale, trigger)
+		wrist = hand * (glove.transform * Vector3(r + 0.008, -0.018, 0.075))
+	else:
+		wrist = hand * (glove.transform * (scanned.wrist as Vector3))
+		fore_length = (scanned.fore_length as float) * hand_scale
 
-	var wrist := hand * (glove.transform * Vector3(r + 0.008, -0.018, 0.075))
 	# Two-bone IK: the elbow sits where both segments meet, bent outwards and
 	# down.
 	var reach := wrist - shoulder
-	var d := clampf(reach.length(), 0.05, UPPER_LENGTH + FORE_LENGTH - 0.002)
+	var d := clampf(reach.length(), 0.05, UPPER_LENGTH + fore_length - 0.002)
 	var dir := reach.normalized()
-	var along := (UPPER_LENGTH * UPPER_LENGTH - FORE_LENGTH * FORE_LENGTH + d * d) / (2.0 * d)
+	var along := (UPPER_LENGTH * UPPER_LENGTH - fore_length * fore_length + d * d) / (2.0 * d)
 	var out := sqrt(maxf(UPPER_LENGTH * UPPER_LENGTH - along * along, 0.0))
 	var pole := Vector3(0.7 * side, -1.0, 0.25)
 	pole = (pole - dir * pole.dot(dir)).normalized()
 	var elbow := shoulder + dir * along + pole * out
 	var fore_dir := (wrist - elbow).normalized()
+	if not scanned.is_empty():
+		var rig_to_skeleton := (hand * glove.transform * (scanned.model as Node3D).transform).affine_inverse()
+		_bend_forearm(scanned, rig_to_skeleton * elbow)
 
 	# Upper arm: sleeve, a strap with a pouch, and the elbow pad.
 	var upper_dir := (elbow - shoulder).normalized()
@@ -128,22 +175,99 @@ func _build_arm(side: int, shoulder: Vector3, hand: Transform3D, r: float, hand_
 	_ellipsoid(elbow + pole * 0.024, Vector3(0.036, 0.046, 0.022), fore_dir, pole, _hard)
 
 	# Forearm: sleeve bunched at the cuff, a strap, the wrist band with its tab.
-	var cuff := wrist - fore_dir * 0.03
-	_limb(elbow, cuff, 0.037, 0.031, _fabric)
-	_limb(cuff - fore_dir * 0.03, cuff, 0.035, 0.034, _fabric)
+	# Over the scanned forearm the sleeve has to be wider and stop short of
+	# the glove.
+	var cuff := wrist - fore_dir * (0.03 if scanned.is_empty() else 0.05)
+	var sleeve := 1.0 if scanned.is_empty() else 1.5
+	_limb(elbow, cuff, 0.037 * sleeve, 0.031 * sleeve, _fabric)
+	_limb(cuff - fore_dir * 0.03, cuff, 0.035 * sleeve, 0.034 * sleeve, _fabric)
 	# Folds where the sleeve bunches above the cuff, each a little askew.
 	var side_dir := fore_dir.cross(pole).normalized()
 	for i in 3:
 		var at := cuff - fore_dir * (0.045 + i * 0.03)
 		var tilt := (pole if i % 2 == 0 else side_dir) * 0.004
-		_limb(at - fore_dir * 0.006 - tilt, at + fore_dir * 0.006 + tilt, 0.0345 + i * 0.001, 0.0345 + i * 0.001, _fabric)
+		var fold := (0.0345 + i * 0.001) * sleeve
+		_limb(at - fore_dir * 0.006 - tilt, at + fore_dir * 0.006 + tilt, fold, fold, _fabric)
 	# A velcro patch on the outside of the forearm.
-	_box(elbow.lerp(cuff, 0.25) + pole * 0.033, Vector3(0.03, 0.05, 0.006), fore_dir, pole, _patch)
+	_box(elbow.lerp(cuff, 0.25) + pole * 0.033 * sleeve, Vector3(0.03, 0.05, 0.006), fore_dir, pole, _patch)
 	var band := elbow.lerp(cuff, 0.5)
-	_limb(band - fore_dir * 0.008, band + fore_dir * 0.008, 0.036, 0.0355, _nylon)
-	_box(band + pole * 0.036, Vector3(0.018, 0.024, 0.01), fore_dir, pole, _hard)
-	_limb(cuff - fore_dir * 0.004, wrist + fore_dir * 0.004, 0.03, 0.029, _nylon)
-	_box(cuff.lerp(wrist, 0.5) + pole * 0.03, Vector3(0.022, 0.016, 0.005), fore_dir, pole, _accent)
+	_limb(band - fore_dir * 0.008, band + fore_dir * 0.008, 0.036 * sleeve, 0.0355 * sleeve, _nylon)
+	_box(band + pole * 0.036 * sleeve, Vector3(0.018, 0.024, 0.01), fore_dir, pole, _hard)
+	if scanned.is_empty():
+		_limb(cuff - fore_dir * 0.004, wrist + fore_dir * 0.004, 0.03, 0.029, _nylon)
+		_box(cuff.lerp(wrist, 0.5) + pole * 0.03, Vector3(0.022, 0.016, 0.005), fore_dir, pole, _accent)
+
+
+# --- Scanned hand -----------------------------------------------------------------
+
+## Puts the skinned arm model under [param glove] (the hand frame, mirrored for
+## the left hand) with an object of radius [param r] in its grip, and curls its
+## fingers round it. Returns the model, its skeleton, the wrist in glove space
+## and the forearm length - or nothing if the model is missing.
+func _build_scanned_hand(glove: Node3D, r: float, trigger: bool) -> Dictionary:
+	if _arm_scene == null:
+		_arm_scene = load(ARM_MODEL) as PackedScene
+		if _arm_scene == null:
+			return {}
+		_skin = StandardMaterial3D.new()
+		_skin.albedo_texture = load(ARM_TEXTURES % "Albedo")
+		_skin.normal_enabled = true
+		_skin.normal_texture = load(ARM_TEXTURES % "Normal")
+		_skin.roughness_texture = load(ARM_TEXTURES % "Roughness")
+		_skin.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	var model := _arm_scene.instantiate() as Node3D
+	var skeletons := model.find_children("*", "Skeleton3D", true, false)
+	if skeletons.is_empty():
+		model.free()
+		return {}
+	var skeleton := skeletons[0] as Skeleton3D
+	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+		mesh.material_override = _skin
+		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	model.transform = Transform3D(MODEL_TO_HAND, -(MODEL_TO_HAND * MODEL_GRIP_CENTRE))
+	glove.add_child(model)
+
+	var open := clampf(CURL_RADIUS / maxf(r, 0.005), 0.6, 1.15)
+	for i in FINGERS.size():
+		_curl(skeleton, FINGERS[i], CURL_TRIGGER if i == 0 and trigger else CURL_GRIP, open)
+	_curl(skeleton, THUMB, CURL_THUMB, open, THUMB_AXIS)
+	var wrist := skeleton.get_bone_global_rest(skeleton.find_bone("BoneHand")).origin
+	var elbow := skeleton.get_bone_global_rest(skeleton.find_bone("BoneArm")).origin
+	return {
+		"model": model, "skeleton": skeleton,
+		"wrist": model.transform * wrist, "fore_length": wrist.distance_to(elbow),
+	}
+
+
+static func _curl(skeleton: Skeleton3D, bones: Array, degrees: Array, amount: float,
+		axis := Vector3.UP) -> void:
+	for j in bones.size():
+		var bone := skeleton.find_bone(bones[j])
+		if bone < 0:
+			continue
+		var rest := skeleton.get_bone_rest(bone).basis.get_rotation_quaternion()
+		skeleton.set_bone_pose_rotation(bone, rest * Quaternion(axis, deg_to_rad(degrees[j] * amount)))
+
+
+## Swings the forearm about the wrist so it runs to [param elbow] (skeleton
+## space) while the hand stays on the grip - the wrist bends, as a real one
+## does.
+static func _bend_forearm(scanned: Dictionary, elbow: Vector3) -> void:
+	var skeleton := scanned.skeleton as Skeleton3D
+	var arm := skeleton.find_bone("BoneArm")
+	var roll := skeleton.find_bone("BoneWristRoll")
+	var hand := skeleton.find_bone("BoneHand")
+	var wrist := skeleton.get_bone_global_rest(hand).origin
+	var arm_rest := skeleton.get_bone_global_rest(arm)
+	var from := (arm_rest.origin - wrist).normalized()
+	var to := (elbow - wrist).normalized()
+	if from.cross(to).length() < 0.0001:
+		return
+	var swing := Transform3D(Basis(Quaternion(from, to)), wrist) * Transform3D(Basis(), -wrist)
+	skeleton.set_bone_global_pose(arm, swing * arm_rest)
+	if roll >= 0:
+		skeleton.set_bone_global_pose(roll, swing * skeleton.get_bone_global_rest(roll))
+	skeleton.set_bone_global_pose(hand, skeleton.get_bone_global_rest(hand))
 
 
 ## The glove, in the hand frame (see [method _grip_basis]) around an object of

@@ -1,0 +1,15 @@
+[gd_resource type="StandardMaterial3D" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/weapons/cc0/sniper/Sniper_Base_Color.png" id="1_v3hpp"]
+[ext_resource type="Texture2D" path="res://assets/weapons/cc0/sniper/Sniper_Metallic.png" id="2_61lhq"]
+[ext_resource type="Texture2D" path="res://assets/weapons/cc0/sniper/Sniper_Normal.png" id="3_1rkyo"]
+[ext_resource type="Texture2D" path="res://assets/weapons/cc0/sniper/Sniper_Roughness.png" id="4_p64js"]
+
+[resource]
+albedo_texture = ExtResource("1_v3hpp")
+metallic = 1.0
+metallic_texture = ExtResource("2_61lhq")
+roughness_texture = ExtResource("4_p64js")
+normal_enabled = true
+normal_texture = ExtResource("3_1rkyo")
+texture_filter = 5

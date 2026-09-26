@@ -185,12 +185,22 @@ Source: Quaternius **Ultimate Gun Pack** (CC0), FBX, in
 large units; each weapon has a scene in `scenes/weapons/models/` that turns it
 to -Z, scales it by 0.16 (a rifle is ~0.83 m) and mounts accessories:
 
-| Weapon | Model | Accessories |
+| Weapon | Model | Source |
 |---|---|---|
-| Wren | **Poly Haven service_pistol** (realistic PBR, real-world metres, variant "a" with wood grips; `_b` parts, loose magazines and bullet hidden) | - |
-| Swift | SubmachineGun_3 | Flashlight |
-| Harrier | AssaultRifle2_3 | Scope_3 (scope overlay, ADS zoom 1.8) |
-| Kestrel | AssaultRifle2_1 | Grip, Flashlight |
+| Wren | service_pistol (wood grips) | Poly Haven, CC0 |
+| Swift | M3 Grease Gun | "Free CC0 Guns & Explosives Pack", 3dmodelscc0.itch.io, CC0 |
+| Harrier | scoped sniper rifle (scope overlay, ADS zoom 1.8) | same pack, CC0 |
+| Kestrel | M4A1 | same pack, CC0 |
+
+The CC0 pack guns are real-world metres, pointing -Z. Their FBX files carry no
+materials, so each scene's root is a `WeaponModel`
+(`scripts/weapons/weapon_model.gd`) that applies
+`assets/weapons/cc0/<gun>/<gun>.tres`: albedo, metallic, roughness and
+normal. The Grease Gun's normal map is DirectX, so it is flipped on import.
+The rest of that pack (AK-47, Suomi, shotgun, Makarov, Luger, grenades, C4,
+smoke, flashbang...) is not in the repo. Re-download it from the itch page if
+it is needed. The Quaternius pack stays in `assets/weapons/quaternius/`,
+unused.
 
 Each scene has a `Muzzle` marker (tracers/flash start) and a `Sight` marker.
 `WeaponData.viewmodel_scene` points at it; `Weapon._apply_model()` swaps it in
@@ -200,6 +210,22 @@ hides the model when fully aimed and shows `HudScopeOverlay`. Remote players
 carry the same model (`Player._refresh_third_person_weapon`, under the head,
 follows replicated pitch). To add a gun: make a model scene with Muzzle +
 Sight markers, point a WeaponData at it, tune the root position for hip framing.
+
+**Scanned hands** - `assets/characters/fp_arms/`, from "First Person Hands
+with Gloves" by rrfreelance (free on itch.io, originally a Unity Asset Store
+pack). The itch page states no explicit licence, so check it before a
+commercial release.
+- A single skinned right forearm and hand in a fingerless glove, mirrored for
+  the left hand.
+- The roughness map is the pack's gloss map inverted.
+- `ViewmodelArms` places it on each hand marker using `MODEL_TO_HAND` and
+  `MODEL_GRIP_CENTRE`, both measured from the curled pose.
+- It curls the finger bones about local +Y and the thumb about -X, opening
+  the hand for thicker grips.
+- It bends the wrist, via `set_bone_global_pose`, so the forearm runs to the
+  IK elbow.
+- The sleeve is drawn 1.5x wider over it so the model's bare forearm never
+  shows through.
 
 **First-person arms** (`scripts/weapons/viewmodel_arms.gd`, `ViewmodelArms`):
 built in code from primitives (no art assets) - sleeves with folds, strap and
