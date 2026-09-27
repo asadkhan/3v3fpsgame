@@ -20,11 +20,19 @@ const PATHS := {
 }
 
 
+## loaded weapons, kept alive here. without this, load() re-reads a weapon
+## (model, textures and all) from disk whenever nothing else holds it - e.g.
+## the hud asking for the sidearm's name every frame while the knife is out.
+static var _cache: Dictionary = {}
+
+
 ## the weapon with this id, or null if unknown/empty.
 static func find(weapon_id: StringName) -> WeaponData:
 	if not PATHS.has(weapon_id):
 		return null
-	return load(PATHS[weapon_id]) as WeaponData
+	if not _cache.has(weapon_id):
+		_cache[weapon_id] = load(PATHS[weapon_id]) as WeaponData
+	return _cache[weapon_id]
 
 
 static func sidearm() -> WeaponData:
