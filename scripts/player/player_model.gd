@@ -326,7 +326,7 @@ func _build_tree() -> AnimationTree:
 	loco.max_space = Vector2(2, 2)
 	for point in [[&"idle", Vector2.ZERO], [&"run", Vector2(0, 1)],
 			[&"back", Vector2(0, -1)], [&"strafe_l", Vector2(-1, 0)], [&"strafe_r", Vector2(1, 0)]]:
-		loco.add_blend_point(_clip(point[0]), point[1], -1, "p%d" % loco.get_blend_point_count())
+		loco.add_blend_point(_clip(point[0]), point[1])
 	root.add_node(&"loco", loco, Vector2(0, 0))
 	var loco_speed := AnimationNodeTimeScale.new()
 	root.add_node(&"loco_speed", loco_speed, Vector2(200, 0))
@@ -337,7 +337,7 @@ func _build_tree() -> AnimationTree:
 	crouch.max_space = Vector2(2, 2)
 	for point in [[&"crouch_idle", Vector2.ZERO], [&"crouch_walk", Vector2(0, 1)],
 			[&"crouch_walk", Vector2(0, -1)], [&"crouch_walk", Vector2(1, 0)], [&"crouch_walk", Vector2(-1, 0)]]:
-		crouch.add_blend_point(_clip(point[0]), point[1], -1, "p%d" % crouch.get_blend_point_count())
+		crouch.add_blend_point(_clip(point[0]), point[1])
 	root.add_node(&"crouch", crouch, Vector2(0, 200))
 
 	var crouch_mix := AnimationNodeBlend2.new()
