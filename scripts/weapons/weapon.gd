@@ -298,6 +298,14 @@ func _on_animation_cue(cue: StringName) -> void:
 			Audio.play(&"knife_draw", -6.0)
 
 
+## The gun dips out of the way for a throw and comes back up; it cannot fire
+## until it is back.
+func throw_motion() -> void:
+	Audio.play(&"grenade_throw", -4.0, 0.1)
+	if _animator != null:
+		_draw_left = _animator.play_draw()
+
+
 ## Starts the inspect animation, if nothing else is happening.
 func inspect() -> void:
 	if data == null or _animator == null or is_reloading or _draw_left > 0.0:

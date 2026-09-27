@@ -142,7 +142,7 @@ func _echo(remote: bool, at := Vector3.ZERO) -> void:
 	if remote:
 		Audio.play_at(&"shot_echo", at, 0.0, 0.1, 160.0)
 	else:
-		get_tree().create_timer(0.06).timeout.connect(func() -> void: Audio.play(&"shot_echo", -13.0, 0.1))
+		get_tree().create_timer(0.06).timeout.connect(func() -> void: Audio.play(&"shot_echo", -18.0, 0.1))
 
 
 ## A round that passes close to this machine's player cracks past their head.
@@ -170,6 +170,11 @@ func _eject_remote_casing(muzzle: Vector3) -> void:
 		_weapon.data.category == WeaponData.Category.PISTOL)
 
 
+func _listener_position() -> Vector3:
+	var camera := get_viewport().get_camera_3d()
+	return camera.global_position if camera != null else Vector3.ZERO
+
+
 func _is_remote_shooter() -> bool:
 	return _player != null and _player.is_network_remote
 
@@ -189,7 +194,9 @@ func _spawn_tracer(to: Vector3, with_flash: bool) -> void:
 			from = held
 	if with_flash:
 		# Somebody else's shot: heard from where they are, so it can be located.
-		Audio.play_at(_shot_sound(), from, 2.0, 0.05, 110.0)
+		var far := StringName(String(_shot_sound()) + "_far")
+		var near := from.distance_to(_listener_position()) < 12.0
+		Audio.play_at(_shot_sound() if near or not Audio.has_sound(far) else far, from, 2.0, 0.05, 140.0)
 		_echo(true, from)
 		_crack_past_listener(from, to)
 		_eject_remote_casing(from)

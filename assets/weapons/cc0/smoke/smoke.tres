@@ -1,0 +1,14 @@
+[gd_resource type="StandardMaterial3D" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/weapons/cc0/smoke/Smoke_Grenade_Base_Color.png" id="1_1abqi"]
+[ext_resource type="Texture2D" path="res://assets/weapons/cc0/smoke/Smoke_Grenade_Metallic.png" id="2_dp8qm"]
+[ext_resource type="Texture2D" path="res://assets/weapons/cc0/smoke/Smoke_Grenade_Normal_DirectX.png" id="3_tdwqc"]
+[ext_resource type="Texture2D" path="res://assets/weapons/cc0/smoke/Smoke_Grenade_Roughness.png" id="4_ifo2s"]
+
+[resource]
+albedo_texture = ExtResource("1_1abqi")
+metallic = 1.0
+metallic_texture = ExtResource("2_dp8qm")
+roughness_texture = ExtResource("4_ifo2s")
+normal_enabled = true
+normal_texture = ExtResource("3_tdwqc")

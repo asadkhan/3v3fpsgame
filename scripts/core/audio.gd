@@ -123,6 +123,13 @@ func _build_library() -> void:
 	_library[&"distant_burst"] = _distant_burst()
 	_library[&"wind"] = _looped(_wind(8.0))
 	_library[&"fire_crackle"] = _looped(_crackle(4.0))
+	# Grenades.
+	_library[&"grenade_throw"] = _whoosh(0.3, 500.0, 1800.0, 0.5)
+	_library[&"grenade_bounce"] = _tones([[1150.0, 0.0, 0.25], [2380.0, 0.0, 0.12]], 0.16, 38.0, 0.5)
+	_library[&"grenade_boom"] = _boom(2.4, 1.0)
+	_library[&"smoke_pop"] = _thump(0.25, 90.0, 16.0, 0.9)
+	_library[&"smoke_hiss"] = _looped(_hiss(3.0))
+	_load_recordings()
 	# Knife: air, steel, and what it meets.
 	_library[&"knife_swing"] = _whoosh(0.26, 700.0, 2600.0, 0.55)
 	_library[&"knife_heavy"] = _whoosh(0.4, 380.0, 1700.0, 0.7)
@@ -328,6 +335,36 @@ func _shing(seconds: float, gain: float) -> AudioStreamWAV:
 			var partials := sin(TAU * 3120.0 * r) * 0.5 + sin(TAU * 4710.0 * r) * 0.3 + sin(TAU * 6240.0 * r) * 0.2
 			ring = partials * exp(-r * 7.0) * minf(r / 0.005, 1.0)
 		samples[i] = (scrape + ring * 0.5) * gain
+	return _to_stream(samples)
+
+
+## Real gunshots recorded at a range (The Free Firearm Sound Library, CC0),
+## replacing the synthesised ones under the same names. The [code]_far[/code]
+## takes were miked further off and are used for other players' shots.
+const RECORDINGS := ["shot_rifle", "shot_rifle_far", "shot_smg", "shot_smg_far", "shot_burst",
+	"shot_burst_far", "shot_pistol", "shot_pistol_far"]
+
+
+func _load_recordings() -> void:
+	for sound in RECORDINGS:
+		var path := "res://assets/audio/weapons/%s.wav" % sound
+		if ResourceLoader.exists(path):
+			_library[StringName(sound)] = load(path)
+
+
+## A grenade venting smoke: a steady filtered hiss.
+func _hiss(seconds: float) -> AudioStreamWAV:
+	var count := int(seconds * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var lp := 0.0
+	var last := 0.0
+	for i in count:
+		var noise := randf_range(-1.0, 1.0)
+		lp += (noise - lp) * 0.4
+		var hp := lp - last
+		last = lp
+		samples[i] = hp * 1.2
 	return _to_stream(samples)
 
 

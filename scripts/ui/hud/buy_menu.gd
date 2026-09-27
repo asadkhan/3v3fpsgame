@@ -61,7 +61,25 @@ func _ready() -> void:
 		shields.add_child(card)
 		_shield_cards[shield_id] = card
 
-	column.add_child(UITheme.label("Sidearm: Wren (key 2)   Knife (key 3)   Inspect: Y.  Weapons you survive with carry over.  B to close.",
+	var utility := HBoxContainer.new()
+	utility.add_theme_constant_override(&"separation", 12)
+	column.add_child(utility)
+	for grenade_id in PlayerLoadout.GRENADE_IDS:
+		var card := Button.new()
+		card.custom_minimum_size = Vector2(210, 70)
+		card.focus_mode = Control.FOCUS_NONE
+		card.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		card.text = "%s  (max %d)\n%d credits" % [String(PlayerLoadout.GRENADE_NAME[grenade_id]).to_upper(),
+			int(PlayerLoadout.GRENADE_MAX[grenade_id]), int(PlayerLoadout.GRENADE_PRICE[grenade_id])]
+		card.add_theme_color_override(&"font_color", UITheme.ACCENT)
+		card.pressed.connect(func() -> void:
+			var player := NetworkManager.get_local_player()
+			if player != null:
+				player.loadout.request_buy_grenade(grenade_id))
+		utility.add_child(card)
+		_grenade_cards[grenade_id] = card
+
+	column.add_child(UITheme.label("Sidearm: Wren (key 2)   Knife (key 3)   Frag: G   Smoke: Q   Inspect: Y.  Weapons you survive with carry over.  B to close.",
 		UITheme.SIZE_SMALL, UITheme.TEXT_DIM, HORIZONTAL_ALIGNMENT_CENTER))
 
 
@@ -89,6 +107,7 @@ func update_view(player: Player) -> void:
 		close(player)
 		return
 	_credits.text = "%d credits" % player.state.credits
+	_refresh_grenades(player)
 	for weapon_id in _cards:
 		var data := WeaponCatalog.find(weapon_id)
 		var card: Button = _cards[weapon_id]
@@ -100,6 +119,17 @@ func update_view(player: Player) -> void:
 		shield_card.disabled = not player.loadout.can_buy_shield(shield_id)
 		var have: bool = player.state.shield >= PlayerLoadout.shield_amount(shield_id)
 		shield_card.modulate = UITheme.GOOD if have else Color.WHITE
+
+
+var _grenade_cards: Dictionary = {}
+
+
+func _refresh_grenades(player: Player) -> void:
+	for grenade_id in _grenade_cards:
+		var card: Button = _grenade_cards[grenade_id]
+		card.disabled = not player.loadout.can_buy_grenade(grenade_id)
+		var full: bool = int(player.loadout.grenades[grenade_id]) >= int(PlayerLoadout.GRENADE_MAX[grenade_id])
+		card.modulate = UITheme.GOOD if full else Color.WHITE
 
 
 func _on_shield_pressed(shield_id: StringName) -> void:

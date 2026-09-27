@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://vcehpslu6hng"
-path.s3tc="res://.godot/imported/kabar_diffuse.jpg-262ff5fb20680ea2dcf0267e68115967.s3tc.ctex"
+uid="uid://cljbn1kxyry75"
+path.s3tc="res://.godot/imported/Smoke_Grenade_Normal_DirectX.png-77e497acfca7f267f9c392a0d4cbe058.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://assets/weapons/cc0/kabar/kabar_diffuse.jpg"
-dest_files=["res://.godot/imported/kabar_diffuse.jpg-262ff5fb20680ea2dcf0267e68115967.s3tc.ctex"]
+source_file="res://assets/weapons/cc0/smoke/Smoke_Grenade_Normal_DirectX.png"
+dest_files=["res://.godot/imported/Smoke_Grenade_Normal_DirectX.png-77e497acfca7f267f9c392a0d4cbe058.s3tc.ctex"]
 
 [params]
 
@@ -22,7 +22,7 @@ compress/lossy_quality=0.7
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
-compress/normal_map=0
+compress/normal_map=1
 compress/channel_pack=0
 mipmaps/generate=true
 mipmaps/limit=-1
@@ -34,7 +34,7 @@ process/channel_remap/blue=2
 process/channel_remap/alpha=3
 process/fix_alpha_border=true
 process/premult_alpha=false
-process/normal_map_invert_y=false
+process/normal_map_invert_y=true
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0

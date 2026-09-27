@@ -359,7 +359,53 @@ func update(delta: float, local_velocity: Vector3, crouch: float, airborne: bool
 	_smooth_f(&"parameters/upper/blend_amount", 1.0 if two_handed and not uses_mixamo() else 0.0, delta * 8.0)
 	_aim.pitch = pitch
 
-	_place_hands(gun, two_handed)
+	if uses_mixamo():
+		# The clips hold a rifle properly with both hands: the gun goes into
+		# them instead of the arms being pulled onto the gun.
+		for ik in _iks:
+			ik.influence = 0.0
+		_mount_gun(gun, two_handed)
+	else:
+		_place_hands(gun, two_handed)
+
+
+## Puts [param gun] in the animated hands: its grip in the right hand, its
+## barrel running through the left (one-handed, along the aim).
+func _mount_gun(gun: Node3D, two_handed: bool) -> void:
+	if gun == null or skeleton == null:
+		return
+	var hand_r := gun.find_child("HandR", true, false) as Node3D
+	if hand_r == null:
+		return
+	var sx := skeleton.global_transform
+	var rb := skeleton.find_bone(&"RightHand")
+	var rm := skeleton.find_bone(&"RightMiddleProximal")
+	var lb := skeleton.find_bone(&"LeftHand")
+	if rb < 0:
+		return
+	var right := sx * skeleton.get_bone_global_pose(rb).origin
+	var grip := right.lerp(sx * skeleton.get_bone_global_pose(rm).origin, 0.55) if rm >= 0 else right
+	var grip_local := ViewmodelArms._relative(hand_r, gun).origin
+
+	var local_dir := Vector3.FORWARD
+	var world_dir := -(gun.get_parent() as Node3D).global_basis.z
+	var hand_l := gun.find_child("HandL", true, false) as Node3D
+	if two_handed and hand_l != null and lb >= 0:
+		var support := sx * skeleton.get_bone_global_pose(lb).origin
+		local_dir = (ViewmodelArms._relative(hand_l, gun).origin - grip_local).normalized()
+		world_dir = (support - grip).normalized()
+	var from := _frame(local_dir, Vector3.UP)
+	var to := _frame(world_dir, global_basis.y)
+	var basis := to * from.inverse()
+	gun.global_transform = Transform3D(basis, grip - basis * grip_local)
+
+
+static func _frame(forward: Vector3, up: Vector3) -> Basis:
+	var f := forward.normalized()
+	var r := f.cross(up).normalized()
+	if r.length_squared() < 0.0001:
+		r = Vector3.RIGHT
+	return Basis(r, r.cross(f), -f)
 
 
 func _place_hands(gun: Node3D, two_handed: bool) -> void:

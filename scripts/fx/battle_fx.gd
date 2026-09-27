@@ -81,7 +81,12 @@ static func _blotch(size: int, colour: Color, strength: float, lumpiness: float)
 
 ## A billboard material for particles: [param additive] for fire and sparks,
 ## otherwise lit-by-nothing alpha smoke tinted by the particle colour.
-static func particle_material(texture: Texture2D, additive: bool) -> StandardMaterial3D:
+static func particle_material(texture: Texture2D, additive: bool) -> Material:
+	if not additive:
+		var smoke := ShaderMaterial.new()
+		smoke.shader = load("res://assets/shaders/smoke_particle.gdshader")
+		smoke.set_shader_parameter(&"puff", texture)
+		return smoke
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
@@ -122,6 +127,9 @@ static func _emitter(amount: int, lifetime: float, size: float, texture: Texture
 	p.mesh = quad
 	p.material_override = particle_material(texture, additive)
 	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Render layer 2: decals (scorches) are masked to layer 1, so they never
+	# paint onto smoke and fire.
+	p.layers = 2
 	return p
 
 
@@ -149,7 +157,7 @@ static func smoke_column(scale: float = 1.0) -> CPUParticles3D:
 	p.color_ramp = _ramp([Color(0.08, 0.07, 0.06, 0.0), Color(0.09, 0.08, 0.07, 0.85),
 		Color(0.16, 0.15, 0.14, 0.7), Color(0.3, 0.29, 0.28, 0.35), Color(0.4, 0.39, 0.38, 0.0)])
 	p.visibility_aabb = AABB(Vector3(-60, -5, -60) * scale, Vector3(120, 140, 120) * scale)
-	return p
+	return tint(p)
 
 
 ## Flames licking up out of a barrel or wreck, [param width] metres across.
@@ -197,7 +205,7 @@ static func fire_smoke() -> CPUParticles3D:
 	p.angle_max = 180.0
 	p.scale_amount_curve = _grow(0.6, 2.8)
 	p.color_ramp = _ramp([Color(0.2, 0.19, 0.18, 0.0), Color(0.22, 0.2, 0.19, 0.45), Color(0.4, 0.38, 0.36, 0.0)])
-	return p
+	return tint(p)
 
 
 ## A one-shot cloud where a round kicks up the ground or a wall: [param colour]
@@ -217,7 +225,7 @@ static func dust_burst(normal: Vector3, colour: Color) -> CPUParticles3D:
 	p.angle_max = 180.0
 	p.scale_amount_curve = _grow(0.5, 2.4)
 	p.color_ramp = _ramp([Color(colour, 0.0), Color(colour, 0.7), Color(colour, 0.0)])
-	return p
+	return tint(p)
 
 
 ## Bright sparks skipping off a hard surface.
@@ -250,6 +258,20 @@ static func blood_mist(normal: Vector3) -> CPUParticles3D:
 	p.gravity = Vector3(0, -2.0, 0)
 	p.scale_amount_curve = _grow(0.4, 1.8)
 	p.color_ramp = _ramp([Color(0.45, 0.02, 0.02, 0.0), Color(0.5, 0.03, 0.03, 0.85), Color(0.3, 0.02, 0.02, 0.0)])
+	return tint(p)
+
+
+## Moves a blended emitter's colour into its smoke material: the strongest
+## colour on its ramp (the ramp's own RGB does not reach blended particles).
+static func tint(p: CPUParticles3D) -> CPUParticles3D:
+	var material := p.material_override as ShaderMaterial
+	if material == null or p.color_ramp == null:
+		return p
+	var best := Color(1, 1, 1, 0)
+	for c in p.color_ramp.colors:
+		if c.a > best.a:
+			best = c
+	material.set_shader_parameter(&"tint", best)
 	return p
 
 

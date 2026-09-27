@@ -181,8 +181,128 @@ func _net_shield_bought() -> void:
 		_play_buy_sound()
 
 
+# --- Grenades ------------------------------------------------------------------
+
+const FRAG := &"frag"
+const SMOKE := &"smoke"
+const GRENADE_IDS: Array[StringName] = [FRAG, SMOKE]
+const GRENADE_PRICE := {FRAG: 300, SMOKE: 200}
+const GRENADE_MAX := {FRAG: 1, SMOKE: 2}
+const GRENADE_NAME := {FRAG: "Frag Grenade", SMOKE: "Smoke Grenade"}
+## Metres per second a grenade leaves the hand at.
+const THROW_SPEED := 17.0
+
+## Grenades carried. The host's copy is the authority; the owner's is a
+## prediction corrected by [method _net_grenades].
+var grenades := {FRAG: 0, SMOKE: 0}
+
+
+func can_buy_grenade(grenade_id: StringName) -> bool:
+	return grenade_id in GRENADE_IDS \
+		and GameManager.is_in(GamePhase.Phase.BUY) \
+		and _player.state.is_alive \
+		and int(grenades[grenade_id]) < int(GRENADE_MAX[grenade_id]) \
+		and _player.state.credits >= int(GRENADE_PRICE[grenade_id])
+
+
+func request_buy_grenade(grenade_id: StringName) -> void:
+	if _is_authority():
+		_server_buy_grenade(_player.peer_id, grenade_id)
+	else:
+		_rpc_buy_grenade.rpc_id(NetworkManager.SERVER_PEER_ID, grenade_id)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_buy_grenade(grenade_id: StringName) -> void:
+	if multiplayer.is_server():
+		_server_buy_grenade(multiplayer.get_remote_sender_id(), grenade_id)
+
+
+func _server_buy_grenade(sender: int, grenade_id: StringName) -> void:
+	if NetworkManager.is_online and sender != _player.peer_id:
+		return
+	if not can_buy_grenade(grenade_id):
+		return
+	_player.state.credits -= int(GRENADE_PRICE[grenade_id])
+	grenades[grenade_id] = int(grenades[grenade_id]) + 1
+	_player._publish_net_state()
+	_sync_grenades()
+	_play_buy_sound()
+	changed.emit()
+
+
+## Host: tell the owner how many grenades they really have.
+func _sync_grenades() -> void:
+	if NetworkManager.is_online and multiplayer.is_server() and _player.peer_id != multiplayer.get_unique_id():
+		_net_grenades.rpc_id(_player.peer_id, int(grenades[FRAG]), int(grenades[SMOKE]))
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _net_grenades(frags: int, smokes: int) -> void:
+	if multiplayer.get_remote_sender_id() != NetworkManager.SERVER_PEER_ID:
+		return
+	grenades[FRAG] = frags
+	grenades[SMOKE] = smokes
+	changed.emit()
+
+
+## The owner throwing a grenade from their eye, along their aim.
+func throw_grenade(grenade_id: StringName) -> void:
+	if not _player.state.is_alive or int(grenades.get(grenade_id, 0)) <= 0:
+		return
+	var origin := _player.get_eye_position() + _player.get_look_direction() * 0.4
+	var velocity := _player.get_look_direction() * THROW_SPEED + Vector3.UP * 2.2 \
+		+ Vector3(_player.velocity.x, 0.0, _player.velocity.z) * 0.6
+	_player.weapon.throw_motion()
+	if _is_authority():
+		_server_throw(_player.peer_id, grenade_id, origin, velocity)
+	else:
+		grenades[grenade_id] = int(grenades[grenade_id]) - 1
+		changed.emit()
+		_rpc_throw.rpc_id(NetworkManager.SERVER_PEER_ID, grenade_id, origin, velocity)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_throw(grenade_id: StringName, origin: Vector3, velocity: Vector3) -> void:
+	if multiplayer.is_server():
+		_server_throw(multiplayer.get_remote_sender_id(), grenade_id, origin, velocity)
+
+
+func _server_throw(sender: int, grenade_id: StringName, origin: Vector3, velocity: Vector3) -> void:
+	if NetworkManager.is_online and sender != _player.peer_id:
+		return
+	if not _player.state.is_alive or int(grenades.get(grenade_id, 0)) <= 0:
+		return
+	# Thrown from where the host believes this player is, at no more than a
+	# throw's speed.
+	if origin.distance_to(_player.get_eye_position()) > 1.5:
+		origin = _player.get_eye_position()
+	velocity = velocity.limit_length(THROW_SPEED + 6.0)
+	grenades[grenade_id] = int(grenades[grenade_id]) - 1
+	_sync_grenades()
+	changed.emit()
+	_spawn_grenade(grenade_id, origin, velocity)
+	if NetworkManager.is_online:
+		_net_spawn_grenade.rpc(grenade_id, origin, velocity)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _net_spawn_grenade(grenade_id: StringName, origin: Vector3, velocity: Vector3) -> void:
+	if multiplayer.get_remote_sender_id() == NetworkManager.SERVER_PEER_ID:
+		_spawn_grenade(grenade_id, origin, velocity)
+
+
+func _spawn_grenade(grenade_id: StringName, origin: Vector3, velocity: Vector3) -> void:
+	var parent := get_tree().get_first_node_in_group(&"match_scene")
+	if parent == null:
+		parent = get_tree().current_scene
+	Grenade.spawn(parent, Grenade.Kind.FRAG if grenade_id == FRAG else Grenade.Kind.SMOKE, origin, velocity, _player)
+
+
 ## Host only: the player died, so the primary is gone.
 func server_on_death() -> void:
+	grenades = {FRAG: 0, SMOKE: 0}
+	_sync_grenades()
 	if has_primary():
 		_set_primary(&"", false)
 

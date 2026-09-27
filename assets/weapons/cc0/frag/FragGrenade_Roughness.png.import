@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://vcehpslu6hng"
-path.s3tc="res://.godot/imported/kabar_diffuse.jpg-262ff5fb20680ea2dcf0267e68115967.s3tc.ctex"
+uid="uid://d4dbmpa6yc6ao"
+path.s3tc="res://.godot/imported/FragGrenade_Roughness.png-8010e0ad2810c0f1d5a0831f2b0613fd.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://assets/weapons/cc0/kabar/kabar_diffuse.jpg"
-dest_files=["res://.godot/imported/kabar_diffuse.jpg-262ff5fb20680ea2dcf0267e68115967.s3tc.ctex"]
+source_file="res://assets/weapons/cc0/frag/FragGrenade_Roughness.png"
+dest_files=["res://.godot/imported/FragGrenade_Roughness.png-8010e0ad2810c0f1d5a0831f2b0613fd.s3tc.ctex"]
 
 [params]
 

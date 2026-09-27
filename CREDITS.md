@@ -21,6 +21,9 @@ the project.
   covered car, tyres, jerrycans and others), and the service pistol (Wren).
 - **"Free CC0 Guns & Explosives Pack"** (https://3dmodelscc0.itch.io/free-cc0-guns-explosives-pack):
   the M4A1 (Kestrel), M3 Grease Gun (Swift), and scoped rifle (Harrier).
+- **The Free Firearm Sound Library** (https://opengameart.org/content/the-free-firearm-sound-library):
+  the recorded gunshots (AR-15, Carl Gustav M45, Savage 10, Walther PPQ).
+- The frag and smoke grenade models are from the same "Free CC0 Guns & Explosives Pack".
 - **"Kabar Combat knife"** by gamekorp (https://opengameart.org/content/kabar-combat-knife): the knife.
 - **Quaternius Ultimate Gun Pack** (https://quaternius.com): the earlier weapon
   models and accessories, still in `assets/weapons/quaternius/`.

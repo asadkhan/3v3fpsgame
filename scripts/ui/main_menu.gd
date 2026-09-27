@@ -52,11 +52,21 @@ func _ready() -> void:
 
 const BACKDROP_MAP := preload("res://scenes/maps/meridian.tscn")
 
-## Seconds per full orbit of the backdrop camera.
-const ORBIT_SECONDS := 90.0
+## Slow ground-level dolly shots through Meridian, cut between like a trailer:
+## [camera from, camera to, look-at from, look-at to]. Each lasts
+## [constant SHOT_SECONDS].
+const SHOTS := [
+	[Vector3(-25, 1.4, 26), Vector3(-25, 1.6, 12), Vector3(-24, 1.2, -10), Vector3(-22, 1.0, -20)],
+	[Vector3(-4, 1.1, 30), Vector3(3, 1.3, 30), Vector3(18, 2.5, 20), Vector3(22, 3.0, 8)],
+	[Vector3(-14, 1.7, -24), Vector3(-22, 1.9, -22), Vector3(-28, 1.5, -12), Vector3(-30, 1.8, -4)],
+	[Vector3(0, 1.3, 22), Vector3(0, 1.4, 8), Vector3(0, 1.8, -20), Vector3(0, 2.2, -30)],
+	[Vector3(24, 1.5, -12), Vector3(18, 1.7, -14), Vector3(12, 1.2, -28), Vector3(20, 1.4, -30)],
+]
+const SHOT_SECONDS := 11.0
 
 var _orbit_camera: Camera3D
-var _orbit_angle: float = 0.6
+var _shot: int = 0
+var _shot_time: float = 0.0
 
 
 ## A live view of the map behind the menu: Meridian in its own world, with a
@@ -78,7 +88,7 @@ func _build_backdrop() -> void:
 	container.add_child(viewport)
 	viewport.add_child(BACKDROP_MAP.instantiate())
 	_orbit_camera = Camera3D.new()
-	_orbit_camera.fov = 55.0
+	_orbit_camera.fov = 62.0
 	viewport.add_child(_orbit_camera)
 	_orbit_camera.make_current()
 	_update_orbit()
@@ -100,14 +110,18 @@ func _build_backdrop() -> void:
 func _process(delta: float) -> void:
 	if _orbit_camera == null:
 		return
-	_orbit_angle += TAU * delta / ORBIT_SECONDS
+	_shot_time += delta
+	if _shot_time > SHOT_SECONDS:
+		_shot_time = 0.0
+		_shot = (_shot + 1) % SHOTS.size()
 	_update_orbit()
 
 
 func _update_orbit() -> void:
-	var radius := 58.0
-	_orbit_camera.position = Vector3(cos(_orbit_angle) * radius, 30.0, sin(_orbit_angle) * radius)
-	_orbit_camera.look_at(Vector3(0.0, 0.0, -6.0), Vector3.UP)
+	var shot: Array = SHOTS[_shot]
+	var t := smoothstep(0.0, 1.0, _shot_time / SHOT_SECONDS)
+	_orbit_camera.position = (shot[0] as Vector3).lerp(shot[1], t)
+	_orbit_camera.look_at((shot[2] as Vector3).lerp(shot[3], t), Vector3.UP)
 
 
 ## Your level, title, progress to the next level and career numbers - the

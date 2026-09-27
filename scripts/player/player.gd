@@ -890,7 +890,7 @@ func _on_weapon_fired() -> void:
 	# host validates and casts exactly the ray the shooter's crosshair produced.
 	# Before this call existed `spread_degrees` was authored on every weapon and
 	# read by nothing, so every gun was perfectly accurate.
-	var direction := weapon.apply_spread(get_look_direction(), aim.spread_scale())
+	var direction := weapon.apply_spread(get_look_direction(), aim.spread_scale() * get_movement_inaccuracy())
 	direction = weapon.apply_spray(direction, aim.recoil_scale())
 	shot_fired.emit(origin, direction)
 
@@ -1891,6 +1891,27 @@ func _net_state_receive(health_value: int, alive: bool, side: int, kills: int, d
 ## Called by the weapon, which knows how much kick the weapon has. The
 ## [member max_recoil_pitch_degrees] cap lives here because it is a limit on how
 ## far the [b]player's view[/b] may be displaced, not a property of any gun.
+## Spread multiplier from moving: 1 standing still, up to 4 at full run, 5 in
+## the air, eased by crouching. Stop to shoot straight.
+func get_movement_inaccuracy() -> float:
+	if weapon != null and weapon.data != null and weapon.data.is_melee:
+		return 1.0
+	var speed := Vector2(_move_velocity.x, _move_velocity.z).length()
+	var m := 1.0 + clampf((speed - 0.6) / maxf(walk_speed, 0.1), 0.0, 1.0) * 3.0
+	if not is_on_floor():
+		m = 5.0
+	if _stance < 0.5:
+		m = 1.0 + (m - 1.0) * 0.6
+	return m
+
+
+## A jolt to the view - a nearby blast.
+func add_shake(amount: float) -> void:
+	_shake = 1.0
+	_shake_roll = randf_range(-1.0, 1.0) * amount
+	_shake_pitch = randf_range(0.3, 1.0) * amount
+
+
 func add_recoil(pitch_degrees: float, yaw_degrees: float) -> void:
 	if state.is_alive:
 		_recoil_pitch = minf(_recoil_pitch + pitch_degrees, max_recoil_pitch_degrees)
@@ -1974,6 +1995,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed(&"weapon_knife"):
 		loadout.switch_to(PlayerLoadout.SLOT_KNIFE)
+		return
+	if event.is_action_pressed(&"throw_frag") and _controls_active():
+		loadout.throw_grenade(PlayerLoadout.FRAG)
+		return
+	if event.is_action_pressed(&"throw_smoke") and _controls_active():
+		loadout.throw_grenade(PlayerLoadout.SMOKE)
 		return
 	if event.is_action_pressed(&"inspect") and state.is_alive and weapon != null:
 		weapon.inspect()
@@ -2105,7 +2132,8 @@ func _update_combat(delta: float) -> void:
 	# and the weapon itself never has to know the word "input".
 	# The pointer must be captured too: with it free the player is clicking on
 	# a menu (buy, Esc), and those clicks must not also fire the gun.
-	var can_trigger := _controls_active() and is_mouse_captured()
+	# No firing on the run: the gun is carried, not aimed, while sprinting.
+	var can_trigger := _controls_active() and is_mouse_captured() and not is_sprinting()
 	weapon.update_trigger(
 		can_trigger and Input.is_action_pressed(&"fire"),
 		can_trigger and Input.is_action_just_pressed(&"fire"),

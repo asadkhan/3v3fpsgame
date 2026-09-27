@@ -176,7 +176,9 @@ func update_view(player: Player, spectating: bool = false) -> void:
 			primary_text = "[%s]" % primary_text
 		_:
 			sidearm_text = "[%s]" % sidearm_text
-	_slots.text = "%s     %s     %s" % [primary_text, sidearm_text, knife_text]
+	var nades := player.loadout.grenades
+	_slots.text = "%s     %s     %s     G FRAG %d     Q SMOKE %d" % [primary_text, sidearm_text, knife_text,
+		int(nades[PlayerLoadout.FRAG]), int(nades[PlayerLoadout.SMOKE])]
 
 	var weapon := player.weapon
 	if weapon == null or weapon.data == null:
