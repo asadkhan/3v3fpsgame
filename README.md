@@ -69,7 +69,7 @@ Gun sounds are plain `.wav` files in `assets/audio/weapons/`. Replace a file wit
 | `shot_smg.wav` | Swift |
 | `shot_pistol.wav` | Wren |
 
-You can also put your own files in `assets/audio/weapons_custom/` with the same names. Anything there is used instead of the stock sound, and that folder is ignored by git, so sounds you can't share never get uploaded.
+You can also put your own files in `assets/audio/weapons_custom/` with the same names. Anything there is used instead of the stock sound.
 
 Each one also has a `_far.wav` version (e.g. `shot_rifle_far.wav`) that plays when the shot is more than 12 m away. If you delete a `_far` file the normal one is used instead. Which weapon uses which sound is decided in `_shot_sound()` in `scripts/fx/weapon_fx.gd`.
 

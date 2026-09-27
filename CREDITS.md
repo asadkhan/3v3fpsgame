@@ -43,3 +43,7 @@ the project.
 ## Music
 
 - The menu theme (`assets/audio/music/menu_theme.wav`) was made for this project.
+
+## Weapon sounds (weapons_custom)
+
+- The gunshots in `assets/audio/weapons_custom/` are cut from videos on the ActionEffectsPro YouTube channel (M4 single shot, mp5 full auto, Pistole single shot, Sniper shot reloading). Used for a non-commercial college showcase only.
