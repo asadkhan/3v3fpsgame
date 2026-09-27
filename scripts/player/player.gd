@@ -1095,6 +1095,10 @@ func _confirm_shot(point: Vector3, normal: Vector3, zone: int, victim_peer_id: i
 	# drawn yet - including for this machine's own shots, which previously
 	# produced no impact at all on a client.
 	shot_resolved.emit(point, normal, victim, zone, killed, false, surface)
+	# A client learns it was shot only from this verdict: point the damage
+	# indicator at the shooter (this body).
+	if hit and victim != null and not victim.is_network_remote and not multiplayer.is_server():
+		EventBus.local_hit_from.emit(global_position)
 
 
 func _on_recoil_requested(_pitch_degrees: float, _yaw_degrees: float) -> void:
@@ -1399,6 +1403,8 @@ func apply_damage(amount: float, _source: Node = null, _zone: Damageable.HitZone
 	if removed > 0.0:
 		_last_hit_zone = _zone
 		took_hit.emit(_source, removed, _zone)
+		if not is_network_remote and _source is Node3D and is_instance_valid(_source):
+			EventBus.local_hit_from.emit((_source as Node3D).global_position)
 		var attacker := _source as Player
 		EventBus.player_damaged.emit(peer_id,
 			attacker.peer_id if attacker != null else EventBus.INVALID_PEER, removed)

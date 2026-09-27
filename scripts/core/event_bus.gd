@@ -27,6 +27,13 @@ signal player_damaged(victim_id: int, attacker_id: int, amount: float)
 ## caused by the environment. Raised on every machine: on the host by
 ## [method Player.die], on clients by the host's death announcement - so the
 ## kill feed and the round's elimination check see the same events everywhere.
+## The player this machine controls was hurt by something at [param from]
+## (for the damage-direction indicator). Local presentation only.
+signal local_hit_from(from: Vector3)
+
+## A blast went off near the local player; [param strength] 0..1.
+signal local_concussion(strength: float)
+
 signal player_died(victim_id: int, killer_id: int, was_headshot: bool)
 
 ## A shot was taken. For tracers, muzzle flash and the kill feed - the

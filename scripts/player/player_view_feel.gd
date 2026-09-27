@@ -72,6 +72,9 @@ var _bob_camera_out := Vector3.ZERO
 
 
 ## Mouse movement in pixels, from the player's look handler.
+var _air: float = 0.0
+
+
 func add_look(relative: Vector2) -> void:
 	_look_accum += relative
 
@@ -127,6 +130,11 @@ func update(delta: float, velocity: Vector3, on_floor: bool, sprinting: bool, ai
 	_land_velocity += (-_land * LAND_RECOVERY * LAND_RECOVERY - _land_velocity * 2.0 * LAND_RECOVERY) * delta
 	_land += _land_velocity * delta
 
+	# The weapon lags behind vertical motion: dips as you jump, rises as you
+	# fall.
+	var target_air := clampf(-velocity.y * 0.005, -0.035, 0.035) if not on_floor else 0.0
+	_air = lerpf(_air, target_air, 1.0 - exp(-8.0 * delta))
+
 	_fov = lerpf(_fov, lerpf(1.0, SPRINT_FOV, _sprint), 1.0 - exp(-8.0 * delta))
 	_steady = steady
 
@@ -143,6 +151,7 @@ func weapon_offset() -> Vector3:
 	offset.y += sin(_time * 1.6) * 0.0025 * (1.0 - _bob_weight)
 	offset += SPRINT_POS * _sprint
 	offset.y += _land * 0.6
+	offset.y += _air
 	# Sway also nudges the position a touch, not just the angle.
 	offset.x += _sway.x * 0.12
 	offset.y -= _sway.y * 0.12

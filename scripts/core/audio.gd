@@ -41,6 +41,65 @@ func _ready() -> void:
 		if key == "audio/master_volume":
 			_apply_volume())
 	_build_library()
+	# A low-pass on the master bus, opened wide; a nearby blast closes it for
+	# a moment so the world sounds muffled.
+	_muffle = AudioEffectLowPassFilter.new()
+	_muffle.cutoff_hz = 20500.0
+	AudioServer.add_bus_effect(0, _muffle)
+	# Every button in the game answers the pointer: a soft tick and a slight
+	# grow on hover, a click on press.
+	get_tree().node_added.connect(_on_node_added)
+
+
+var _muffle: AudioEffectLowPassFilter = null
+var _muffle_tween: Tween = null
+
+
+## Muffles everything and rings the ears, for [param strength] 0..1 of a blast.
+func concuss(strength: float) -> void:
+	if _muffle == null:
+		return
+	play(&"tinnitus", linear_to_db(clampf(strength, 0.05, 1.0)) - 4.0, 0.0)
+	if _muffle_tween != null:
+		_muffle_tween.kill()
+	_muffle.cutoff_hz = lerpf(3000.0, 500.0, strength)
+	_muffle_tween = create_tween()
+	_muffle_tween.tween_property(_muffle, "cutoff_hz", 20500.0, 1.5 + strength * 2.0) \
+		.set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
+
+
+func _on_node_added(node: Node) -> void:
+	if not node is BaseButton:
+		return
+	var button := node as BaseButton
+	button.mouse_entered.connect(func() -> void:
+		if button.disabled:
+			return
+		play(&"ui_hover", -14.0, 0.05)
+		button.pivot_offset = button.size * 0.5
+		var tween := button.create_tween()
+		tween.tween_property(button, "scale", Vector2.ONE * 1.03, 0.08))
+	button.mouse_exited.connect(func() -> void:
+		var tween := button.create_tween()
+		tween.tween_property(button, "scale", Vector2.ONE, 0.1))
+	button.pressed.connect(func() -> void: play(&"ui_click", -8.0, 0.05))
+
+
+## Two thumps, lub-dub.
+func _heartbeat() -> AudioStreamWAV:
+	var seconds := 0.5
+	var count := int(seconds * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	for i in count:
+		var t := float(i) / RATE
+		var v := 0.0
+		for beat: Array in [[0.0, 1.0], [0.2, 0.7]]:
+			var r: float = t - beat[0]
+			if r >= 0.0:
+				v += sin(TAU * 52.0 * r) * exp(-r * 22.0) * beat[1]
+		samples[i] = v * 0.9
+	return _to_stream(samples)
 
 
 func _apply_volume() -> void:
@@ -130,6 +189,9 @@ func _build_library() -> void:
 	_library[&"smoke_pop"] = _thump(0.25, 90.0, 16.0, 0.9)
 	_library[&"smoke_hiss"] = _looped(_hiss(3.0))
 	_load_recordings()
+	_library[&"heartbeat"] = _heartbeat()
+	_library[&"tinnitus"] = _tones([[4100.0, 0.0, 0.35]], 2.6, 1.1, 0.25)
+	_library[&"ui_hover"] = _click(0.025, 2400.0, 0.18)
 	# Knife: air, steel, and what it meets.
 	_library[&"knife_swing"] = _whoosh(0.26, 700.0, 2600.0, 0.55)
 	_library[&"knife_heavy"] = _whoosh(0.4, 380.0, 1700.0, 0.7)

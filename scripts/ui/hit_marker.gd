@@ -15,7 +15,7 @@ extends Control
 
 ## How long the cross stays fully visible, in seconds. Long enough to register
 ## at 60 fps without lingering into the next shot.
-@export var hold_time: float = 0.16
+@export var hold_time: float = 0.2
 
 ## How long the fade out takes after the hold.
 @export var fade_time: float = 0.1
@@ -88,6 +88,14 @@ func _draw() -> void:
 	# Four ticks at the diagonals, pointing outwards. Drawn as a gap in the
 	# middle rather than a continuous cross, because a solid cross sitting on top
 	# of the crosshair hides the thing the player is aiming with.
-	var unit := Vector2.ONE * 0.70710678  # 45 degrees
-	for direction in [Vector2(-1.0, -1.0), Vector2(1.0, -1.0), Vector2(-1.0, 1.0), Vector2(1.0, 1.0)]:
-		draw_line(centre + unit * gap, centre + unit * (gap + _tick_length), colour, 2.0, true)
+	# Pops out and settles: bigger for the first few frames.
+	var pop := 1.0 + 0.45 * (1.0 - clampf(_age / 0.09, 0.0, 1.0))
+	var width := 2.5 if _colour != normal_colour else 2.0
+	for direction: Vector2 in [Vector2(-1.0, -1.0), Vector2(1.0, -1.0), Vector2(-1.0, 1.0), Vector2(1.0, 1.0)]:
+		var d := direction.normalized()
+		draw_line(centre + d * gap * pop, centre + d * (gap + _tick_length) * pop, Color(0, 0, 0, colour.a * 0.6), width + 2.0, true)
+		draw_line(centre + d * gap * pop, centre + d * (gap + _tick_length) * pop, colour, width, true)
+	# A kill also throws a ring outwards.
+	if _colour == kill_colour:
+		var t := clampf(_age / (hold_time + fade_time), 0.0, 1.0)
+		draw_arc(centre, lerpf(10.0, 34.0, t), 0.0, TAU, 40, Color(colour, colour.a * (1.0 - t)), 2.0, true)

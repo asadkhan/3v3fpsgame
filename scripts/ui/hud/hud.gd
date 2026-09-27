@@ -29,6 +29,8 @@ var _objective_prompt: HudObjectivePrompt
 var _buy: HudBuyMenu
 var _spectating: Label
 var _scope: HudScopeOverlay
+var _screen_fx: HudScreenFx
+var _direction: HudDamageDirection
 
 ## The player this machine drives, re-resolved each frame (bodies come and go).
 var _player: Player = null
@@ -44,7 +46,9 @@ func _ready() -> void:
 	_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_root)
 
+	_screen_fx = _add(HudScreenFx.new(), "ScreenFx")
 	_scope = _add(HudScopeOverlay.new(), "ScopeOverlay")
+	_direction = _add(HudDamageDirection.new(), "DamageDirection")
 	_vignette = _add(HudDamageVignette.new(), "DamageVignette")
 	_crosshair = _add(HudCrosshair.new(), "Crosshair")
 	_top_bar = _add(HudTopBar.new(), "TopBar")
@@ -98,6 +102,8 @@ func _process(delta: float) -> void:
 	else:
 		_crosshair.bloom = 0.0
 	_vignette.update_view(_player, delta)
+	# While spectating, the watched teammate is alive: no death greying.
+	_screen_fx.update_view(spectator.target if spectating else _player, delta)
 	_top_bar.update_view()
 	_status.update_view(spectator.target if spectating else _player, spectating)
 	# The result screen carries the score and everyone's numbers itself.

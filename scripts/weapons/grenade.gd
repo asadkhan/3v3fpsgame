@@ -114,6 +114,12 @@ func _explode() -> void:
 		var d := me.global_position.distance_to(at)
 		if d < 18.0:
 			me.add_shake(clampf(1.0 - d / 18.0, 0.0, 1.0) * 4.0)
+		if d < 9.0 and me.state.is_alive:
+			var strength := clampf(1.0 - d / 9.0, 0.0, 1.0)
+			EventBus.local_concussion.emit(strength)
+			Audio.concuss(strength)
+		if d < FRAG_RADIUS and NetworkManager.is_online and not multiplayer.is_server():
+			EventBus.local_hit_from.emit(at)
 	if not NetworkManager.is_online or multiplayer.is_server():
 		_deal_blast_damage(at)
 	_model.visible = false
