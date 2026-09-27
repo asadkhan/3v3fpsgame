@@ -4,10 +4,68 @@
 [ext_resource type="PackedScene" path="res://assets/weapons/cc0/m4a1/M4A1.fbx" id="2_model"]
 [ext_resource type="Material" path="res://assets/weapons/cc0/m4a1/m4a1.tres" id="3_mat"]
 
+[sub_resource type="StandardMaterial3D" id="optic_body"]
+albedo_color = Color(0.07, 0.075, 0.08, 1)
+metallic = 0.6
+roughness = 0.55
+cull_mode = 2
+
+[sub_resource type="StandardMaterial3D" id="optic_glass"]
+transparency = 1
+albedo_color = Color(0.55, 0.75, 0.7, 0.12)
+metallic = 0.3
+roughness = 0.05
+cull_mode = 2
+
+[sub_resource type="StandardMaterial3D" id="optic_dot"]
+shading_mode = 0
+albedo_color = Color(1, 0.08, 0.05, 1)
+
+[sub_resource type="CylinderMesh" id="tube"]
+top_radius = 0.02
+bottom_radius = 0.02
+height = 0.05
+radial_segments = 24
+rings = 1
+cap_top = false
+cap_bottom = false
+
+[sub_resource type="CylinderMesh" id="hood"]
+top_radius = 0.022
+bottom_radius = 0.022
+height = 0.008
+radial_segments = 24
+rings = 1
+cap_top = false
+cap_bottom = false
+
+[sub_resource type="BoxMesh" id="riser"]
+size = Vector3(0.022, 0.04, 0.036)
+
+[sub_resource type="BoxMesh" id="clamp"]
+size = Vector3(0.032, 0.008, 0.044)
+
+[sub_resource type="BoxMesh" id="knob"]
+size = Vector3(0.008, 0.012, 0.012)
+
+[sub_resource type="CylinderMesh" id="lens"]
+top_radius = 0.0195
+bottom_radius = 0.0195
+height = 0.0015
+radial_segments = 24
+rings = 1
+
+[sub_resource type="SphereMesh" id="dot"]
+radius = 0.0013
+height = 0.0026
+radial_segments = 8
+rings = 4
+
 [node name="KestrelModel" type="Node3D"]
 position = Vector3(0, -0.02, -0.12)
 script = ExtResource("1_script")
 material = ExtResource("3_mat")
+hidden_parts = Array[NodePath]([NodePath("Model/M4A1/Parts/Sight")])
 metadata/magazine = NodePath("Model/M4A1/Magazine")
 
 [node name="Model" parent="." instance=ExtResource("2_model")]
@@ -16,7 +74,52 @@ metadata/magazine = NodePath("Model/M4A1/Magazine")
 position = Vector3(0, 0.004, -0.535)
 
 [node name="Sight" type="Marker3D" parent="Model"]
-position = Vector3(0, 0.082, 0.07)
+position = Vector3(0, 0.108, -0.02)
+
+[node name="RedDot" type="Node3D" parent="Model"]
+position = Vector3(0, 0.108, -0.02)
+
+[node name="Tube" type="MeshInstance3D" parent="Model/RedDot"]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0)
+cast_shadow = 0
+mesh = SubResource("tube")
+material_override = SubResource("optic_body")
+
+[node name="Hood" type="MeshInstance3D" parent="Model/RedDot"]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, -0.023)
+cast_shadow = 0
+mesh = SubResource("hood")
+material_override = SubResource("optic_body")
+
+[node name="Riser" type="MeshInstance3D" parent="Model/RedDot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.037, 0)
+cast_shadow = 0
+mesh = SubResource("riser")
+material_override = SubResource("optic_body")
+
+[node name="Clamp" type="MeshInstance3D" parent="Model/RedDot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.054, 0)
+cast_shadow = 0
+mesh = SubResource("clamp")
+material_override = SubResource("optic_body")
+
+[node name="Knob" type="MeshInstance3D" parent="Model/RedDot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.022, 0, 0.004)
+cast_shadow = 0
+mesh = SubResource("knob")
+material_override = SubResource("optic_body")
+
+[node name="Dot" type="MeshInstance3D" parent="Model/RedDot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.021)
+cast_shadow = 0
+mesh = SubResource("dot")
+material_override = SubResource("optic_dot")
+
+[node name="Lens" type="MeshInstance3D" parent="Model/RedDot"]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, -0.023)
+cast_shadow = 0
+mesh = SubResource("lens")
+material_override = SubResource("optic_glass")
 
 [node name="HandR" type="Marker3D" parent="Model"]
 position = Vector3(0, -0.075, 0.085)

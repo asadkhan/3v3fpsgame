@@ -90,6 +90,9 @@ func _process(delta: float) -> void:
 	_crosshair.visible = (spectating or (_player != null and _player.state.is_alive)) \
 		and not GameManager.is_in(GamePhase.Phase.MATCH_END)
 	_scope.update_view(_player if not spectating else null)
+	if _player != null and not spectating and _player.weapon != null \
+			and _player.weapon.has_red_dot() and _player.get_aim_amount() > 0.85:
+		_crosshair.visible = false
 	if _scope.visible:
 		# the scope has its own reticle.
 		_crosshair.visible = false

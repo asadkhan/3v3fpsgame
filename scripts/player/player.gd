@@ -596,6 +596,12 @@ func _update_viewmodel_kick(delta: float) -> void:
 	_weapon_mount.position = _viewmodel_rest + aim.viewmodel_offset() + Vector3(0.0, rear * 0.03, kick) \
 		+ view_feel.weapon_offset()
 	_weapon_mount.rotation = view_feel.weapon_rotation() + Vector3(rear, 0.0, -rear * 0.25)
+	# while aiming, turn the gun around its sight rather than its base, so the
+	# kick and any leftover sway don't slide the sight off the crosshair
+	var sight: Variant = weapon.get_sight_position() if weapon != null else null
+	if sight != null and aim.amount > 0.0:
+		var at: Vector3 = weapon.transform * (sight as Vector3)
+		_weapon_mount.position += (at - _weapon_mount.basis * at) * aim.amount
 
 
 ## applies aim to things outside the weapon's own numbers: camera zoom, fire interval.
@@ -973,7 +979,7 @@ func _update_name_tag() -> void:
 func get_third_person_muzzle() -> Variant:
 	if _third_person_weapon == null or not _third_person_weapon.visible:
 		return null
-	var muzzle := _third_person_weapon.find_child("Muzzle", true, false) as Node3D
+	var muzzle := WeaponModel.marker(_third_person_weapon, "Muzzle")
 	return muzzle.global_position if muzzle != null else null
 
 

@@ -61,7 +61,7 @@ var _was_on_floor: bool = true
 var _fall_speed: float = 0.0
 var _time: float = 0.0
 var _fov: float = 1.0
-var _steady: float = 1.0          # 1 at the hip, 0.2 fully aimed
+var _steady: float = 1.0          # 1 at the hip, 0 fully aimed
 var _bob_weapon_out := Vector3.ZERO  # smoothed bob output
 var _bob_camera_out := Vector3.ZERO
 
@@ -78,7 +78,7 @@ func add_look(relative: Vector2) -> void:
 
 func update(delta: float, velocity: Vector3, on_floor: bool, sprinting: bool, aim_amount: float) -> void:
 	_time += delta
-	var steady := 1.0 - 0.8 * aim_amount
+	var steady := 1.0 - aim_amount
 
 	# sway: mouse movement pushes the weapon the other way, builds up over a
 	# flick, then drifts back to centre
@@ -164,9 +164,11 @@ func weapon_rotation() -> Vector3:
 
 
 func camera_offset() -> Vector3:
+	# fully aimed the camera stays put - the gun hangs off the head, not the
+	# camera, so any camera bob would wobble the sight
 	if not GameConfig.head_bob:
-		return Vector3(0.0, _land * 0.5, 0.0)
-	return (_bob_camera_out + Vector3(0.0, _land * 0.5, 0.0)) * (1.0 - 0.7 * (1.0 - _steady))
+		return Vector3(0.0, _land * 0.5, 0.0) * _steady
+	return (_bob_camera_out + Vector3(0.0, _land * 0.5, 0.0)) * _steady
 
 
 func camera_roll() -> float:

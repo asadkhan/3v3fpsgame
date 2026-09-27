@@ -188,6 +188,7 @@ var _arms: ViewmodelArms = null
 ## get_sight_position().
 var _sight_position: Vector3 = Vector3.ZERO
 var _has_sight: bool = false
+var _has_red_dot: bool = false
 
 ## placeholder block rifle, used for weapons without a model.
 @onready var _viewmodel: Node3D = $ViewModel if has_node("ViewModel") else null
@@ -230,8 +231,9 @@ func _apply_model() -> void:
 	# huge shadow of the gun across the world.
 	for mesh: GeometryInstance3D in _model.find_children("*", "GeometryInstance3D", true, false):
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var muzzle := _model.find_child("Muzzle", true, false) as Node3D
-	var sight := _model.find_child("Sight", true, false) as Node3D
+	var muzzle := WeaponModel.marker(_model, "Muzzle")
+	var sight := WeaponModel.marker(_model, "Sight")
+	_has_red_dot = _model.find_child("RedDot", true, false) != null
 	if muzzle != null and is_inside_tree():
 		var at := to_local(muzzle.global_position)
 		if _muzzle_point != null:
@@ -284,6 +286,11 @@ func inspect() -> void:
 ## Sight marker. PlayerAim lines this up with the eye.
 func get_sight_position() -> Variant:
 	return _sight_position if _has_sight else null
+
+
+## true when the gun has a red dot optic (hud hides the crosshair while aimed).
+func has_red_dot() -> bool:
+	return _has_red_dot
 
 
 ## hides the model when looking through a scope, so it doesn't fill the view.
