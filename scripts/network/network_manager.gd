@@ -407,7 +407,7 @@ func request_spawn(player_name: String = "", player_level: int = 1) -> void:
 	var clean := sanitize_name(player_name)
 	var changes := {"level": clampi(player_level, 1, 999)}
 	if not clean.is_empty():
-		changes["display_name"] = clean
+		changes["display_name"] = _unique_name(clean, sender)
 	players.update(sender, changes)
 	roster_updated.emit()
 
@@ -416,6 +416,21 @@ func request_spawn(player_name: String = "", player_level: int = 1) -> void:
 	GameManager.send_snapshot_to(sender)
 	peer_registered.emit(sender, players.team_of(sender), players.display_name_of(sender))
 	spawn_requested.emit(sender)
+
+
+## [param wanted], with a number added if someone else in the session already
+## goes by it - two "Player867"s on one scoreboard are unreadable.
+func _unique_name(wanted: String, peer_id: int) -> String:
+	var taken := {}
+	for other: int in players.peer_ids():
+		if other != peer_id:
+			taken[players.display_name_of(other).to_lower()] = true
+	var out := wanted
+	var n := 2
+	while taken.has(out.to_lower()):
+		out = "%s %d" % [wanted.substr(0, MAX_NAME_LENGTH - 2), n]
+		n += 1
+	return out
 
 
 func _on_peer_disconnected(id: int) -> void:

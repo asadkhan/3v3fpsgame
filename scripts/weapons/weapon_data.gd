@@ -144,6 +144,10 @@ enum Category {
 ## after that the spray sways side to side by up to [member recoil_sway_degrees]
 ## in the same shape every time, so it can be learned and pulled against.
 @export_range(0, 30) var recoil_vertical_shots: int = 6
+## The opening rounds of a spray barely climb (each kicks this fraction of
+## [member recoil_kick_degrees]), so tapping and short bursts stay on target.
+@export_range(0, 10) var recoil_flat_shots: int = 2
+@export_range(0.0, 1.0, 0.05) var recoil_flat_scale: float = 0.2
 @export_range(0.0, 20.0, 0.1) var recoil_max_pitch: float = 5.0
 @export_range(0.0, 10.0, 0.05) var recoil_sway_degrees: float = 1.2
 ## How much of the pattern moves the camera; the rest moves the bullets away
@@ -252,7 +256,10 @@ enum Category {
 ## Where the [param shot]-th round of a spray goes (0 is the first), as
 ## (pitch up, yaw right) in degrees off the aim.
 func recoil_pattern(shot: float) -> Vector2:
-	var climb := minf(shot, float(recoil_vertical_shots)) * recoil_kick_degrees
+	var flat := float(recoil_flat_shots)
+	var lifted := shot * recoil_flat_scale if shot <= flat \
+		else flat * recoil_flat_scale + (shot - flat)
+	var climb := minf(lifted, float(recoil_vertical_shots)) * recoil_kick_degrees
 	var over := maxf(shot - float(recoil_vertical_shots), 0.0)
 	var pitch := minf(climb + over * recoil_kick_degrees * 0.12, recoil_max_pitch)
 	# One slow swing each way then back, the same every spray: right first.

@@ -68,8 +68,8 @@ const UPPER_BONES := [&"Spine", &"Chest", &"UpperChest", &"Neck", &"Head",
 ## Team colour washed over the Mixamo operator's urban camo: cool grey-blue
 ## for Alpha, sand for Bravo.
 const TEAM_TINT := {
-	Team.Side.ALPHA: Color(0.82, 0.88, 1.0),
-	Team.Side.BRAVO: Color(1.0, 0.86, 0.66),
+	Team.Side.ALPHA: Color(0.66, 0.8, 1.0),
+	Team.Side.BRAVO: Color(1.0, 0.78, 0.52),
 	Team.Side.NONE: Color(1, 1, 1),
 }
 ## Scale that puts the model's eyes at the player's eye height (1.62 m).
@@ -136,6 +136,8 @@ func build(team: int) -> void:
 	_tree.anim_player = _tree.get_path_to(_player)
 	_tree.active = true
 
+	_add_armbands(team)
+
 	_aim = PlayerModelAim.new()
 	skeleton.add_child(_aim)
 	_iks.clear()
@@ -160,6 +162,45 @@ func build(team: int) -> void:
 		_ik_targets.append(target)
 		_ik_targets.append(pole)
 	_dead = false
+
+
+## A glowing band in the side's colour round each upper arm: the one thing
+## that tells a teammate from an enemy at a glance, from any angle, in shade.
+func _add_armbands(team: int) -> void:
+	if team == Team.Side.NONE:
+		return
+	var colour := UITheme.team_colour(team)
+	var material := StandardMaterial3D.new()
+	material.albedo_color = colour
+	material.emission_enabled = true
+	material.emission = colour
+	material.emission_energy_multiplier = 1.4
+	material.roughness = 0.6
+	# The skeleton may carry the importer's scale; the band is sized in metres.
+	var unit := 1.0 / maxf(skeleton.global_basis.get_scale().x, 0.0001)
+	for side in ["Left", "Right"]:
+		var bone := skeleton.find_bone("%sUpperArm" % side)
+		var child := skeleton.find_bone("%sLowerArm" % side)
+		if bone < 0 or child < 0:
+			continue
+		var length := skeleton.get_bone_rest(child).origin.length()
+		var attach := BoneAttachment3D.new()
+		attach.name = "%sArmband" % side
+		attach.bone_name = "%sUpperArm" % side
+		skeleton.add_child(attach)
+		var band := MeshInstance3D.new()
+		var mesh := CylinderMesh.new()
+		mesh.top_radius = 0.062
+		mesh.bottom_radius = 0.066
+		mesh.height = 0.075
+		mesh.radial_segments = 16
+		mesh.rings = 1
+		band.mesh = mesh
+		band.material_override = material
+		band.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		band.scale = Vector3.ONE * unit
+		band.position = Vector3(0.0, length * 0.3, 0.0)
+		attach.add_child(band)
 
 
 static var _tint_cache: Dictionary = {}

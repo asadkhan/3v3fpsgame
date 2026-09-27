@@ -264,4 +264,4 @@ func _receive_phase(phase: int, match_data: Dictionary, remaining: float) -> voi
 	match_state.apply_dict(match_data)
 	if phase != current_phase:
 		_enter_phase(phase, current_state)
-	current_state._remaining = remaining
+	current_state._start_countdown(remaining)

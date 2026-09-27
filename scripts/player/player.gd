@@ -1275,6 +1275,41 @@ func _update_model(delta: float) -> void:
 	var airborne := absf(_model_velocity.y) > 1.2
 	_model.update(delta, Vector3(local.x, 0.0, local.z), 1.0 - _stance, airborne, _head.rotation.x,
 		_third_person_weapon if state.is_alive else null, walk_speed)
+	_update_name_tag()
+
+
+var _name_tag: Label3D = null
+
+
+## A teammate's name floats over their head, visible through walls, so you
+## always know where your side is and never mistake them for an enemy. Enemies
+## get no tag.
+func _update_name_tag() -> void:
+	var me := NetworkManager.get_local_player()
+	var wanted := me != null and me != self and state.is_alive and not _model_hidden \
+		and state.team != Team.Side.NONE and state.team == me.state.team
+	if not wanted:
+		if _name_tag != null:
+			_name_tag.visible = false
+		return
+	if _name_tag == null:
+		_name_tag = Label3D.new()
+		_name_tag.name = "NameTag"
+		_name_tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		_name_tag.no_depth_test = true
+		_name_tag.fixed_size = true
+		_name_tag.pixel_size = 0.0011
+		_name_tag.font_size = 34
+		_name_tag.outline_size = 8
+		_name_tag.outline_modulate = Color(0, 0, 0, 0.85)
+		_name_tag.font = UITheme.font()
+		_name_tag.render_priority = 10
+		_name_tag.outline_render_priority = 9
+		_name_tag.position = Vector3(0.0, 1.98, 0.0)
+		add_child(_name_tag)
+	_name_tag.visible = true
+	_name_tag.text = "%s\n\u25BC" % state.display_name.to_upper()
+	_name_tag.modulate = UITheme.team_colour(state.team)
 
 
 ## Where a remote player's shots appear to leave from: the held gun's muzzle.

@@ -44,6 +44,12 @@ var game_manager
 ## on every transition, so this always starts at zero for a new phase.
 var _remaining: float = 0.0
 
+## The wall-clock moment ([method Time.get_ticks_msec]) the countdown reaches
+## zero. Counting against the real clock rather than summing frame deltas keeps
+## a 20-second buy phase 20 seconds long even when the host stutters or the
+## engine clamps a long frame.
+var _deadline_ms: int = 0
+
 
 func _init(manager = null) -> void:
 	game_manager = manager
@@ -96,13 +102,15 @@ func get_time_remaining() -> float:
 ## Arms the countdown for [param seconds]. Call from [method enter].
 func _start_countdown(seconds: float) -> void:
 	_remaining = maxf(seconds, 0.0)
+	_deadline_ms = Time.get_ticks_msec() + int(_remaining * 1000.0)
 
 
-## Advances the countdown by [param delta] and returns the time left, which
+## Updates the countdown from the real clock and returns the time left, which
 ## never goes below zero. Call from [method update], then compare
 ## [member _remaining] against zero to detect the frame the phase should end.
-func _tick_countdown(delta: float) -> float:
-	_remaining = maxf(_remaining - delta, 0.0)
+## [param _delta] is unused: frame time is not trusted for match timing.
+func _tick_countdown(_delta: float) -> float:
+	_remaining = maxf(float(_deadline_ms - Time.get_ticks_msec()) / 1000.0, 0.0)
 	return _remaining
 
 
