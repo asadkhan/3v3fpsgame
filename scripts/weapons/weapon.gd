@@ -254,11 +254,19 @@ func _apply_model() -> void:
 func _on_animation_cue(cue: StringName) -> void:
 	if _viewmodel == null or not _viewmodel.is_visible_in_tree():
 		return
+	# long guns get their own heavier, louder magazine sounds when there are any
+	var long_gun := data != null and data.category != WeaponData.Category.PISTOL
 	match cue:
 		&"mag_out":
-			Audio.play(&"reload_out", -6.0)
+			if long_gun and Audio.has_sound(&"reload_out_rifle"):
+				Audio.play(&"reload_out_rifle", -2.0)
+			else:
+				Audio.play(&"reload_out", -6.0)
 		&"mag_in":
-			Audio.play(&"reload_in", -4.0)
+			if long_gun and Audio.has_sound(&"reload_in_rifle"):
+				Audio.play(&"reload_in_rifle", 0.0)
+			else:
+				Audio.play(&"reload_in", -4.0)
 		&"rack":
 			Audio.play(&"rack", -8.0)
 		&"shing":
