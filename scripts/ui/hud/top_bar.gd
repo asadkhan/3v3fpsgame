@@ -1,8 +1,8 @@
 class_name HudTopBar
 extends Control
-## top-centre match bar: alpha score and players alive, round clock and
-## phase, bravo's players alive and score. reads GameManager and the player
-## bodies every frame - cheap, and can't drift out of step.
+## top-centre match bar: slanted team score tiles either side of the round
+## clock, alive pips outside them, phase and round underneath. shapes are
+## drawn here, numbers are labels on top. reads GameManager every frame.
 
 const PHASE_TITLES := {
 	GamePhase.Phase.LOBBY: "LOBBY",
@@ -13,15 +13,20 @@ const PHASE_TITLES := {
 	GamePhase.Phase.MATCH_END: "MATCH OVER",
 }
 
+const WIDTH := 640.0
+const CX := WIDTH * 0.5
+const TILE_H := 46.0
+const SLOTS := 3
+
 var _alpha_score: Label
 var _bravo_score: Label
-var _alpha_pips: HudAlivePips
-var _bravo_pips: HudAlivePips
 var _clock: Label
 var _phase: Label
 var _round: Label
 var _alpha_role: Label
 var _bravo_role: Label
+var _counts := {Team.Side.ALPHA: [0, 0], Team.Side.BRAVO: [0, 0]}
+var _urgent: bool = false
 
 ## set by Hud: the core is down, so the clock is its detonation timer.
 var core_planted: bool = false
@@ -29,59 +34,65 @@ var core_planted: bool = false
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UITheme.pin(self, Vector2(0.5, 0.0), -300, 10, 300, 110)
+	UITheme.pin(self, Vector2(0.5, 0.0), -CX, 10, CX, 110)
 
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override(&"separation", 10)
-	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(row)
-
-	var alpha_box := _score_box(row, UITheme.ALPHA)
-	_alpha_score = alpha_box[0]
-	_alpha_role = alpha_box[1]
-	_alpha_pips = HudAlivePips.new()
-	_alpha_pips.colour = UITheme.ALPHA
-	row.add_child(_alpha_pips)
-
-	var centre := VBoxContainer.new()
-	centre.custom_minimum_size = Vector2(130, 0)
-	centre.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	centre.add_theme_constant_override(&"separation", 0)
-	centre.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_child(centre)
-	_clock = UITheme.label("--", UITheme.SIZE_LARGE + 2, UITheme.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
-	_phase = UITheme.label("", UITheme.SIZE_SMALL, UITheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
-	_round = UITheme.label("", UITheme.SIZE_SMALL, UITheme.TEXT_DIM, HORIZONTAL_ALIGNMENT_CENTER)
-	centre.add_child(_clock)
-	centre.add_child(_phase)
-	centre.add_child(_round)
-
-	_bravo_pips = HudAlivePips.new()
-	_bravo_pips.colour = UITheme.BRAVO
-	_bravo_pips.right_to_left = true
-	row.add_child(_bravo_pips)
-	var bravo_box := _score_box(row, UITheme.BRAVO)
-	_bravo_score = bravo_box[0]
-	_bravo_role = bravo_box[1]
+	_clock = _place(UITheme.heading("--", 36, UITheme.TEXT, HORIZONTAL_ALIGNMENT_CENTER), CX - 70, -2, 140, 50)
+	_alpha_score = _place(UITheme.heading("0", 34, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER), CX - 166, 0, 80, TILE_H)
+	_bravo_score = _place(UITheme.heading("0", 34, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER), CX + 86, 0, 80, TILE_H)
+	_alpha_role = _place(UITheme.caption("", UITheme.ALPHA, HORIZONTAL_ALIGNMENT_CENTER), CX - 176, TILE_H + 3, 90, 16)
+	_bravo_role = _place(UITheme.caption("", UITheme.BRAVO, HORIZONTAL_ALIGNMENT_CENTER), CX + 86, TILE_H + 3, 90, 16)
+	_phase = _place(UITheme.caption("", UITheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER), CX - 100, 52, 200, 16)
+	_round = _place(UITheme.caption("", UITheme.TEXT_DIM, HORIZONTAL_ALIGNMENT_CENTER), CX - 150, 70, 300, 16)
 
 
-## [score label, attack/defend label]
-func _score_box(parent: Control, colour: Color) -> Array:
-	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(72, 52)
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	parent.add_child(panel)
-	var column := VBoxContainer.new()
-	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	column.add_theme_constant_override(&"separation", -2)
-	panel.add_child(column)
-	var label := UITheme.label("0", UITheme.SIZE_LARGE + 4, colour, HORIZONTAL_ALIGNMENT_CENTER)
-	column.add_child(label)
-	var role := UITheme.label("", UITheme.SIZE_SMALL - 3, UITheme.TEXT_DIM, HORIZONTAL_ALIGNMENT_CENTER)
-	column.add_child(role)
-	return [label, role]
+func _place(label: Label, x: float, y: float, w: float, h: float) -> Label:
+	label.position = Vector2(x, y)
+	label.size = Vector2(w, h)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	add_child(label)
+	return label
+
+
+func _draw() -> void:
+	# clock plate: a trapezoid, wide at the top
+	var plate := PackedVector2Array([Vector2(CX - 84, 0), Vector2(CX + 84, 0),
+		Vector2(CX + 70, 50), Vector2(CX - 70, 50)])
+	draw_colored_polygon(plate, Color(0.02, 0.025, 0.03, 0.78))
+	var edge := UITheme.DANGER if _urgent else UITheme.ACCENT
+	draw_line(Vector2(CX - 70, 50), Vector2(CX + 70, 50), edge, 2.0)
+	# score tiles, slanted away from the clock
+	_tile(-1, UITheme.ALPHA)
+	_tile(1, UITheme.BRAVO)
+	_pips(-1, UITheme.ALPHA, _counts[Team.Side.ALPHA])
+	_pips(1, UITheme.BRAVO, _counts[Team.Side.BRAVO])
+
+
+func _tile(side: int, colour: Color) -> void:
+	var inner := CX + side * 88.0
+	var outer := CX + side * 166.0
+	var pts := PackedVector2Array([Vector2(inner, 0), Vector2(outer, 0),
+		Vector2(outer - side * 12.0, TILE_H), Vector2(inner - side * 12.0, TILE_H)])
+	draw_colored_polygon(pts, Color(colour.darkened(0.25), 0.88))
+	# glossy top half
+	var top := PackedVector2Array([Vector2(inner, 0), Vector2(outer, 0),
+		Vector2(outer - side * 6.0, TILE_H * 0.5), Vector2(inner - side * 6.0, TILE_H * 0.5)])
+	draw_colored_polygon(top, Color(1, 1, 1, 0.08))
+
+
+func _pips(side: int, colour: Color, counts: Array) -> void:
+	var total: int = counts[0]
+	var alive: int = counts[1]
+	var start := CX + side * 182.0
+	for i in maxi(total, SLOTS):
+		if i >= total:
+			break
+		var x := start + side * i * 13.0
+		var lit := i < alive
+		var c := colour if lit else Color(colour, 0.18)
+		var pts := PackedVector2Array([Vector2(x + 3, 8), Vector2(x + 10, 8), Vector2(x + 7, 38), Vector2(x, 38)])
+		if side < 0:
+			pts = PackedVector2Array([Vector2(x - 10, 8), Vector2(x - 3, 8), Vector2(x, 38), Vector2(x - 7, 38)])
+		draw_colored_polygon(pts, c)
 
 
 func update_view() -> void:
@@ -94,14 +105,14 @@ func update_view() -> void:
 	var timed := phase in [GamePhase.Phase.WARMUP, GamePhase.Phase.BUY,
 		GamePhase.Phase.ROUND_ACTIVE, GamePhase.Phase.ROUND_END]
 	_clock.text = UITheme.clock(remaining) if timed else "--"
-	var urgent := phase == GamePhase.Phase.ROUND_ACTIVE and (core_planted or remaining <= 10.0)
-	_clock.add_theme_color_override(&"font_color", UITheme.DANGER if urgent else UITheme.TEXT)
+	_urgent = phase == GamePhase.Phase.ROUND_ACTIVE and (core_planted or remaining <= 10.0)
+	_clock.add_theme_color_override(&"font_color", UITheme.DANGER if _urgent else UITheme.TEXT)
 	_phase.text = "CORE PLANTED" if core_planted else PHASE_TITLES.get(phase, "")
 	_phase.add_theme_color_override(&"font_color", UITheme.DANGER if core_planted else UITheme.ACCENT)
 	var attacking := match_state.attacking_side(maxi(match_state.round_number, 1))
 	_alpha_role.text = "ATTACK" if attacking == Team.Side.ALPHA else "DEFEND"
 	_bravo_role.text = "ATTACK" if attacking == Team.Side.BRAVO else "DEFEND"
-	_round.text = "ROUND %d  -  FIRST TO %d" % [maxi(match_state.round_number, 1), GameManager.match_rules.rounds_to_win]
+	_round.text = "ROUND %d  /  FIRST TO %d" % [maxi(match_state.round_number, 1), GameManager.match_rules.rounds_to_win]
 
 	var counts := {Team.Side.ALPHA: [0, 0], Team.Side.BRAVO: [0, 0]}
 	for player in NetworkManager.get_players():
@@ -110,5 +121,5 @@ func update_view() -> void:
 		counts[player.state.team][0] += 1
 		if player.state.is_alive:
 			counts[player.state.team][1] += 1
-	_alpha_pips.set_counts(counts[Team.Side.ALPHA][0], counts[Team.Side.ALPHA][1])
-	_bravo_pips.set_counts(counts[Team.Side.BRAVO][0], counts[Team.Side.BRAVO][1])
+	_counts = counts
+	queue_redraw()

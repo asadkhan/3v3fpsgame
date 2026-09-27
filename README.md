@@ -13,6 +13,7 @@
 - impact effects, shell casings, tracers, recorded gunshot sounds
 - Meridian map with a battlefield look (smoke, fires, dust)
 - graphics presets (low / medium / high / ultra)
+- original menu music, red dot sight on the Kestrel
 
 ## Running it
 
@@ -56,6 +57,21 @@ To play online, one player picks **Host** and the others **Join** with the host'
 - `assets/` - models, textures, sounds, shaders
 
 Weapon damage, recoil and fire rate are all in the `.tres` files in `data/weapons/`, round timers and money are in `data/match_rules.tres`.
+
+## Changing sounds and music
+
+Gun sounds are plain `.wav` files in `assets/audio/weapons/`. Replace a file with your own (same name) and Godot picks it up next time you open the project:
+
+| File | Used by |
+|---|---|
+| `shot_rifle.wav` | Kestrel |
+| `shot_burst.wav` | Harrier |
+| `shot_smg.wav` | Swift |
+| `shot_pistol.wav` | Wren |
+
+Each one also has a `_far.wav` version (e.g. `shot_rifle_far.wav`) that plays when the shot is more than 12 m away. If you delete a `_far` file the normal one is used instead. Which weapon uses which sound is decided in `_shot_sound()` in `scripts/fx/weapon_fx.gd`.
+
+The menu music is `assets/audio/music/menu_theme.wav`. To use your own track, replace that file and turn on looping in the Import tab (Loop Mode: Forward). Music volume per game phase is `MUSIC_BY_PHASE` in `scripts/core/audio.gd`; players can change it in the pause menu.
 
 ## Credits
 

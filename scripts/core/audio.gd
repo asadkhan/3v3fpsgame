@@ -35,7 +35,9 @@ func _ready() -> void:
 	_apply_volume()
 	GameConfig.setting_changed.connect(func(key: String, _value: Variant) -> void:
 		if key == "audio/master_volume":
-			_apply_volume())
+			_apply_volume()
+		elif key == "audio/music_volume":
+			_update_music(0.3))
 	_build_library()
 	# low-pass on the master bus, wide open; a nearby blast closes it briefly
 	# to muffle the world.
@@ -44,6 +46,7 @@ func _ready() -> void:
 	AudioServer.add_bus_effect(0, _muffle)
 	# every button gets a hover tick + grow, and a click on press
 	get_tree().node_added.connect(_on_node_added)
+	_setup_music.call_deferred()
 
 
 var _muffle: AudioEffectLowPassFilter = null
@@ -95,6 +98,59 @@ func _heartbeat() -> AudioStreamWAV:
 				v += sin(TAU * 52.0 * r) * exp(-r * 22.0) * beat[1]
 		samples[i] = v * 0.9
 	return _to_stream(samples)
+
+
+# --- Music --------------------------------------------------------------------
+
+## the menu theme. swap the file to change the music.
+const MUSIC_PATH := "res://assets/audio/music/menu_theme.wav"
+## how loud the music sits under everything else, before the music slider
+const MUSIC_BASE_DB := -9.0
+## per phase, dB on top of the base. missing = music off (live rounds, so
+## footsteps stay readable)
+const MUSIC_BY_PHASE := {
+	GamePhase.Phase.MAIN_MENU: 0.0,
+	GamePhase.Phase.LOBBY: -4.0,
+	GamePhase.Phase.WARMUP: -8.0,
+	GamePhase.Phase.BUY: -10.0,
+	GamePhase.Phase.MATCH_END: 0.0,
+}
+
+var _music: AudioStreamPlayer = null
+var _music_tween: Tween = null
+
+
+func _setup_music() -> void:
+	if not ResourceLoader.exists(MUSIC_PATH):
+		return
+	_music = AudioStreamPlayer.new()
+	_music.name = "Music"
+	_music.stream = load(MUSIC_PATH)
+	_music.volume_db = -60.0
+	add_child(_music)
+	GameManager.state_changed.connect(func(_from: int, _to: int) -> void: _update_music(1.5))
+	_update_music(2.0)
+
+
+## fades the music to wherever the current phase wants it, over seconds.
+func _update_music(seconds: float) -> void:
+	if _music == null:
+		return
+	var phase: int = GameManager.current_phase
+	var music := clampf(GameConfig.music_volume, 0.0, 1.0)
+	var on := MUSIC_BY_PHASE.has(phase) and music > 0.001
+	var target := MUSIC_BASE_DB + float(MUSIC_BY_PHASE.get(phase, 0.0)) + linear_to_db(maxf(music, 0.0001))
+	if on and not _music.playing:
+		_music.volume_db = -60.0
+		_music.play()
+	if _music_tween != null:
+		_music_tween.kill()
+	_music_tween = create_tween()
+	if on:
+		_music_tween.tween_property(_music, "volume_db", target, seconds)
+	else:
+		_music_tween.tween_property(_music, "volume_db", -60.0, seconds)
+		_music_tween.tween_callback(_music.stop)
 
 
 func _apply_volume() -> void:

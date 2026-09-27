@@ -28,7 +28,7 @@ func _ready() -> void:
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.alignment = BoxContainer.ALIGNMENT_CENTER
 	add_child(column)
-	_title = UITheme.label("", UITheme.SIZE_HUGE, UITheme.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+	_title = UITheme.heading("", UITheme.SIZE_HUGE, UITheme.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 	_subtitle = UITheme.label("", UITheme.SIZE_BODY, UITheme.TEXT_DIM, HORIZONTAL_ALIGNMENT_CENTER)
 	column.add_child(_title)
 	column.add_child(_subtitle)
@@ -46,7 +46,7 @@ func _ready() -> void:
 	EventBus.core_detonated.connect(_on_core_detonated)
 	EventBus.player_callout.connect(_on_callout)
 
-	_callout = UITheme.label("", UITheme.SIZE_LARGE + 8, UITheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
+	_callout = UITheme.heading("", UITheme.SIZE_LARGE + 8, UITheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
 	add_child(_callout)
 	UITheme.pin(_callout, Vector2(0.5, 1.0), -300, 90, 300, 140)
 	_callout.modulate.a = 0.0

@@ -32,16 +32,59 @@ func _ready() -> void:
 	NetworkManager.last_disconnect_reason = ""
 
 	theme = UITheme.build()
-	%Title.text = UITheme.GAME_TITLE
-	%Title.add_theme_font_size_override(&"font_size", UITheme.SIZE_HUGE + 16)
-	%Title.add_theme_color_override(&"font_color", UITheme.ACCENT)
-	%Title.add_theme_constant_override(&"outline_size", 10)
-	%Subtitle.text = UITheme.GAME_TAGLINE
-	%Subtitle.add_theme_color_override(&"font_color", UITheme.TECH)
-	%Subtitle.add_theme_font_size_override(&"font_size", UITheme.SIZE_BODY)
+	_style()
 	_build_backdrop()
 	_name_edit.text = NetworkManager.local_display_name()
 	_build_profile_card()
+	_intro()
+
+
+## fonts and colours for the scene's labels.
+func _style() -> void:
+	%Title.text = UITheme.GAME_TITLE
+	%Title.add_theme_font_override(&"font", UITheme.heading_font())
+	%Title.add_theme_font_size_override(&"font_size", 104)
+	%Title.add_theme_color_override(&"font_color", UITheme.TEXT)
+	%Title.add_theme_color_override(&"font_shadow_color", Color(0, 0, 0, 0.6))
+	%Title.add_theme_constant_override(&"shadow_offset_y", 4)
+	%Title.add_theme_constant_override(&"shadow_outline_size", 10)
+	%Subtitle.text = UITheme.GAME_TAGLINE
+	_as_caption(%Subtitle, UITheme.ACCENT)
+	_as_caption(%OperatorTitle, UITheme.ACCENT)
+	_as_caption(%NameLabel, UITheme.TEXT_DIM)
+	_as_caption(%AddressLabel, UITheme.TEXT_DIM)
+	%Operator.add_theme_stylebox_override(&"panel", UITheme.glass(Color(0.025, 0.03, 0.04, 0.8), 20))
+	for button: Button in [%OfflineButton, %HostButton, %JoinButton, %QuitButton]:
+		button.add_theme_font_size_override(&"font_size", 24)
+	_status_label.add_theme_color_override(&"font_color", UITheme.ACCENT)
+	var version := UITheme.caption("V1.0  /  GODOT 4.7", Color(UITheme.TEXT_DIM, 0.6))
+	UITheme.pin(version, Vector2(0.0, 1.0), 90, -44, 400, -24)
+	add_child(version)
+
+
+func _as_caption(label: Label, colour: Color) -> void:
+	var model := UITheme.caption(label.text, colour)
+	label.text = model.text
+	label.add_theme_font_override(&"font", model.get_theme_font(&"font"))
+	label.add_theme_font_size_override(&"font_size", model.get_theme_font_size(&"font_size"))
+	label.add_theme_color_override(&"font_color", colour)
+	model.free()
+
+
+## menu slides in from the left, cards fade in.
+func _intro() -> void:
+	var column: Control = $Column
+	column.modulate.a = 0.0
+	column.position.x -= 40
+	var tween := create_tween().set_parallel()
+	tween.tween_property(column, "modulate:a", 1.0, 0.5)
+	tween.tween_property(column, "position:x", column.position.x + 40, 0.6) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	for card: Control in [%Operator, _profile_card]:
+		if card == null:
+			continue
+		card.modulate.a = 0.0
+		tween.tween_property(card, "modulate:a", 1.0, 0.6).set_delay(0.2)
 
 
 const BACKDROP_MAP := preload("res://scenes/maps/meridian.tscn")
@@ -117,16 +160,21 @@ func _update_orbit() -> void:
 
 ## level, title, progress to next level and career numbers - the first
 ## thing on screen so every match visibly moves something.
+var _profile_card: PanelContainer = null
+
+
 func _build_profile_card() -> void:
 	var card := PanelContainer.new()
-	UITheme.pin(card, Vector2(0.0, 0.5), 40, -170, 360, -170)
+	card.add_theme_stylebox_override(&"panel", UITheme.glass(Color(0.025, 0.03, 0.04, 0.8), 20))
+	UITheme.pin(card, Vector2(1.0, 0.0), -420, 60, -60, 60)
 	add_child(card)
+	_profile_card = card
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override(&"separation", 6)
 	card.add_child(column)
 
-	column.add_child(UITheme.label(Profile.title().to_upper(), UITheme.SIZE_SMALL, UITheme.ACCENT))
-	column.add_child(UITheme.label("LEVEL %d" % Profile.level, UITheme.SIZE_LARGE + 6, UITheme.TEXT))
+	column.add_child(UITheme.caption("CAREER  /  " + Profile.title(), UITheme.ACCENT))
+	column.add_child(UITheme.heading("LEVEL %d" % Profile.level, 40, UITheme.TEXT))
 	var bar := ProgressBar.new()
 	bar.show_percentage = false
 	bar.custom_minimum_size = Vector2(0, 8)

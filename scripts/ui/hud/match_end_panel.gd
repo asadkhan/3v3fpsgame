@@ -30,8 +30,8 @@ func _ready() -> void:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override(&"separation", 8)
 	add_child(column)
-	_result = UITheme.label("", UITheme.SIZE_HUGE, UITheme.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
-	_score = UITheme.label("", UITheme.SIZE_LARGE, UITheme.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+	_result = UITheme.heading("", UITheme.SIZE_HUGE, UITheme.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+	_score = UITheme.heading("", UITheme.SIZE_LARGE, UITheme.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 	_mvp = UITheme.label("", UITheme.SIZE_BODY, UITheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
 	column.add_child(_result)
 	column.add_child(_score)
@@ -47,7 +47,7 @@ func _ready() -> void:
 	var xp_left := VBoxContainer.new()
 	xp_left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	xp_box.add_child(xp_left)
-	_xp_total = UITheme.label("", UITheme.SIZE_LARGE, UITheme.GOOD)
+	_xp_total = UITheme.heading("", UITheme.SIZE_LARGE, UITheme.GOOD)
 	_level_label = UITheme.label("", UITheme.SIZE_SMALL, UITheme.TEXT)
 	_level_bar = ProgressBar.new()
 	_level_bar.show_percentage = false

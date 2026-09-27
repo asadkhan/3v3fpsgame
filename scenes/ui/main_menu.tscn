@@ -31,80 +31,108 @@ grow_vertical = 2
 texture = SubResource("Tex_bg")
 expand_mode = 1
 
-[node name="Center" type="CenterContainer" parent="."]
+[node name="Column" type="VBoxContainer" parent="."]
 layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="Column" type="VBoxContainer" parent="Center"]
-custom_minimum_size = Vector2(380, 0)
-layout_mode = 2
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 90.0
+offset_top = -250.0
+offset_right = 470.0
+offset_bottom = 290.0
 theme_override_constants/separation = 10
 
-[node name="Title" type="Label" parent="Center/Column"]
+[node name="Subtitle" type="Label" parent="Column"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "3v3 TACTICAL FPS"
-horizontal_alignment = 1
+text = "3V3 TACTICAL SHOOTER"
 
-[node name="Subtitle" type="Label" parent="Center/Column"]
+[node name="Title" type="Label" parent="Column"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "working title"
-horizontal_alignment = 1
+text = "SIGNALFALL"
 
-[node name="Spacer" type="Control" parent="Center/Column"]
-custom_minimum_size = Vector2(0, 16)
+[node name="Rule" type="ColorRect" parent="Column"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(96, 3)
+layout_mode = 2
+size_flags_horizontal = 0
+color = Color(1, 0.7, 0.24, 1)
+
+[node name="Spacer" type="Control" parent="Column"]
+custom_minimum_size = Vector2(0, 26)
 layout_mode = 2
 
-[node name="NameLabel" type="Label" parent="Center/Column"]
+[node name="OfflineButton" type="Button" parent="Column"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 54)
 layout_mode = 2
-text = "Your name"
+text = "PRACTICE RANGE"
+alignment = 0
 
-[node name="NameEdit" type="LineEdit" parent="Center/Column"]
+[node name="HostButton" type="Button" parent="Column"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 54)
+layout_mode = 2
+text = "HOST MATCH"
+alignment = 0
+
+[node name="JoinButton" type="Button" parent="Column"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 54)
+layout_mode = 2
+text = "JOIN MATCH"
+alignment = 0
+
+[node name="QuitButton" type="Button" parent="Column"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 54)
+layout_mode = 2
+text = "QUIT"
+alignment = 0
+
+[node name="StatusLabel" type="Label" parent="Column"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="Operator" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -420.0
+offset_top = -250.0
+offset_right = -60.0
+offset_bottom = -60.0
+
+[node name="Fields" type="VBoxContainer" parent="Operator"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="OperatorTitle" type="Label" parent="Operator/Fields"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "OPERATOR"
+
+[node name="NameLabel" type="Label" parent="Operator/Fields"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "CALLSIGN"
+
+[node name="NameEdit" type="LineEdit" parent="Operator/Fields"]
 unique_name_in_owner = true
 layout_mode = 2
 max_length = 16
 placeholder_text = "Player name"
 
-[node name="AddressLabel" type="Label" parent="Center/Column"]
+[node name="AddressLabel" type="Label" parent="Operator/Fields"]
+unique_name_in_owner = true
 layout_mode = 2
-text = "Host address (for Join)"
+text = "HOST ADDRESS  (FOR JOIN)"
 
-[node name="AddressEdit" type="LineEdit" parent="Center/Column"]
+[node name="AddressEdit" type="LineEdit" parent="Operator/Fields"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "127.0.0.1"
-
-[node name="HostButton" type="Button" parent="Center/Column"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 44)
-layout_mode = 2
-text = "HOST MATCH"
-
-[node name="JoinButton" type="Button" parent="Center/Column"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 44)
-layout_mode = 2
-text = "JOIN MATCH"
-
-[node name="OfflineButton" type="Button" parent="Center/Column"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 44)
-layout_mode = 2
-text = "PRACTICE RANGE (offline)"
-
-[node name="QuitButton" type="Button" parent="Center/Column"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 44)
-layout_mode = 2
-text = "QUIT"
-
-[node name="StatusLabel" type="Label" parent="Center/Column"]
-unique_name_in_owner = true
-layout_mode = 2
-horizontal_alignment = 1
-autowrap_mode = 3

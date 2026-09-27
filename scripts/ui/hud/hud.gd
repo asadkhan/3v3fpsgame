@@ -120,9 +120,13 @@ func _process(delta: float) -> void:
 	_match_end.update_view(team, delta)
 	_pause.update_view()
 	_pause.visible = _pause.visible and not _buy.is_open
+	# the pause screen covers the lobby card (and offers START MATCH itself)
+	if _pause.visible:
+		_lobby.visible = false
 	_buy.update_view(_player)
 	var objective := get_tree().get_first_node_in_group(SignalCoreObjective.GROUP) as SignalCoreObjective
 	_objective_prompt.update_view(objective, _player)
+	_objective_prompt.set_suppressed(_buy.is_open or _scoreboard.visible or _pause.visible)
 	_top_bar.core_planted = objective != null and objective.is_planted() \
 		and GameManager.is_in(GamePhase.Phase.ROUND_ACTIVE)
 

@@ -39,3 +39,7 @@ the project.
   (https://rrfreelance.itch.io/first-person-hands-with-gloves): the
   first-person hands. The asset is offered free, but its page states no
   explicit licence. Confirm with the author before a commercial release.
+
+## Music
+
+- The menu theme (`assets/audio/music/menu_theme.wav`) was made for this project.

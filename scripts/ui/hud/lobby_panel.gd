@@ -19,7 +19,7 @@ func _ready() -> void:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override(&"separation", 8)
 	add_child(column)
-	_title = UITheme.label("LOBBY  -  MERIDIAN", UITheme.SIZE_LARGE, UITheme.ACCENT)
+	_title = UITheme.heading("LOBBY  -  MERIDIAN", UITheme.SIZE_LARGE, UITheme.ACCENT)
 	column.add_child(_title)
 
 	_teams = HBoxContainer.new()

@@ -28,9 +28,16 @@ func _ready() -> void:
 	_bar.add_theme_stylebox_override(&"fill", fill)
 	add_child(_bar)
 
-	_carrier = UITheme.label("", UITheme.SIZE_SMALL, UITheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
+	_carrier = UITheme.caption("", UITheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
 	get_parent().add_child.call_deferred(_carrier)
-	UITheme.pin(_carrier, Vector2(0.5, 1.0), -250, -170, 250, -145)
+	UITheme.pin(_carrier, Vector2(0.5, 0.0), -250, 122, 250, 144)
+
+
+## hides everything (e.g. while the buy menu covers the screen).
+func set_suppressed(suppressed: bool) -> void:
+	visible = not suppressed
+	if _carrier != null:
+		_carrier.visible = not suppressed
 
 
 func update_view(objective: SignalCoreObjective, player: Player) -> void:
@@ -41,7 +48,7 @@ func update_view(objective: SignalCoreObjective, player: Player) -> void:
 		return
 
 	if objective.core_state == SignalCoreObjective.CoreState.CARRIED and objective.carrier_peer == player.peer_id:
-		_carrier.text = "YOU CARRY THE SIGNAL CORE  -  plant it on A or B"
+		_carrier.text = "YOU CARRY THE SIGNAL CORE  /  PLANT ON A OR B"
 
 	if objective.planter_peer == player.peer_id:
 		_prompt.text = "PLANTING..."

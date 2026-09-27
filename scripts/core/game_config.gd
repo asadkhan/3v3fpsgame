@@ -24,6 +24,7 @@ signal setting_changed(key: String, value: Variant)
 ## everything as a string).
 var _settings: Dictionary = {
 	"audio/master_volume": {"default": 0.8, "type": TYPE_FLOAT},
+	"audio/music_volume": {"default": 0.6, "type": TYPE_FLOAT},
 	"input/mouse_sensitivity": {"default": 0.4, "type": TYPE_FLOAT},
 	"input/invert_mouse_y": {"default": false, "type": TYPE_BOOL},
 	"video/field_of_view": {"default": 90.0, "type": TYPE_FLOAT},
@@ -47,6 +48,10 @@ func _ready() -> void:
 var master_volume: float:
 	get: return get_setting("audio/master_volume")
 	set(value): set_setting("audio/master_volume", value)
+
+var music_volume: float:
+	get: return get_setting("audio/music_volume")
+	set(value): set_setting("audio/music_volume", value)
 
 var mouse_sensitivity: float:
 	get: return get_setting("input/mouse_sensitivity")

@@ -66,17 +66,17 @@ func _add_entry(bbcode: String, highlight: bool) -> void:
 	var panel := PanelContainer.new()
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.size_flags_horizontal = Control.SIZE_SHRINK_END
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.02, 0.025, 0.03, 0.72)
+	box.content_margin_left = 12
+	box.content_margin_right = 12
+	box.content_margin_top = 4
+	box.content_margin_bottom = 4
 	if highlight:
-		var box := StyleBoxFlat.new()
-		box.bg_color = UITheme.PANEL
-		box.set_border_width_all(1)
+		box.bg_color = Color(0.12, 0.08, 0.02, 0.8)
+		box.border_width_right = 3
 		box.border_color = UITheme.ACCENT
-		box.set_corner_radius_all(3)
-		box.content_margin_left = 10
-		box.content_margin_right = 10
-		box.content_margin_top = 4
-		box.content_margin_bottom = 4
-		panel.add_theme_stylebox_override(&"panel", box)
+	panel.add_theme_stylebox_override(&"panel", box)
 
 	var label := RichTextLabel.new()
 	label.bbcode_enabled = true
@@ -85,13 +85,14 @@ func _add_entry(bbcode: String, highlight: bool) -> void:
 	label.scroll_active = false
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.add_theme_font_size_override(&"normal_font_size", UITheme.SIZE_SMALL + 1)
-	label.add_theme_constant_override(&"outline_size", 3)
-	label.add_theme_color_override(&"font_outline_color", UITheme.OUTLINE)
+	label.add_theme_font_override(&"normal_font", UITheme.heading_font())
 	label.text = bbcode
 	panel.add_child(label)
 
 	add_child(panel)
 	move_child(panel, 0)
+	panel.modulate.a = 0.0
+	panel.create_tween().tween_property(panel, ^"modulate:a", 1.0, 0.15)
 	while get_child_count() > MAX_ENTRIES:
 		var oldest := get_child(get_child_count() - 1)
 		remove_child(oldest)
