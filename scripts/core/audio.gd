@@ -454,11 +454,15 @@ const RECORDINGS := ["shot_rifle", "shot_rifle_far", "shot_smg", "shot_smg_far",
 	"shot_burst_far", "shot_pistol", "shot_pistol_far"]
 
 
+## drop your own wavs with the same names in weapons_custom/ and they win
+## over the stock ones (that folder is git-ignored, for sounds you can't share)
 func _load_recordings() -> void:
 	for sound in RECORDINGS:
-		var path := "res://assets/audio/weapons/%s.wav" % sound
-		if ResourceLoader.exists(path):
-			_library[StringName(sound)] = load(path)
+		for folder in ["weapons_custom", "weapons"]:
+			var path := "res://assets/audio/%s/%s.wav" % [folder, sound]
+			if ResourceLoader.exists(path):
+				_library[StringName(sound)] = load(path)
+				break
 
 
 ## grenade venting smoke: steady filtered hiss
