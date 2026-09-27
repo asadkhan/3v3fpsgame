@@ -464,11 +464,21 @@ func _load_recordings() -> void:
 		var path := "res://assets/audio/weapons/%s.wav" % sound
 		if ResourceLoader.exists(path):
 			_library[StringName(sound)] = load(path)
-	# overrides. exported builds list "x.wav.import" rather than "x.wav"
+	# overrides: wav, mp3 or ogg. exported builds list "x.wav.import" rather
+	# than "x.wav". a file godot can't read is skipped with a warning.
 	for file in DirAccess.get_files_at(CUSTOM_DIR):
 		var clean := file.trim_suffix(".import").trim_suffix(".remap")
-		if clean.get_extension() == "wav":
-			_library[StringName(clean.get_basename())] = load(CUSTOM_DIR + "/" + clean)
+		if not clean.get_extension().to_lower() in ["wav", "mp3", "ogg"]:
+			continue
+		var path := CUSTOM_DIR + "/" + clean
+		var stream: AudioStream = null
+		if ResourceLoader.exists(path):
+			stream = ResourceLoader.load(path, "AudioStream") as AudioStream
+		if stream == null:
+			push_warning("Audio: couldn't load %s - is it really a %s file, and has the editor imported it?"
+				% [clean, clean.get_extension().to_upper()])
+			continue
+		_library[StringName(clean.get_basename())] = stream
 
 
 ## grenade venting smoke: steady filtered hiss
