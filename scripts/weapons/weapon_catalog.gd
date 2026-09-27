@@ -1,16 +1,16 @@
 class_name WeaponCatalog
 extends RefCounted
-## Every weapon in the game, by [member WeaponData.weapon_id].
+## every weapon in the game, by weapon_id.
 ##
-## A fixed list of paths rather than a folder scan: an exported build remaps
-## resource files, so listing [code]res://data/weapons/[/code] at runtime is not
-## reliable, and the buy menu's order is a design decision anyway.
+## fixed list of paths instead of scanning the folder: exported builds remap
+## resource paths so scanning res://data/weapons/ at runtime isn't reliable,
+## plus we want to control the buy menu order anyway.
 
-## Always carried, never bought, never lost.
+## always carried, never bought, never lost.
 const SIDEARM_ID := &"wren"
 const KNIFE_ID := &"knife"
 
-## Buy-menu order.
+## buy-menu order.
 const PATHS := {
 	&"wren": "res://data/weapons/wren.tres",
 	&"jackal": "res://data/weapons/jackal.tres",
@@ -20,7 +20,7 @@ const PATHS := {
 }
 
 
-## The weapon with [param weapon_id], or null for an unknown or empty id.
+## the weapon with this id, or null if unknown/empty.
 static func find(weapon_id: StringName) -> WeaponData:
 	if not PATHS.has(weapon_id):
 		return null
@@ -35,7 +35,7 @@ static func knife() -> WeaponData:
 	return find(KNIFE_ID)
 
 
-## Primary weapons a player can buy, in menu order.
+## primary weapons a player can buy, in menu order.
 static func buyable() -> Array[WeaponData]:
 	var out: Array[WeaponData] = []
 	for weapon_id in PATHS:

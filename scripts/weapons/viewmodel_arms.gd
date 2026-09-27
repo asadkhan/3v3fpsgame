@@ -1,51 +1,46 @@
 class_name ViewmodelArms
 extends Node3D
-## The first-person arms: tactical sleeves, elbow pads, wrist straps and hard-
-## knuckle gloves, built in code from primitives so they need no art assets and
-## fit the flat-shaded weapon models.
+## first-person arms: sleeves, elbow pads, wrist straps, gloves - built from
+## primitives in code so they need no art assets and match the flat-shaded
+## weapon models.
 ##
-## [Weapon] adds one under its viewmodel whenever it swaps models. The model
-## scene says where the hands go with [code]HandR[/code] / [code]HandL[/code]
-## markers (children of its Model node), each carrying two pieces of metadata:
-##   [code]grip[/code]   - how the hand holds there: [code]"pistol"[/code] (a
-##                         raked pistol grip), [code]"vertical"[/code] (a
-##                         foregrip), [code]"rail"[/code] (under a handguard)
-##   [code]radius[/code] - how thick the thing being held is, in metres
-##   [code]hand_scale[/code] - optional, for a small gun that needs smaller hands
-## A model without markers simply has no arms. The shoulders sit at fixed
-## points below and behind the camera, and each arm reaches its hand with
-## two-bone IK, so a new gun only needs its two markers.
+## Weapon adds one of these under its viewmodel whenever the model changes.
+## the model scene marks where hands go with HandR/HandL markers (children of
+## Model), each carrying metadata:
+##   grip - how the hand holds it: "pistol" (raked grip), "vertical"
+##          (foregrip), "rail" (under a handguard)
+##   radius - how thick the held thing is, in metres
+##   hand_scale - optional, shrinks the hand for a small gun
+## no markers = no arms. shoulders are fixed points below/behind the camera;
+## each arm reaches its hand with two-bone IK, so a new gun just needs its
+## two markers.
 ##
-## The hands and forearms are a scanned, skinned arm model
-## ([constant ARM_MODEL], fingerless tactical gloves): placed on each marker,
-## mirrored for the left hand, its wrist bent so the forearm runs to the IK
-## elbow and its fingers curled round the grip. The sleeves, straps and upper
-## arms are still built here from primitives, in the team colour. Without the
-## model file the whole hand falls back to primitives too.
+## hands/forearms are a scanned skinned arm model (ARM_MODEL, fingerless
+## gloves): placed on each marker, mirrored for the left hand, wrist bent so
+## the forearm runs to the IK elbow, fingers curled round the grip. sleeves
+## and upper arms are still built here from primitives in the team colour.
+## falls back to primitives entirely if the model file is missing.
 ##
-## Re-solved every frame, so [ViewmodelAnimator] can move the gun, take the
-## left hand off it (a magazine change) and open the fingers (a knife toss)
-## while the shoulders stay put under the camera. Purely cosmetic and local;
-## the sleeves take the owner's team colour.
+## re-solved every frame so ViewmodelAnimator can move the gun, pull the left
+## hand off it (mag change), open the fingers (knife toss) while shoulders
+## stay put under the camera. purely cosmetic and local.
 
 const ARM_MODEL := "res://assets/characters/fp_arms/firstPersonHandsWithGloves.FBX"
 const ARM_TEXTURES := "res://assets/characters/fp_arms/ArmWithGlove%s.png"
 
-## The arm model's axes in the hand frame (see [method _grip_basis]): its
-## fingers (-Z) point forward, the back of its hand (+Y) faces +X, and its
-## knuckles run index to pinky (+X) down the grip (-Y).
+## arm model's axes in hand space (see _grip_basis): fingers point -Z, back
+## of hand faces +X, knuckles run index to pinky along +X (-Y down the grip).
 const MODEL_TO_HAND := Basis(Vector3(0, -1, 0), Vector3(1, 0, 0), Vector3(0, 0, 1))
-## The centre of the loop the curled fingers make, in model space: a held
-## object's axis goes through it. Measured from the curled pose.
+## centre of the curled-fingers loop, in model space - a held object's axis
+## runs through it. measured from the curled pose.
 const MODEL_GRIP_CENTRE := Vector3(0.006, -0.013, -0.055)
-## Grip radius the curl angles below are tuned for; thicker grips open the hand.
+## grip radius the curl angles below are tuned for; thicker grips open the hand.
 const CURL_RADIUS := 0.019
-## Finger curl in degrees per joint (base, middle, tip): wrapped round a grip,
-## and the straighter trigger finger.
+## finger curl in degrees per joint (base, middle, tip).
 const CURL_GRIP := [62.0, 78.0, 48.0]
 const CURL_TRIGGER := [18.0, 22.0, 12.0]
 const CURL_THUMB := [45.0, 40.0, 30.0]
-## The thumb's joints bend about a different local axis from the fingers'.
+## thumb bends about a different local axis than the fingers.
 const THUMB_AXIS := Vector3(-1, 0, 0)
 const FINGERS := [
 	["BoneIndexBase", "BoneIndexMid", "BoneIndexEnd"],
@@ -58,13 +53,13 @@ const THUMB := ["Bone003", "Bone004", "Bone005"]
 static var _arm_scene: PackedScene = null
 static var _skin: StandardMaterial3D = null
 
-## Shoulders, in the weapon's space: the camera is at the origin looking down -Z.
+## shoulders, in the weapon's space: camera at origin looking down -Z.
 const SHOULDER_R := Vector3(0.17, -0.3, 0.06)
 const SHOULDER_L := Vector3(-0.19, -0.32, 0.04)
 const UPPER_LENGTH := 0.24
 const FORE_LENGTH := 0.23
 
-## Sleeve fabric per side: blue-grey for Alpha, tan for Bravo, olive otherwise.
+## sleeve colour per side: blue-grey Alpha, tan Bravo, olive otherwise.
 const SLEEVE_COLOURS := {
 	Team.Side.NONE: Color(0.24, 0.26, 0.19),
 	Team.Side.ALPHA: Color(0.19, 0.23, 0.29),
@@ -81,11 +76,10 @@ var _accent: BaseMaterial3D
 var _patch: BaseMaterial3D
 
 
-## What the animator ([ViewmodelAnimator]) may change each frame. The left hand
-## can be pulled off its marker towards [member left_override] (a hand frame in
-## the viewmodel's space - see [method _grip_basis]) by [member left_weight],
-## or hidden; either hand can be opened from its grip by [member grip_open]
-## (0 closed round the grip, 1 flat open).
+## what the animator can change each frame: left hand can be pulled off its
+## marker towards left_override (hand frame in viewmodel space) by
+## left_weight, or hidden; either hand can open from its grip via grip_open
+## (0 closed, 1 flat open).
 var left_override := Transform3D.IDENTITY
 var left_weight: float = 0.0
 var left_visible: bool = true
@@ -95,10 +89,9 @@ var _viewmodel: Node3D = null
 var _arms: Array[Dictionary] = []
 
 
-## Builds both arms. [param viewmodel] is the node this rig lives under (its
-## transform relative to the weapon places the shoulders); [param model] is the
-## instanced weapon model holding the hand markers; [param body] is the player,
-## read for the team colour.
+## builds both arms. viewmodel is the node this rig lives under (its
+## transform places the shoulders); model is the weapon model holding the
+## hand markers; body is the player, read for team colour.
 func build(viewmodel: Node3D, model: Node3D, body: Node) -> void:
 	_viewmodel = viewmodel
 	_body = body
@@ -125,7 +118,7 @@ func _refresh_team() -> void:
 		_fabric.albedo_color = SLEEVE_COLOURS.get(team, SLEEVE_COLOURS[Team.Side.NONE])
 
 
-## The rest frame of the hand a marker describes, in the viewmodel's space.
+## rest frame of the hand a marker describes, in viewmodel space.
 func hand_frame(marker: Node3D) -> Transform3D:
 	var at := _relative(marker, _viewmodel)
 	var grip := String(marker.get_meta(&"grip", "pistol"))
@@ -134,29 +127,29 @@ func hand_frame(marker: Node3D) -> Transform3D:
 
 # --- Layout ---------------------------------------------------------------------
 
-## The hand's frame for each kind of hold. In that frame the held object runs
-## along +Y, the back of the hand faces +X and the wrist is towards +Z. The left
-## hand is the same geometry mirrored, so its back faces -X. A [code]custom[/code]
-## grip takes the marker's own orientation (the knife).
+## the hand's frame for each grip type. in that frame the held object runs
+## along +Y, back of the hand faces +X, wrist towards +Z. left hand mirrors
+## the geometry so its back faces -X. "custom" keeps the marker's own
+## orientation (the knife).
 static func _grip_basis(grip: String, marker_basis := Basis()) -> Basis:
 	match grip:
 		"custom":
 			return marker_basis.orthonormalized()
 		"rail":
-			# Palm up under the handguard, fingers over the right side.
+			# palm up under the handguard, fingers over the right side.
 			return Basis(Vector3.UP, Vector3.FORWARD, Vector3.LEFT)
 		"vertical":
 			return Basis(Vector3.RIGHT, Vector3(0, 1, -0.12).normalized(),
 				Vector3(0, 0.12, 1).normalized())
 		_:
-			# A pistol grip rakes back towards the bottom.
+			# pistol grip rakes back towards the bottom.
 			var up := Vector3(0, 0.95, -0.3).normalized()
 			return Basis(Vector3.RIGHT, up, Vector3.RIGHT.cross(up))
 
 
-## Builds one arm as three moving parts: the hand (on its marker), and the
-## forearm and upper-arm sleeves, each built along its own +Y with the elbow's
-## outside towards +Z so [method _solve] only has to aim them.
+## builds one arm as three moving parts: hand (on its marker), forearm and
+## upper-arm sleeves, each built along its own +Y with the elbow's outside
+## towards +Z so _solve only has to aim them.
 func _build_arm(side: int, marker: Node3D) -> Dictionary:
 	var r := float(marker.get_meta(&"radius", 0.02))
 	var hand_scale := float(marker.get_meta(&"hand_scale", 1.0))
@@ -197,9 +190,9 @@ func _build_upper_sleeve(upper: Node3D) -> void:
 	_box(upper, Vector3(0, u * 0.6, 0.04), Vector3(0.038, 0.055, 0.022), Vector3.UP, Vector3.BACK, _nylon)
 
 
-## The forearm sleeve: elbow ball and pad, the sleeve bunched at the cuff, a
-## strap, a velcro patch. Over the scanned forearm it is wider and stops short
-## of the glove, so the model's bare forearm never shows through.
+## forearm sleeve: elbow ball and pad, sleeve bunched at the cuff, a strap, a
+## velcro patch. wider and shorter over the scanned forearm so the model's
+## bare skin never shows through.
 func _build_fore_sleeve(fore: Node3D, length: float, scanned: bool) -> void:
 	var s := 1.5 if scanned else 1.0
 	var cuff := length - (0.05 if scanned else 0.03)
@@ -207,7 +200,7 @@ func _build_fore_sleeve(fore: Node3D, length: float, scanned: bool) -> void:
 	_ellipsoid(fore, Vector3(0, 0, 0.024), Vector3(0.036, 0.046, 0.022), Vector3.UP, Vector3.BACK, _hard)
 	_limb(fore, Vector3.ZERO, Vector3(0, cuff, 0), 0.037 * s, 0.031 * s, _fabric)
 	_limb(fore, Vector3(0, cuff - 0.03, 0), Vector3(0, cuff, 0), 0.035 * s, 0.034 * s, _fabric)
-	# Folds where the sleeve bunches above the cuff, each a little askew.
+	# folds where the sleeve bunches above the cuff, each a bit askew.
 	for i in 3:
 		var y := cuff - (0.045 + i * 0.03)
 		var tilt := (Vector3.BACK if i % 2 == 0 else Vector3.RIGHT) * 0.004
@@ -231,9 +224,8 @@ func _solve_all() -> void:
 		_solve(arm)
 
 
-## Puts the hand where it belongs this frame and aims both sleeves with two-bone
-## IK from a shoulder that stays fixed under the camera, whatever the gun is
-## doing.
+## puts the hand where it belongs this frame and aims both sleeves with
+## two-bone IK from a shoulder fixed under the camera, whatever the gun does.
 func _solve(arm: Dictionary) -> void:
 	var side: int = arm.side
 	var visible_now := side == 1 or left_visible
@@ -257,13 +249,13 @@ func _solve(arm: Dictionary) -> void:
 	var dir := reach.normalized()
 	var along := (UPPER_LENGTH * UPPER_LENGTH - fore_length * fore_length + d * d) / (2.0 * d)
 	var out := sqrt(maxf(UPPER_LENGTH * UPPER_LENGTH - along * along, 0.0))
-	# The elbow bends outwards and down, in the camera's frame.
+	# elbow bends outwards and down, in the camera's frame.
 	var pole := _viewmodel.transform.basis.inverse() * Vector3(0.7 * side, -1.0, 0.25)
 	pole = (pole - dir * pole.dot(dir)).normalized()
 	var elbow := shoulder + dir * along + pole * out
 
 	(arm.upper as Node3D).transform = Transform3D(_facing(elbow - shoulder, pole), shoulder)
-	# Out of reach (a hand dropped off-screen) the forearm stretches rather than
+	# out of reach (hand dropped off-screen), stretch the forearm instead of
 	# leaving a gap at the wrist.
 	var stretch := elbow.distance_to(wrist) / fore_length
 	(arm.fore as Node3D).transform = Transform3D(
@@ -276,7 +268,7 @@ func _solve(arm: Dictionary) -> void:
 		_bend_forearm(scanned, rig_to_skeleton * elbow)
 
 
-## Re-curls a scanned hand's fingers when its openness changes.
+## re-curls a scanned hand's fingers when openness changes.
 func _apply_open(arm: Dictionary, amount: float) -> void:
 	var scanned: Dictionary = arm.scanned
 	if scanned.is_empty() or is_equal_approx(amount, arm.open):
@@ -297,10 +289,10 @@ static func _blend(a: Transform3D, b: Transform3D, weight: float) -> Transform3D
 
 # --- Scanned hand -----------------------------------------------------------------
 
-## Puts the skinned arm model under [param glove] (the hand frame, mirrored for
-## the left hand) with the grip loop of its fingers on the frame's origin; the
-## curl itself is set by [method _apply_open]. Returns the model, its skeleton, the wrist in glove space
-## and the forearm length - or nothing if the model is missing.
+## puts the skinned arm model under glove (the hand frame, mirrored for the
+## left hand) with the finger-curl loop centred on the frame's origin; curl
+## itself is set by _apply_open. returns the model, skeleton, wrist in glove
+## space and forearm length - or empty if the model is missing.
 func _build_scanned_hand(glove: Node3D) -> Dictionary:
 	if _arm_scene == null:
 		_arm_scene = load(ARM_MODEL) as PackedScene
@@ -342,9 +334,8 @@ static func _curl(skeleton: Skeleton3D, bones: Array, degrees: Array, amount: fl
 		skeleton.set_bone_pose_rotation(bone, rest * Quaternion(axis, deg_to_rad(degrees[j] * amount)))
 
 
-## Swings the forearm about the wrist so it runs to [param elbow] (skeleton
-## space) while the hand stays on the grip - the wrist bends, as a real one
-## does.
+## swings the forearm about the wrist so it runs to elbow (skeleton space)
+## while the hand stays on the grip - like a real wrist bend.
 static func _bend_forearm(scanned: Dictionary, elbow: Vector3) -> void:
 	var skeleton := scanned.skeleton as Skeleton3D
 	var arm := skeleton.find_bone("BoneArm")
@@ -363,14 +354,14 @@ static func _bend_forearm(scanned: Dictionary, elbow: Vector3) -> void:
 	skeleton.set_bone_global_pose(hand, skeleton.get_bone_global_rest(hand))
 
 
-## The glove, in the hand frame (see [method _grip_basis]) around an object of
-## radius [param r] running along Y.
+## the glove, in hand space (see _grip_basis) around an object of radius r
+## running along Y.
 func _build_glove(glove: Node3D, r: float, trigger: bool) -> void:
 	var x := r + 0.012
-	# Palm and back of the hand, and the cuff that meets the wrist band.
+	# palm, back of hand, and the cuff meeting the wrist band.
 	_blob(glove, Vector3(x, -0.002, 0.028), Vector3(0.015, 0.043, 0.042), _leather)
 	_blob(glove, Vector3(x - 0.002, -0.014, 0.066), Vector3(0.017, 0.03, 0.022), _leather)
-	# Hard knuckle guard across the back of the hand.
+	# hard knuckle guard across the back of the hand.
 	_blob(glove, Vector3(x + 0.012, 0.0, 0.006), Vector3(0.008, 0.038, 0.017), _hard)
 	for i in 4:
 		var y := 0.03 - i * 0.02
@@ -378,19 +369,19 @@ func _build_glove(glove: Node3D, r: float, trigger: bool) -> void:
 		var thick := 0.0095 if i < 3 else 0.0082
 		var knuckle := Vector3(x, y, -0.006)
 		if i == 0 and trigger:
-			# Index finger along the frame, off the trigger.
+			# index finger runs straight along the frame, off the trigger.
 			_limb_in(glove, knuckle, Vector3(x - 0.004, y + 0.012, -0.05), thick, _leather)
 			_limb_in(glove, Vector3(x - 0.004, y + 0.012, -0.05), Vector3(x - 0.008, y + 0.016, -0.078), thick * 0.95, _leather)
 			continue
-		# Three joints wrapped round the grip: along the near side, across the
-		# front, and the tip on the far side.
+		# three joints wrapped round the grip: near side, across the front,
+		# tip on the far side.
 		var a := Vector3(r * 0.75, y, -r - thick * 0.8)
 		var b := Vector3(-r * 0.75, y - 0.002, -r - thick * 0.8)
 		var c := Vector3(-r - thick * 0.7, y - 0.004, -0.004)
 		_limb_in(glove, knuckle, a, thick, _leather)
 		_limb_in(glove, a, b, thick * 0.97, _leather)
 		_limb_in(glove, b, c, thick * 0.92, _leather)
-	# Thumb: from the heel of the palm, round the back of the grip.
+	# thumb: from the heel of the palm, round the back of the grip.
 	var t0 := Vector3(x - 0.004, 0.022, 0.045)
 	var t1 := Vector3(r * 0.5, 0.042, r + 0.012)
 	var t2 := Vector3(-r - 0.006, 0.046, 0.004)
@@ -410,7 +401,7 @@ func _limb(parent: Node3D, a: Vector3, b: Vector3, radius_a: float, radius_b: fl
 	_part(parent, mesh, material, Transform3D(_along(b - a), (a + b) * 0.5))
 
 
-## A finger joint: a capsule from [param a] to [param b] under [param parent].
+## a finger joint: a capsule from a to b under parent.
 func _limb_in(parent: Node3D, a: Vector3, b: Vector3, radius: float, material: Material) -> void:
 	var mesh := CapsuleMesh.new()
 	mesh.radius = radius
@@ -420,7 +411,7 @@ func _limb_in(parent: Node3D, a: Vector3, b: Vector3, radius: float, material: M
 	_part(parent, mesh, material, Transform3D(_along(b - a), (a + b) * 0.5))
 
 
-## An ellipsoid with radii [param radii] under [param parent], axis-aligned.
+## an ellipsoid with radii radii under parent, axis-aligned.
 func _blob(parent: Node3D, at: Vector3, radii: Vector3, material: Material) -> void:
 	_part(parent, _sphere_mesh(1.0), material, Transform3D(Basis.from_scale(radii), at))
 
@@ -439,7 +430,7 @@ func _part(parent: Node3D, mesh: Mesh, material: Material, xform: Transform3D) -
 	part.mesh = mesh
 	part.material_override = material
 	part.transform = xform
-	# A viewmodel is drawn close to the camera; its shadow would cover the world.
+	# viewmodel is drawn close to the camera; its shadow would cover the world.
 	part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(part)
 
@@ -459,7 +450,7 @@ static func _sphere_mesh(radius: float) -> SphereMesh:
 	return mesh
 
 
-## A basis whose Y runs along [param dir].
+## a basis whose Y runs along dir.
 static func _along(dir: Vector3) -> Basis:
 	var y := dir.normalized()
 	var ref := Vector3.FORWARD if absf(y.dot(Vector3.FORWARD)) < 0.9 else Vector3.RIGHT
@@ -467,15 +458,14 @@ static func _along(dir: Vector3) -> Basis:
 	return Basis(x, y, x.cross(y))
 
 
-## A basis whose Y runs along [param along] and whose Z faces [param facing].
+## a basis whose Y runs along "along" and whose Z faces "facing".
 static func _facing(along: Vector3, facing: Vector3) -> Basis:
 	var y := along.normalized()
 	var z := (facing - y * facing.dot(y)).normalized()
 	return Basis(y.cross(z), y, z)
 
 
-## [param node]'s transform in [param ancestor]'s space, whether or not either
-## is in the tree yet.
+## node's transform in ancestor's space, whether or not either is in the tree yet.
 static func _relative(node: Node3D, ancestor: Node3D) -> Transform3D:
 	var xform := Transform3D.IDENTITY
 	var at: Node = node
@@ -487,9 +477,9 @@ static func _relative(node: Node3D, ancestor: Node3D) -> Transform3D:
 
 
 func _make_materials() -> void:
-	# Scanned cloth and leather (Poly Haven, CC0), projected in the arm's own
-	# space since the primitives' UVs stretch. The sleeve cloth is pale, so the
-	# team colour tints it.
+	# scanned cloth/leather (poly haven, CC0), projected in the arm's own
+	# space since primitive UVs stretch. sleeve cloth is pale so the team
+	# colour tints it.
 	_fabric = _scanned("rough_linen", SLEEVE_COLOURS[Team.Side.NONE], 9.0)
 	_leather = _scanned("fabric_leather_02", Color(0.11, 0.11, 0.115), 14.0)
 	_hard = _material(Color(0.11, 0.11, 0.12), 0.38)

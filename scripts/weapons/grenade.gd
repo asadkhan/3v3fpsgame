@@ -1,16 +1,15 @@
 class_name Grenade
 extends Node3D
-## A thrown frag or smoke grenade. Every machine spawns and flies its own copy
-## from the same start (see [method PlayerLoadout.throw_grenade]); the flight is
-## a deterministic ray-bounce integration against the world, so all copies land
-## in the same place. Only the host's frag deals damage.
+## a thrown frag or smoke grenade. every machine spawns and flies its own
+## copy from the same start (see PlayerLoadout.throw_grenade); the flight
+## is a deterministic ray-bounce sim, so all copies land in the same place.
+## only the host's frag deals damage.
 ##
-## Frag: bounces, explodes 2.2 s after the throw - fireball, flash, debris,
-## scorch, a shockwave that shakes nearby cameras - and deals up to
-## [constant FRAG_DAMAGE] falling off to nothing at [constant FRAG_RADIUS],
-## blocked by walls.
-## Smoke: pops after 1.4 s and billows into an opaque cloud about
-## [constant SMOKE_RADIUS] across that lasts [constant SMOKE_TIME] seconds.
+## frag: bounces, explodes 2.2s after the throw - fireball, flash, debris,
+## scorch, a shockwave that shakes nearby cameras - up to FRAG_DAMAGE,
+## falling off to nothing at FRAG_RADIUS, blocked by walls.
+## smoke: pops after 1.4s into an opaque cloud about SMOKE_RADIUS across
+## that lasts SMOKE_TIME seconds.
 
 enum Kind { FRAG, SMOKE }
 
@@ -23,7 +22,7 @@ const SMOKE_RADIUS := 4.2
 const SMOKE_TIME := 16.0
 
 var kind: int = Kind.FRAG
-## The player who threw it, credited with frag kills. May be freed.
+## player who threw it, credited with frag kills. may be freed.
 var thrower: Node = null
 
 var _velocity := Vector3.ZERO
@@ -108,7 +107,7 @@ func _explode() -> void:
 	decal.global_position = at
 	decal.rotation.y = randf() * TAU
 	parent.get_tree().create_timer(40.0).timeout.connect(decal.queue_free)
-	# Shockwave: nearby cameras shake.
+	# shockwave: nearby cameras shake.
 	var me := NetworkManager.get_local_player()
 	if me != null:
 		var d := me.global_position.distance_to(at)
@@ -157,7 +156,7 @@ func _fireball(parent: Node, at: Vector3) -> void:
 	BattleFx.burst(parent, smoke, at)
 
 
-## Host only: damage everyone in range who is not behind cover.
+## host only: damage everyone in range who isn't behind cover.
 func _deal_blast_damage(at: Vector3) -> void:
 	var space := get_world_3d().direct_space_state
 	var targets: Array = []
@@ -174,7 +173,7 @@ func _deal_blast_damage(at: Vector3) -> void:
 			continue
 		var query := PhysicsRayQueryParameters3D.create(at, centre, CollisionLayers.WORLD)
 		var blocked := space.intersect_ray(query)
-		# Cover blocks the blast; the target's own body does not.
+		# cover blocks the blast; the target's own body doesn't.
 		if not blocked.is_empty() and Damageable.find_target(blocked.get("collider")) != player:
 			continue
 		var amount := FRAG_DAMAGE * pow(1.0 - d / FRAG_RADIUS, 1.3)
@@ -189,12 +188,12 @@ func _pop_smoke() -> void:
 	var cloud := Node3D.new()
 	get_parent().add_child(cloud)
 	cloud.global_position = global_position
-	# A thick core that blocks sight and a softer rolling outer layer.
+	# a thick core that blocks sight and a softer rolling outer layer.
 	for layer in 2:
 		var p := CPUParticles3D.new()
 		p.amount = 140 if layer == 0 else 60
 		p.lifetime = 5.0
-		# Most of it bursts out at once, so it blooms within a second.
+		# most of it bursts out at once, so it blooms within a second.
 		p.explosiveness = 0.35
 		p.preprocess = 0.0
 		p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE

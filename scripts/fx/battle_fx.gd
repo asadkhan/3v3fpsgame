@@ -1,34 +1,32 @@
 class_name BattleFx
 extends RefCounted
-## Shared battlefield effects: procedurally made textures (smoke puff, flame,
-## scorch, stain) and ready-configured particle emitters for smoke, fire,
-## embers, dust and blood. Textures are generated once and cached, so every
-## emitter in the match shares them.
+## shared battlefield fx: procedural textures (smoke puff, flame, scorch,
+## stain) and ready-made particle emitters for smoke, fire, embers, dust,
+## blood. textures are generated once and cached, shared by every emitter.
 ##
-## CPU particles throughout: they run the same on every renderer and every GPU,
-## and the counts here are small.
+## cpu particles throughout - same look on every gpu, and counts are small.
 
 static var _cache: Dictionary = {}
 
 
 # --- Textures -----------------------------------------------------------------------
 
-## A soft, lumpy white puff: fractal noise inside a feathered circle.
+## a soft, lumpy white puff: fractal noise inside a feathered circle.
 static func smoke_texture() -> Texture2D:
 	return _cached(&"smoke", func() -> Texture2D: return _puff(128, 0.55, 3, 1.0))
 
 
-## A flame tongue: bright core, ragged edge, taller than wide.
+## a flame tongue: bright core, ragged edge, taller than wide.
 static func flame_texture() -> Texture2D:
 	return _cached(&"flame", func() -> Texture2D: return _puff(64, 0.9, 2, 1.6))
 
 
-## A blackened blast mark: dark, irregular, soft-edged; alpha carries the shape.
+## a blackened blast mark: dark, irregular, soft-edged; alpha carries the shape.
 static func scorch_texture() -> Texture2D:
 	return _cached(&"scorch", func() -> Texture2D: return _blotch(256, Color(0.035, 0.03, 0.026), 0.82, 11.0))
 
 
-## A dark oil or water stain.
+## a dark oil or water stain.
 static func stain_texture() -> Texture2D:
 	return _cached(&"stain", func() -> Texture2D: return _blotch(256, Color(0.06, 0.055, 0.05), 0.6, 9.0))
 
@@ -79,8 +77,8 @@ static func _blotch(size: int, colour: Color, strength: float, lumpiness: float)
 
 # --- Emitters ---------------------------------------------------------------------------
 
-## A billboard material for particles: [param additive] for fire and sparks,
-## otherwise lit-by-nothing alpha smoke tinted by the particle colour.
+## a billboard material for particles: additive for fire and sparks,
+## otherwise unlit alpha smoke tinted by the particle colour.
 static func particle_material(texture: Texture2D, additive: bool) -> Material:
 	if not additive:
 		var smoke := ShaderMaterial.new()
@@ -111,7 +109,7 @@ static func _ramp(colours: Array) -> Gradient:
 
 static func _grow(from: float, to: float) -> Curve:
 	var curve := Curve.new()
-	# The default range is 0..1, which would clamp any growth past full size.
+	# default range is 0..1, which would clamp any growth past full size.
 	curve.max_value = maxf(maxf(from, to), 1.0)
 	curve.add_point(Vector2(0, from))
 	curve.add_point(Vector2(1, to))
@@ -127,14 +125,14 @@ static func _emitter(amount: int, lifetime: float, size: float, texture: Texture
 	p.mesh = quad
 	p.material_override = particle_material(texture, additive)
 	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	# Render layer 2: decals (scorches) are masked to layer 1, so they never
+	# render layer 2: decals (scorches) are masked to layer 1, so they never
 	# paint onto smoke and fire.
 	p.layers = 2
 	return p
 
 
-## A column of dark smoke rising from a fire far away: big, slow, leaning with
-## the wind. [param scale] 1 is a burning building.
+## a column of dark smoke rising from a fire far away: big, slow, leaning
+## with the wind. scale 1 is a burning building.
 static func smoke_column(scale: float = 1.0) -> CPUParticles3D:
 	var p := _emitter(60, 24.0, 9.0 * scale, smoke_texture(), false)
 	p.preprocess = 24.0
@@ -160,7 +158,7 @@ static func smoke_column(scale: float = 1.0) -> CPUParticles3D:
 	return tint(p)
 
 
-## Flames licking up out of a barrel or wreck, [param width] metres across.
+## flames licking up out of a barrel or wreck, width metres across.
 static func flames(width: float = 0.5) -> CPUParticles3D:
 	var p := _emitter(22, 0.7, 0.55 * width / 0.5, flame_texture(), true)
 	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
@@ -178,7 +176,7 @@ static func flames(width: float = 0.5) -> CPUParticles3D:
 	return p
 
 
-## Glowing sparks drifting up from a fire.
+## glowing sparks drifting up from a fire.
 static func embers() -> CPUParticles3D:
 	var p := _emitter(14, 2.6, 0.03, MuzzleFlashMesh.glow_texture(), true)
 	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
@@ -192,7 +190,7 @@ static func embers() -> CPUParticles3D:
 	return p
 
 
-## Thin grey smoke trailing off a fire.
+## thin grey smoke trailing off a fire.
 static func fire_smoke() -> CPUParticles3D:
 	var p := _emitter(10, 4.0, 0.9, smoke_texture(), false)
 	p.preprocess = 4.0
@@ -208,8 +206,8 @@ static func fire_smoke() -> CPUParticles3D:
 	return tint(p)
 
 
-## A one-shot cloud where a round kicks up the ground or a wall: [param colour]
-## is the surface's dust.
+## a one-shot cloud where a round kicks up the ground or a wall; colour is
+## the surface's dust.
 static func dust_burst(normal: Vector3, colour: Color) -> CPUParticles3D:
 	var p := _emitter(7, 1.1, 0.32, smoke_texture(), false)
 	p.one_shot = true
@@ -228,7 +226,7 @@ static func dust_burst(normal: Vector3, colour: Color) -> CPUParticles3D:
 	return tint(p)
 
 
-## Bright sparks skipping off a hard surface.
+## bright sparks skipping off a hard surface.
 static func sparks(normal: Vector3) -> CPUParticles3D:
 	var p := _emitter(9, 0.35, 0.02, MuzzleFlashMesh.glow_texture(), true)
 	p.one_shot = true
@@ -244,7 +242,7 @@ static func sparks(normal: Vector3) -> CPUParticles3D:
 	return p
 
 
-## A red mist where a round hits a body.
+## a red mist where a round hits a body.
 static func blood_mist(normal: Vector3) -> CPUParticles3D:
 	var p := _emitter(8, 0.55, 0.22, smoke_texture(), false)
 	p.one_shot = true
@@ -261,8 +259,8 @@ static func blood_mist(normal: Vector3) -> CPUParticles3D:
 	return tint(p)
 
 
-## Moves a blended emitter's colour into its smoke material: the strongest
-## colour on its ramp (the ramp's own RGB does not reach blended particles).
+## moves a blended emitter's colour into its smoke material: the strongest
+## colour on its ramp (the ramp's own rgb doesn't reach blended particles).
 static func tint(p: CPUParticles3D) -> CPUParticles3D:
 	var material := p.material_override as ShaderMaterial
 	if material == null or p.color_ramp == null:
@@ -275,8 +273,7 @@ static func tint(p: CPUParticles3D) -> CPUParticles3D:
 	return p
 
 
-## Adds a one-shot emitter to [param parent] at [param at] and frees it when
-## it is done.
+## adds a one-shot emitter to parent at at, and frees it when done.
 static func burst(parent: Node, particles: CPUParticles3D, at: Vector3) -> void:
 	parent.add_child(particles)
 	particles.global_position = at

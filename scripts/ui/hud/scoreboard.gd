@@ -1,8 +1,8 @@
 class_name HudScoreboard
 extends PanelContainer
-## Held-Tab scoreboard: both sides with each player's level, combat score per
-## round (ACS), kills, deaths, assists and whether they are alive, sorted by
-## combat score, with your own row marked. Rebuilt only while visible.
+## held-tab scoreboard: both sides, each player's level, ACS (combat score
+## per round), kills, deaths, assists, alive status. sorted by combat score,
+## your row marked. only rebuilt while visible.
 
 const COLUMNS := ["ACS", "K", "D", "A"]
 

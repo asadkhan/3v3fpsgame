@@ -1,196 +1,161 @@
 class_name Weapon
 extends Node3D
-## One equipped weapon: its magazine, its trigger, its reload timer and the
-## hitscan that turns a trigger pull into a line in the world.
+## one equipped weapon: its magazine, trigger, reload timer, and the hitscan
+## that turns a trigger pull into a line in the world.
 ##
-## [b]What this owns versus what the player owns.[/b] The split is deliberate
-## and it is the whole reason this is a separate node:
+## weapon owns: when a shot fires, how much damage, what it hits, recoil,
+## magazine contents, reload progress. player owns: camera, aim direction,
+## input, and the health that takes the damage. the player polls the
+## trigger and hands in the aim ray - it never decides if a shot is legal.
 ##
-## - [b]The weapon owns[/b] when a shot happens, how much damage it does, what
-##   it hits, recoil magnitude, magazine contents and reload progress.
-## - [b]The player owns[/b] the camera, the aim direction, the input state and
-##   the health that receives the damage. The player polls the trigger and
-##   passes the aim ray in; it never decides whether a shot is legal.
+## aim is passed in rather than read from a camera here because the ray
+## starts at the camera, not the muzzle, so the crosshair tells the truth.
+## the muzzle is just where the flash and tracer start.
 ##
-## So [Player] contains no fire-rate maths, no magazine arithmetic and no
-## knowledge of [member WeaponData], and this file contains no input polling and
-## no reference to a camera. Chapter 3's brief asks for exactly that separation,
-## and Chapter 4 needs it for a second reason: when the host has to validate a
-## client's shot, it needs the origin and direction as two values it can be
-## handed and re-run, not a ray buried inside a camera.
-##
-## [b]Why aim is passed in rather than read from a camera here.[/b] The ray
-## starts at the camera, not the muzzle, so the crosshair tells the truth about
-## where the bullet goes. The muzzle is only where the flash and the tracer
-## start, which is why a shot can look like it comes from the barrel and still
-## land exactly under the crosshair.
-##
-## [b]Not included, by design.[/b] No view bob, no ADS, no animation, no
-## projectile path. [b]Not a singleton[/b] and not a global - it is a child of
-## the player that owns it, so six players in a match means six of these.
+## no view bob, no ads, no animation, no projectile path. not a singleton -
+## it's a child of whichever player owns it.
 
 # --- Configuration ------------------------------------------------------
 
-## The stats. Assigned by [method equip] from the player's loadout; never
-## written at runtime, because [method load] hands every player the same shared
-## instance.
+## the loadout stats. set by equip(); never changed at runtime since load()
+## hands every player the same shared instance.
 var data: WeaponData = null
 
-## The body whose shots this weapon must not hit. Set by [method equip] so the
-## raycast can exclude the shooter without this class needing to know what a
-## Player is.
+## the body this weapon's shots must not hit. set by equip() so the raycast
+## can skip the shooter without this class knowing what a player is.
 var shooter: CollisionObject3D = null
 
 # --- Signals ------------------------------------------------------------
-# Emitted rather than called directly on the player, so the weapon has no
-# compile-time dependency on the player and Chapter 4 can drive the same
-# signals from a replicated shot.
+# emitted instead of called directly on the player, so the weapon has no
+# hard dependency on it.
 
-## A round left the barrel. Carries no hit information, because at the moment it
-## is emitted nothing has been hit yet.
+## a round left the barrel. no hit info yet, since nothing's been hit at
+## this point.
 ##
-## The player listens and calls [method hitscan] with its own aim ray. That
-## indirection is the point: this class has no camera and therefore no opinion
-## about where the player is looking, and in Chapter 4 the host can call
-## [method hitscan] itself with a client's ray without going anywhere near a
-## camera.
+## the player listens and calls hitscan() with its own aim ray - keeps this
+## class free of any camera or aim opinion.
 signal fired
 
-## The shot connected. [param killed] lets the hit marker change on a kill.
+## the shot connected. killed flags a kill for the hit marker.
 signal hit_confirmed(killed: bool, zone: int, health_left: int)
 
-## A bullet landed somewhere and asked for an impact effect.
+## a bullet landed somewhere and wants an impact effect.
 ##
-## [b]Deliberately a request, not a spawn.[/b] The weapon decides that a shot
-## ended at a point; it does not know or care what that looks like. A local
-## presentation node listens and draws it. That split is what keeps Chapter 4
-## honest: the replicated shot is a gameplay fact, and the spark is something
-## the machine that pressed the trigger draws locally, so the host validating
-## someone else's shot cannot end up drawing sparks in front of the shooter.
+## just a request, not a spawn - the weapon decides a shot ended at a
+## point, a local presentation node decides what that looks like.
 signal impact_requested(position: Vector3, normal: Vector3, zone: int, surface: int)
 
-## What a round ended on, so the presentation can tell a wall (spark, bullet
-## hole) from a body (blood, no hole) from open air (nothing at all).
+## what a round ended on, so presentation can tell a wall (spark, bullet
+## hole) from a body (blood, no hole) from open air (nothing).
 enum Surface {
-	NONE,    ## Travelled its full range without hitting anything.
-	WORLD,   ## Scenery.
-	ENTITY,  ## Something damageable - a player or a practice target.
+	NONE,    ## missed everything, travelled full range.
+	WORLD,   ## hit scenery.
+	ENTITY,  ## hit something damageable - a player or practice target.
 }
 
-## The [enum Surface] of the most recent [method hitscan]. The host reads it to
-## tell clients what a shot struck.
+## surface of the most recent hitscan. host reads this to tell clients
+## what a shot struck.
 var last_surface: int = Surface.NONE
 
-## The trigger was pulled with an empty magazine. Drives the dry-fire click.
+## trigger pulled on an empty mag. drives the dry-fire click.
 signal dry_fired
 
-## Reloading started. [param duration] is the full reload time.
+## reloading started. duration is the full reload time.
 signal reload_started(duration: float)
 
-## Reloading finished, whether or not it was interrupted.
+## reloading finished, whether or not it was interrupted.
 signal reload_finished
 
-## Magazine contents changed, for the HUD and the debug overlay.
+## magazine contents changed, for the hud and debug overlay.
 signal ammo_changed(magazine: int, reserve: int)
 
-## Ask the player to kick the camera. Degrees, positive is upward.
+## ask the player to kick the camera. degrees, positive is upward.
 signal recoil_requested(pitch_degrees: float, yaw_degrees: float)
 
 # --- Ammunition ---------------------------------------------------------
 
-## Rounds left in the magazine. The only ammunition number that changes by
-## firing.
+## rounds left in the magazine. the only ammo count that changes by firing.
 var ammo_in_magazine: int = 0
 
-## Reserve ammunition. [b]Infinite in practice for now[/b], by design: players
-## re-buy at the start of every round, so a per-match pool is a number nothing
-## would ever consult. The field exists anyway because Chapter 5's buy system
-## and any later limited-ammo mode both need the slot to be there, and adding
-## it then would mean reshaping this API.
+## reserve ammo. infinite for now - players re-buy every round, so a
+## per-match pool doesn't matter yet. kept here for the buy system and any
+## future limited-ammo mode.
 var reserve_ammo: int = 0
 
-## When true, [method try_reload] always succeeds and never decrements
-## [member reserve_ammo]. Set it false and the weapon draws down a real finite
-## pool, with no other code changing.
+## when true, try_reload() always succeeds and never touches reserve_ammo.
+## turn off for a real finite pool, no other code needs to change.
 var infinite_reserve: bool = true
 
-## How many magazines' worth of rounds [member reserve_ammo] starts at when
-## infinite reserve is off. Purely a starting figure for a mode that does not
-## exist yet.
+## how many magazines reserve_ammo starts with when infinite reserve is off.
 @export var starting_reserve_magazines: int = 10
 
 # --- State --------------------------------------------------------------
 
-## True between [signal reload_started] and [signal reload_finished].
+## true between reload_started and reload_finished.
 var is_reloading: bool = false
 
-## Seconds left of the current reload.
+## seconds left on the current reload.
 var _reload_left: float = 0.0
 
-## Seconds until the next shot is allowed. This is the fire-rate limit, and it
-## is the reason holding the trigger cannot outrun the weapon.
+## seconds until the next shot is allowed - the fire-rate limit.
 var _cooldown_left: float = 0.0
 
-## Rounds left to fire in the current burst, for [constant WeaponData.FireMode.BURST].
+## rounds left to fire in the current burst.
 var _burst_left: int = 0
 
-## Seconds until the next round of a burst, which fires at the weapon's own
-## interval rather than at the frame rate.
+## seconds until the next round of a burst, which fires on its own
+## interval rather than the frame rate.
 var _burst_timer: float = 0.0
 
-## Set between the trigger going down and coming back up, so semi-auto can tell
-## one pull from a hold.
+## set while the trigger's held, so semi-auto can tell a pull from a hold.
 var _trigger_held: bool = false
 
-## Health actually removed by the most recent [method hitscan], 0.0 for a miss,
-## scenery, or a target that was already down. The host reads this to tell a
-## client whether its shot was a hit, so the hit marker only flashes for one.
+## damage from the last hitscan. 0 for a miss, scenery, or an already-dead
+## target. host uses this to only flash the hit marker on a real hit.
 var last_damage_dealt: float = 0.0
 
-## Multiplies the time between shots. Set every frame by the owning player from
-## how far into aiming down sights it is; 1.0 at the hip.
+## multiplies time between shots. player sets this every frame from how
+## far into ads it is; 1.0 at the hip.
 var fire_interval_scale: float = 1.0
 
-## Where the last shot ended, for the tracer and the impact effect.
+## where the last shot ended, for the tracer and impact fx.
 var _last_shot_end: Vector3 = Vector3.ZERO
 
 @onready var _muzzle_flash: OmniLight3D = $MuzzleFlash if has_node("MuzzleFlash") else null
 @onready var _muzzle_point: Marker3D = $MuzzlePoint if has_node("MuzzlePoint") else null
 
-## Seconds the muzzle flash stays lit. Long enough to read at 60 fps, short
-## enough not to become a permanent light source.
+## seconds the muzzle flash stays lit. long enough to read at 60fps, short
+## enough it doesn't look like a light left on.
 const MUZZLE_FLASH_TIME := 0.045
 
-## Peak brightness of the muzzle flash.
+## peak brightness of the muzzle flash.
 const MUZZLE_FLASH_ENERGY := 3.0
 
 var _flash_left: float = 0.0
 
-## Keyframed viewmodel animation (draw, reload, inspect, knife swings).
+## keyframed viewmodel animation (draw, reload, inspect, knife swings).
 var _animator: ViewmodelAnimator = null
-## Seconds of the draw animation left; the weapon cannot fire until it is done.
+## seconds left of the draw animation - can't fire until it's done.
 var _draw_left: float = 0.0
-## A melee swing that has started but not yet connected: seconds until it does,
+## a melee swing that's started but hasn't connected yet: seconds left,
 ## or negative for none.
 var _melee_pending: float = -1.0
-## Whether the swing in flight is the heavy one. Read by the player when it
-## offers the hit to the host, and set on the host's copy before it resolves.
+## whether the swing in flight is the heavy one.
 var melee_heavy: bool = false
 
-## How far into a spray the next shot is (0 = the first round, fully accurate).
-## Falls back to 0 over [member WeaponData.recoil_reset_time] off the trigger.
+## how far into a spray the next shot is (0 = first round, fully accurate).
+## decays back to 0 over recoil_reset_time off the trigger.
 var spray_index: float = 0.0
-## The part of the recoil pattern the bullets take but the camera does not, in
-## degrees (pitch, yaw) - applied to the next shot's direction.
+## the part of the recoil pattern the bullets take but the camera doesn't,
+## in degrees (pitch, yaw) - applied to the next shot's direction.
 var _spray_offset := Vector2.ZERO
 var _since_shot: float = 99.0
 
 
 # --- Lifecycle ----------------------------------------------------------
 
-## Binds this weapon to its stats and its owner. Called by the player when the
-## weapon is equipped, and safe to call again to re-equip after a loadout
-## change.
+## binds this weapon to its stats and owner. called when equipped, safe to
+## call again to re-equip after a loadout change.
 func equip(p_data: WeaponData, p_shooter: CollisionObject3D) -> void:
 	data = p_data
 	shooter = p_shooter
@@ -213,23 +178,23 @@ func equip(p_data: WeaponData, p_shooter: CollisionObject3D) -> void:
 
 # --- Model ----------------------------------------------------------------------
 
-## The model currently shown, built from [member WeaponData.viewmodel_scene].
+## the model currently shown, built from WeaponData's viewmodel scene.
 var _model: Node3D = null
 var _model_scene: PackedScene = null
-## The first-person arms holding it, rebuilt with each model.
+## first-person arms holding the gun, rebuilt with each model.
 var _arms: ViewmodelArms = null
 
-## Where the model's Sight marker is, in this node's space. See
-## [method get_sight_position].
+## where the model's Sight marker is, in this node's space. see
+## get_sight_position().
 var _sight_position: Vector3 = Vector3.ZERO
 var _has_sight: bool = false
 
-## The placeholder block rifle, kept for weapons without a model.
+## placeholder block rifle, used for weapons without a model.
 @onready var _viewmodel: Node3D = $ViewModel if has_node("ViewModel") else null
 var _placeholder_parts: Array[Node] = []
 
 
-## Swaps in the equipped weapon's model and moves the muzzle to its barrel.
+## swaps in the equipped weapon's model and moves the muzzle to its barrel.
 func _apply_model() -> void:
 	var scene := data.viewmodel_scene if data != null else null
 	if scene == _model_scene or _viewmodel == null:
@@ -261,7 +226,7 @@ func _apply_model() -> void:
 
 	_model = scene.instantiate() as Node3D
 	_viewmodel.add_child(_model)
-	# Shadows off: a viewmodel is drawn close to the camera and would throw a
+	# shadows off - a viewmodel sits close to the camera and would throw a
 	# huge shadow of the gun across the world.
 	for mesh: GeometryInstance3D in _model.find_children("*", "GeometryInstance3D", true, false):
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -283,7 +248,7 @@ func _apply_model() -> void:
 	_animator.setup(_viewmodel, _model, _arms, data)
 
 
-## Plays the sound a clip marks, on the machine that can see the viewmodel.
+## plays the sound a clip marks, on the machine that can see the viewmodel.
 func _on_animation_cue(cue: StringName) -> void:
 	if _viewmodel == null or not _viewmodel.is_visible_in_tree():
 		return
@@ -298,15 +263,15 @@ func _on_animation_cue(cue: StringName) -> void:
 			Audio.play(&"knife_draw", -6.0)
 
 
-## The gun dips out of the way for a throw and comes back up; it cannot fire
-## until it is back.
+## gun dips out of the way for a throw and comes back up; can't fire until
+## it's back.
 func throw_motion() -> void:
 	Audio.play(&"grenade_throw", -4.0, 0.1)
 	if _animator != null:
 		_draw_left = _animator.play_draw()
 
 
-## Starts the inspect animation, if nothing else is happening.
+## starts the inspect animation, if nothing else is happening.
 func inspect() -> void:
 	if data == null or _animator == null or is_reloading or _draw_left > 0.0:
 		return
@@ -315,14 +280,13 @@ func inspect() -> void:
 	_animator.play_inspect()
 
 
-## The sight's position in this node's space (which is the weapon mount's), or
-## null for a weapon without a Sight marker. [PlayerAim] lines it up with the
-## eye.
+## sight position in local (weapon mount) space, or null if there's no
+## Sight marker. PlayerAim lines this up with the eye.
 func get_sight_position() -> Variant:
 	return _sight_position if _has_sight else null
 
 
-## Hides the model while looking through a scope, when it would fill the view.
+## hides the model when looking through a scope, so it doesn't fill the view.
 func set_model_hidden(hidden: bool) -> void:
 	if _viewmodel != null:
 		_viewmodel.visible = not hidden
@@ -330,16 +294,12 @@ func set_model_hidden(hidden: bool) -> void:
 
 # --- Public queries -----------------------------------------------------
 
-## Whether the trigger would produce a shot right now. The HUD uses this to
-## grey out the fire icon, and the test harness uses it to assert the fire-rate
-## limit rather than inferring it from ammo counts.
+## whether the trigger would fire right now. hud uses this to grey out the
+## fire icon.
 ##
-## [b]Deliberately not gated on the burst counter.[/b] [method update_trigger]
-## already decides whether a press may *start* a burst, and a burst that has
-## started is in the middle of firing by definition. Folding that same
-## condition in here meant the first round of every burst asked a question whose
-## answer was always no - the counter had just been set to the burst size - so
-## burst fire never fired at all.
+## not gated on the burst counter - update_trigger() already decides
+## whether a press can *start* a burst, and a burst already underway is
+## firing by definition.
 func can_fire() -> bool:
 	if data == null or is_reloading or _draw_left > 0.0:
 		return false
@@ -354,15 +314,12 @@ func is_full() -> bool:
 
 # --- Trigger ------------------------------------------------------------
 
-## The player calls this every frame with the current trigger state. Keeping
-## the polling in the player is what lets [member Player.input_enabled] silence
-## the weapon for a remote player without this class knowing anything about
-## input.
+## player calls this every frame with the current trigger state. keeping
+## polling in the player lets input_enabled silence the weapon for a
+## remote player without this class knowing about input.
 ##
-## [param just_pressed] and [param held] are passed in rather than read from
-## [code]Input[/code] here, for the same reason the aim ray is passed in: this
-## class stays free of input and camera, so Chapter 4 can drive it from a
-## network message instead.
+## just_pressed/held are passed in rather than read from Input here, same
+## reason the aim ray is passed in - keeps this class free of input.
 func update_trigger(held: bool, just_pressed: bool, delta: float) -> void:
 	_tick(delta)
 
@@ -374,7 +331,7 @@ func update_trigger(held: bool, just_pressed: bool, delta: float) -> void:
 			if held:
 				_try_fire()
 		WeaponData.FireMode.BURST:
-			# One press starts the burst; holding does not queue another one.
+			# one press starts the burst; holding doesn't queue another one.
 			if just_pressed and _burst_left <= 0:
 				_burst_left = maxi(data.burst_count, 1)
 				_try_fire()
@@ -383,22 +340,18 @@ func update_trigger(held: bool, just_pressed: bool, delta: float) -> void:
 				if _burst_timer <= 0.0:
 					_try_fire()
 
-	# Semi-auto needs to know the trigger came back up before the next pull
-	# counts, which is the difference between one shot per click and one shot
-	# per frame the mouse happens to be down.
+	# semi-auto needs the trigger to come back up before the next pull
+	# counts - the difference between one shot per click and one per frame.
 	_trigger_held = held
 
 
-## Advances cooldowns, the reload and the muzzle flash. The player calls this
-## every frame regardless of trigger state, so a reload finishes and a flash
-## fades even with the trigger released.
+## advances cooldowns, reload, and muzzle flash. player calls this every
+## frame regardless of trigger state, so reload/flash still progress with
+## the trigger released.
 func _tick(delta: float) -> void:
-	# Allowed to run up to one frame below zero, and that overshoot is carried
-	# into the next shot's cooldown (see [method _try_fire]). Clamping at zero
-	# instead rounds every interval up to a whole number of physics frames:
-	# 0.09 s became 6 frames = 0.1 s, so a 667 RPM rifle fired at 600, and
-	# small fire-rate differences (such as aiming's) vanished entirely. The
-	# one-frame floor stops an idle weapon banking extra shots.
+	# allowed to dip one frame below zero; the overshoot carries into the
+	# next shot's cooldown (see _try_fire). clamping at zero instead rounds
+	# every interval up to a whole frame, which broke fire-rate accuracy.
 	_cooldown_left = maxf(_cooldown_left - delta, -delta)
 	_draw_left = maxf(_draw_left - delta, 0.0)
 	_since_shot += delta
@@ -415,13 +368,9 @@ func _tick(delta: float) -> void:
 	if _flash_left > 0.0:
 		_flash_left = maxf(_flash_left - delta, 0.0)
 		if _muzzle_flash != null:
-			# Faded on the way down rather than merely switched off.
-			#
-			# Assigning the light's own energy back to itself - which is what the
-			# obvious-looking "0.0 if expired else unchanged" expression does -
-			# leaves the flash at full brightness for ever after the first shot,
-			# because nothing ever turns it back off. The room ends up lit by a
-			# permanent muzzle.
+			# faded out, not just switched off - assigning the light's own
+			# energy back to itself never turns it off, which leaves a
+			# permanent muzzle flash after the first shot.
 			var t := _flash_left / MUZZLE_FLASH_TIME
 			_muzzle_flash.light_energy = MUZZLE_FLASH_ENERGY * t * t
 		if _flash_mesh != null:
@@ -435,13 +384,10 @@ func _tick(delta: float) -> void:
 
 # --- Firing -------------------------------------------------------------
 
-## Fires one round if the weapon allows it. Returns whether a shot happened, so
-## a caller can tell "fired" from "refused" without reading the ammo count.
+## fires one round if the weapon allows it. returns whether a shot happened.
 func _try_fire() -> bool:
 	if not can_fire():
-		# A click on an empty magazine is a dry fire, not a silent no-op. The
-		# distinction is what makes an empty weapon feel broken rather than
-		# merely unhelpful.
+		# an empty-mag click is a dry fire, not a silent no-op.
 		if data != null and not is_reloading and ammo_in_magazine <= 0 \
 				and _cooldown_left <= 0.0 and _burst_left <= 0:
 			_cooldown_left = data.fire_interval
@@ -456,7 +402,7 @@ func _try_fire() -> bool:
 	if _animator != null and _animator.is_playing(&"inspect"):
 		_animator.stop()
 	ammo_in_magazine -= 1
-	# Scaled by aiming on the shots that start a new trigger pull; the rounds
+	# scaled by aiming only on the shot that starts a new pull - rounds
 	# inside a burst keep the weapon's own rhythm.
 	_cooldown_left = data.fire_interval * fire_interval_scale + minf(_cooldown_left, 0.0)
 	if _burst_left > 0:
@@ -472,7 +418,7 @@ func _try_fire() -> bool:
 	return true
 
 
-## Throws a spent case out of the right side of the viewmodel, on the machine
+## throws a spent case out the right side of the viewmodel, on the machine
 ## that can see it.
 func _eject_casing() -> void:
 	if data == null or data.is_melee or _viewmodel == null or not _viewmodel.is_visible_in_tree():
@@ -491,8 +437,7 @@ func _eject_casing() -> void:
 		data.category == WeaponData.Category.PISTOL)
 
 
-## The knife's alternate attack: a slower, harder stab. Returns whether it
-## started.
+## knife's alt attack: a slower, harder stab. returns whether it started.
 func try_heavy() -> bool:
 	if data == null or not data.is_melee or not can_fire():
 		return false
@@ -501,7 +446,7 @@ func try_heavy() -> bool:
 	return true
 
 
-## Starts a swing; it connects (emits [signal fired]) partway through.
+## starts a swing; it connects (emits fired) partway through.
 func _start_melee(heavy: bool) -> void:
 	melee_heavy = heavy
 	_melee_pending = data.heavy_hit_delay if heavy else data.melee_hit_delay
@@ -512,14 +457,12 @@ func _start_melee(heavy: bool) -> void:
 			_animator.play_slash()
 
 
-## Performs the hitscan along an already-validated aim ray.
+## hitscans along an already-validated aim ray.
 ##
-## Public and separate from [method _try_fire] on purpose: this is the part
-## Chapter 4 re-runs on the host. The host can be handed a client's origin and
-## direction and call this itself, rather than trusting a damage number the
-## client sent.
+## public and separate from _try_fire so the host can re-run it with a
+## client's origin/direction instead of trusting a client's damage number.
 ##
-## Returns the hit result, or an empty dictionary when the shot hit nothing.
+## returns the hit result, or an empty dictionary when nothing was hit.
 func hitscan(origin: Vector3, direction: Vector3) -> Dictionary:
 	last_damage_dealt = 0.0
 	var space := get_world_3d().direct_space_state
@@ -531,13 +474,13 @@ func hitscan(origin: Vector3, direction: Vector3) -> Dictionary:
 		origin + direction * data.max_range,
 		CollisionLayers.WEAPON_MASK)
 
-	# The muzzle sits inside the shooter's own capsule, so without this the
-	# first thing every shot hits is the player holding the gun.
+	# the muzzle sits inside the shooter's own capsule, so without this
+	# every shot would hit the shooter first.
 	if shooter != null:
 		query.exclude = [shooter.get_rid()]
 
-	# Starting inside a shape should not count as hitting it, which matters
-	# for a target the player is standing inside after it drops.
+	# starting inside a shape shouldn't count as a hit - matters for a
+	# target the player is standing inside after it drops.
 	query.hit_from_inside = false
 
 	var result := space.intersect_ray(query)
@@ -552,42 +495,35 @@ func hitscan(origin: Vector3, direction: Vector3) -> Dictionary:
 	return result
 
 
-## Turns a raycast hit into damage, through the [Damageable] contract. The
-## weapon never writes to a target's fields.
+## turns a raycast hit into damage, through the Damageable contract. never
+## writes to a target's fields directly.
 ##
-## [param collider] is whatever the ray touched, which may be a child hitbox
-## rather than the entity itself, so it is resolved upwards first. Only then is
-## the hit zone asked for, because the target - not the weapon - knows which of
-## its own colliders was struck.
+## collider may be a child hitbox rather than the entity itself, so it's
+## resolved upward first - only the resolved target knows which of its own
+## colliders was struck.
 func _apply_damage_to(result: Dictionary, origin: Vector3, direction: Vector3) -> void:
 	var collider: Object = result.get("collider")
 	var point: Vector3 = result.get("position", _last_shot_end)
 	var normal: Vector3 = result.get("normal", -direction)
 
-	# A static body is scenery. The world stops bullets without being damageable.
+	# a static body is scenery - stops bullets without being damageable.
 	var target := Damageable.find_target(collider)
 	if not Damageable.is_damageable(target):
-		# A wall still gets a mark on it. Where the round stopped is a fact
-		# about the world; whether anything was hurt is a separate one.
+		# a wall still gets a mark. where the round stopped is a fact about
+		# the world regardless of whether anything got hurt.
 		last_surface = Surface.WORLD
 		impact_requested.emit(point, normal, Damageable.HitZone.BODY, Surface.WORLD)
 		return
 
-	# Measured here, not read from the result.
-	#
-	# [method PhysicsDirectSpaceState3D.intersect_ray] does not put a distance
-	# in its dictionary - it reports the hit position, and the caller is
-	# expected to work the distance out. Reading a "distance" key that is not
-	# there returns the default of 0.0, and 0.0 is full damage, so the falloff
-	# curve silently became a straight line: every shot at any range did
-	# maximum damage and the falloff fields on the resource did nothing. It is
-	# computed from the origin that was actually used rather than from the
-	# muzzle, so it matches the ray the crosshair is drawing.
+	# measured here, not read from the result - intersect_ray doesn't return
+	# a distance, and a missing "distance" key defaults to 0.0, which is
+	# full damage. computed from the origin actually used so it matches
+	# the ray the crosshair is drawing.
 	var distance := origin.distance_to(point)
 	var zone := Damageable.resolve_zone(target, point, collider)
 	var amount := data.damage_at_distance(distance)
 	if data.is_melee:
-		# A blade does what it does wherever it lands - except from behind.
+		# a blade does its damage wherever it lands - except from behind.
 		amount = data.heavy_damage if melee_heavy else data.damage
 		if _is_behind(target, direction):
 			amount *= data.backstab_multiplier
@@ -597,15 +533,15 @@ func _apply_damage_to(result: Dictionary, origin: Vector3, direction: Vector3) -
 	var dealt := Damageable.deal_damage(target, amount, shooter, zone)
 	last_damage_dealt = dealt
 
-	# Emitted before the early-out so a body that is already down still shows
-	# where the round went. A hit marker is feedback about the player's
-	# accuracy, not a reward for damage.
+	# emitted before the early-out so an already-dead body still shows
+	# where the round went - hit marker is accuracy feedback, not a
+	# damage reward.
 	last_surface = Surface.ENTITY
 	impact_requested.emit(point, normal, zone, Surface.ENTITY)
 
 	if dealt <= 0.0:
-		# Connected but did no damage - already dead, or a target that declined
-		# the hit. No hit marker, because the player did not achieve anything.
+		# connected but did no damage - already dead, or the target
+		# declined the hit. no hit marker.
 		return
 
 	var health_left := -1
@@ -615,8 +551,8 @@ func _apply_damage_to(result: Dictionary, origin: Vector3, direction: Vector3) -
 	hit_confirmed.emit(killed, zone, health_left)
 
 
-## Whether a hit along [param direction] comes from behind [param target]: the
-## two face the same way, ignoring pitch.
+## whether a hit along direction comes from behind target - the two face
+## roughly the same way, ignoring pitch.
 static func _is_behind(target: Object, direction: Vector3) -> bool:
 	if not target.has_method(&"get_look_direction"):
 		return false
@@ -628,7 +564,7 @@ static func _is_behind(target: Object, direction: Vector3) -> bool:
 	return facing.normalized().dot(along.normalized()) > 0.5
 
 
-## Starts a reload if one is needed and allowed. Returns whether it started.
+## starts a reload if one is needed and allowed. returns whether it started.
 func try_reload() -> bool:
 	if data == null or data.is_melee or is_reloading or is_full():
 		return false
@@ -643,8 +579,7 @@ func try_reload() -> bool:
 	return true
 
 
-## Cancels a reload in progress and keeps whatever is already in the magazine.
-## Chapter 4 uses this when a player dies mid-reload.
+## cancels a reload in progress and keeps whatever's already in the magazine.
 func cancel_reload() -> void:
 	if not is_reloading:
 		return
@@ -661,8 +596,8 @@ func _finish_reload() -> void:
 
 	var needed := data.magazine_size - ammo_in_magazine
 	if infinite_reserve:
-		# Nothing is drawn from a pool that does not exist yet. The subtraction
-		# is still written out so the finite path below is the same code.
+		# nothing drawn from a pool that doesn't exist yet - written this
+		# way so the finite path below is the same code.
 		ammo_in_magazine = data.magazine_size
 	else:
 		var taken := mini(needed, reserve_ammo)
@@ -675,14 +610,14 @@ func _finish_reload() -> void:
 
 # --- Feel ---------------------------------------------------------------
 
-## Applies the weapon's spread cone to an aim direction.
+## applies the weapon's spread cone to an aim direction.
 ##
-## A disc perpendicular to the aim, offset by the tangent of the cone angle,
-## which is the standard cheap approximation of a cone. Random rather than a
-## fixed pattern on purpose: a memorisable spray is another game's signature.
+## a disc perpendicular to the aim, offset by tan(cone angle) - the usual
+## cheap cone approximation. random rather than a fixed pattern, so there's
+## no memorisable spray.
 ##
-## [param spread_scale] multiplies the cone - the player passes its aiming
-## bonus here, so the weapon itself stays unaware of ADS.
+## spread_scale multiplies the cone - player passes its ads bonus here, so
+## the weapon stays unaware of ads.
 func apply_spread(direction: Vector3, spread_scale: float = 1.0) -> Vector3:
 	if data == null or data.spread_degrees * spread_scale <= 0.0:
 		return direction
@@ -698,17 +633,15 @@ func apply_spread(direction: Vector3, spread_scale: float = 1.0) -> Vector3:
 	return (direction + offset).normalized()
 
 
-## Where the last shot ended, for the tracer and the impact effect.
+## where the last shot ended, for the tracer and impact effect.
 func get_last_shot_end() -> Vector3:
 	return _last_shot_end
 
 
-## Muzzle position in world space, for the flash and the tracer origin.
+## muzzle position in world space, for the flash and tracer origin.
 ##
-## The marker, not the flash light. They sit in the same place in the
-## placeholder scene, but a light is presentation and a marker is a fact about
-## where the barrel ends, and the two are going to drift apart the moment
-## anyone styles the viewmodel.
+## uses the marker, not the flash light - they sit in the same spot in the
+## placeholder scene but will drift apart once the viewmodel gets styled.
 func get_muzzle_position() -> Vector3:
 	if _muzzle_point != null:
 		return _muzzle_point.global_position
@@ -722,25 +655,24 @@ func _flash_muzzle() -> void:
 	if _muzzle_flash != null:
 		_muzzle_flash.light_energy = MUZZLE_FLASH_ENERGY
 	if _flash_mesh == null and _muzzle_point != null:
-		# Built on first use rather than in the scene, so every weapon scene gets
-		# one without having to author it.
+		# built on first use instead of in the scene, so every weapon gets
+		# one for free.
 		_flash_mesh = MuzzleFlashMesh.create(0.22)
 		_muzzle_point.add_child(_flash_mesh)
 	if _flash_mesh != null:
-		# A different shape every shot, so automatic fire flickers rather than
-		# showing one frozen sprite.
+		# a different shape each shot, so automatic fire flickers instead
+		# of showing one frozen sprite.
 		_flash_mesh.visible = true
 		_flash_mesh.rotation.z = randf() * TAU
 		_flash_mesh.scale = Vector3.ONE * randf_range(0.75, 1.2)
 
 
-## The viewmodel's flash sprite, created on the first shot.
+## viewmodel's flash sprite, created on the first shot.
 var _flash_mesh: MeshInstance3D = null
 
 
-## Advances the spray one round: the camera takes its share of the step along
-## the pattern (as a recoil kick), the bullets take the rest (as
-## [member _spray_offset]).
+## advances the spray one round: camera takes its share of the pattern
+## step as a recoil kick, bullets take the rest as _spray_offset.
 func _request_recoil() -> void:
 	if data == null:
 		return
@@ -755,10 +687,9 @@ func _request_recoil() -> void:
 	recoil_requested.emit(step.x * view, step.y * view)
 
 
-## Applies the spray to a shot's direction: the pattern's off-camera share and
-## the bloom that grows with every round of the spray. The very first round of
-## a spray goes exactly where the crosshair is, as far as [member
-## WeaponData.spread_degrees] allows.
+## applies the spray to a shot's direction: the pattern's off-camera share
+## plus bloom that grows with each round of the spray. the first round of
+## a spray always goes exactly where the crosshair is, within spread_degrees.
 func apply_spray(direction: Vector3, spread_scale: float = 1.0) -> Vector3:
 	if data == null:
 		return direction
@@ -780,7 +711,7 @@ func apply_spray(direction: Vector3, spread_scale: float = 1.0) -> Vector3:
 	return out.normalized()
 
 
-## Current spray bloom in degrees, for the crosshair.
+## current spray bloom in degrees, for the crosshair.
 func get_bloom() -> float:
 	if data == null:
 		return 0.0
@@ -793,7 +724,7 @@ func _emit_ammo_changed() -> void:
 
 # --- Debug --------------------------------------------------------------
 
-## One-line summary for the debug overlay.
+## one-line summary for the debug overlay.
 func debug_line() -> String:
 	if data == null:
 		return "unarmed"
@@ -807,6 +738,6 @@ func debug_line() -> String:
 	]
 
 
-## Readable name for a [enum WeaponData.FireMode] value.
+## readable name for a WeaponData.FireMode value.
 static func FireModeName(mode: WeaponData.FireMode) -> String:
 	return WeaponData.FireMode.keys()[mode]

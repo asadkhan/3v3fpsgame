@@ -1,8 +1,8 @@
 class_name HudKillFeed
 extends VBoxContainer
-## Top-right kill feed: "Killer  [WEAPON]  Victim", team-coloured, newest at the
-## top, each line fading out after a few seconds. Driven by
-## [signal EventBus.player_died], which is raised on every machine.
+## top-right kill feed: "killer [weapon] victim", team-coloured, newest at
+## the top, each line fading out after a few seconds. driven by
+## EventBus.player_died, raised on every machine.
 
 const MAX_ENTRIES := 5
 const ENTRY_LIFETIME := 6.0
@@ -38,7 +38,7 @@ func _on_player_died(victim_id: int, killer_id: int, headshot: bool) -> void:
 	_add_entry(text, involves_me)
 
 
-## The big moments - aces, clutches, first blood - get their own line so the
+## big moments - aces, clutches, first blood - get their own line so the
 ## whole server sees them.
 func _on_callout(peer_id: int, kind: StringName) -> void:
 	if not kind in [MatchTracker.ACE, MatchTracker.CLUTCH, MatchTracker.FIRST_BLOOD]:
@@ -56,8 +56,8 @@ func _name_bbcode(player: Player, fallback_id: int = 0) -> String:
 	return "[color=#%s]%s[/color]" % [colour.to_html(false), _escape(player.state.display_name)]
 
 
-## Player names are typed by players; a "[" in one must print as a bracket,
-## not open a tag that restyles every line of the feed for everyone.
+## player names are player-typed; a "[" must print as a bracket, not open
+## a bbcode tag that restyles every line of the feed.
 static func _escape(text: String) -> String:
 	return text.replace("[", "[lb]")
 

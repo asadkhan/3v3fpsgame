@@ -1,11 +1,11 @@
 class_name HudScopeOverlay
 extends Control
-## The view through a magnified scope: a round lens with a soft dark edge,
-## black outside it, and a fine reticle - tech-cyan lines with an amber centre
-## dot, in the SIGNALFALL palette. Shown only while the local player is fully
-## aimed with a scoped weapon ([method Player.is_scoped]).
+## the view through a magnified scope: a round lens with a soft dark edge,
+## black outside it, and a fine reticle - cyan lines with an amber centre
+## dot. shown only while the local player is fully aimed with a scoped
+## weapon (Player.is_scoped).
 
-const LENS_FRACTION := 0.46   # lens radius as a fraction of screen height
+const LENS_FRACTION := 0.46   # lens radius as a fraction of screen height, bigger = wider lens
 const EDGE := Color(0.0, 0.0, 0.0, 1.0)
 
 var _lens: GradientTexture2D
@@ -41,15 +41,15 @@ func _draw() -> void:
 	var c := size * 0.5
 	var r := size.y * LENS_FRACTION
 	var lens_rect := Rect2(c - Vector2(r, r), Vector2(r, r) * 2.0)
-	# Black outside the lens square, the soft round edge inside it.
+	# black outside the lens square, soft round edge inside it.
 	draw_rect(Rect2(0, 0, lens_rect.position.x, size.y), EDGE)
 	draw_rect(Rect2(lens_rect.end.x, 0, size.x - lens_rect.end.x, size.y), EDGE)
 	draw_rect(Rect2(lens_rect.position.x, 0, lens_rect.size.x, lens_rect.position.y), EDGE)
 	draw_rect(Rect2(lens_rect.position.x, lens_rect.end.y, lens_rect.size.x, size.y - lens_rect.end.y), EDGE)
 	draw_texture_rect(_lens, lens_rect, false)
 
-	# Reticle: thin lines that stop short of the centre, thicker posts at the
-	# edges, and an amber dot where the round goes.
+	# reticle: thin lines stopping short of centre, thicker posts at the
+	# edges, amber dot where the round goes.
 	var line := Color(UITheme.TECH, 0.9)
 	var gap := r * 0.06
 	for dir: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:

@@ -1,27 +1,23 @@
 class_name ViewmodelAnimator
 extends Node
-## Keyframed first-person animation: draw, reload, inspect, and the knife's
+## keyframed first-person animation: draw, reload, inspect, and the knife's
 ## slashes, stab and toss.
 ##
-## Hand-authored here rather than imported: skeletal FPS animations only fit the
-## rig they were made for, and this viewmodel is assembled from separate gun,
-## hand and sleeve models. Each clip is a list of keys over normalised time,
-## and each key sets any of these channels (missing ones hold at their rest
-## value):
-##   [code]pos[/code] / [code]rot[/code] - the gun's offset (metres) and rotation
-##       (degrees, pitch/yaw/roll) about a pivot near its middle
-##   [code]hand[/code] - how far the left hand has left its grip for the
-##       magazine (0..1)
-##   [code]mag[/code]  - how far the magazine has dropped out of the gun (0..1)
-##   [code]open[/code] - how far the right hand has opened (0..1)
-##   [code]spin[/code] / [code]lift[/code] - the knife's flip (degrees) and toss
-##       height (metres) out of the hand
-## Keys blend with smoothstep, so every motion eases in and out. [Weapon] owns
-## one and drives it; it moves only the viewmodel node, the magazine, the
-## knife's spin node and [ViewmodelArms]' hand controls - never gameplay.
+## hand-authored instead of imported, since this viewmodel is built from
+## separate gun/hand/sleeve models and skeletal anims only fit their own rig.
+## each clip is a list of keys over normalised time (0..1); each key sets
+## any of these channels (missing ones hold at rest):
+##   pos / rot - gun offset (metres) and rotation (degrees, pitch/yaw/roll)
+##       about a pivot near its middle
+##   hand - how far the left hand has left its grip for the magazine (0..1)
+##   mag  - how far the magazine has dropped out of the gun (0..1)
+##   open - how far the right hand has opened (0..1)
+##   spin / lift - knife's flip (degrees) and toss height (metres)
+## keys blend with smoothstep so motion eases in and out. Weapon owns one
+## and drives it; it only moves the viewmodel node, magazine, knife spin
+## node and ViewmodelArms' hand controls - never touches gameplay.
 
-## Sounds and moments a clip marks: [code]mag_out[/code], [code]mag_in[/code],
-## [code]rack[/code], [code]shing[/code].
+## sounds/moments a clip marks: mag_out, mag_in, rack, shing.
 signal cue(name: StringName)
 
 const MAG_DROP := 0.34
@@ -47,11 +43,11 @@ var _slash_flip: bool = false
 
 
 func _init() -> void:
-	# Before the arms read the pose this frame.
+	# run before the arms read the pose this frame.
 	process_priority = -10
 
 
-## Points the animator at a freshly built viewmodel.
+## points the animator at a freshly built viewmodel.
 func setup(viewmodel: Node3D, model: Node3D, arms: ViewmodelArms, data: WeaponData) -> void:
 	stop()
 	_viewmodel = viewmodel
@@ -78,8 +74,8 @@ func setup(viewmodel: Node3D, model: Node3D, arms: ViewmodelArms, data: WeaponDa
 	_apply(_pose_at_rest())
 
 
-## The lower quarter of the magazine's mesh, in its own space: where the left
-## hand takes hold of it.
+## the lower quarter of the magazine's mesh, in its own space - where the
+## left hand grips it.
 static func _grip_point(mag: Node3D) -> Vector3:
 	var box := AABB()
 	var first := true
@@ -123,8 +119,7 @@ func play_draw() -> float:
 func play_reload(duration: float) -> void:
 	if _knife:
 		return
-	# Brought up and in, rolled onto its side, so the magazine well faces the
-	# camera for the swap.
+	# brought up and in, rolled onto its side, so the mag well faces camera.
 	var tilt := Vector3(-0.08, 0.075, 0.03)
 	var tilt_rot := Vector3(14, 12, 30)
 	var slap := Vector3(-0.08, 0.09, 0.03)
@@ -156,7 +151,7 @@ func play_inspect() -> void:
 	], [])
 
 
-## A light knife swing, alternating direction each time.
+## a light knife swing, alternating direction each time.
 func play_slash() -> void:
 	_slash_flip = not _slash_flip
 	var s := 1.0 if _slash_flip else -1.0
@@ -171,7 +166,7 @@ func play_slash() -> void:
 	], [])
 
 
-## The heavy stab: drawn back, driven forward.
+## the heavy stab: drawn back, driven forward.
 func play_stab() -> void:
 	_play(&"stab", 0.95, [
 		_k(0.0, Vector3.ZERO, Vector3.ZERO),
@@ -183,7 +178,7 @@ func play_stab() -> void:
 
 
 func _knife_draw_keys() -> Array:
-	# Up from below, flipping end over end into the grip.
+	# up from below, flipping end over end into the grip.
 	return [
 		_k(0.0, Vector3(0.06, -0.3, 0.05), Vector3(-40, 20, -40), {"spin": -540.0, "open": 0.8, "lift": 0.05}),
 		_k(0.55, Vector3(0.0, 0.012, 0.0), Vector3(4, 0, 2), {"spin": -40.0, "open": 0.6, "lift": 0.02}),
@@ -193,7 +188,7 @@ func _knife_draw_keys() -> Array:
 
 
 func _knife_inspect_keys() -> Array:
-	# Show one face, toss it end over end, catch, show the other face.
+	# show one face, toss end over end, catch, show the other face.
 	return [
 		_k(0.0, Vector3.ZERO, Vector3.ZERO),
 		_k(0.14, Vector3(-0.12, 0.08, 0.05), Vector3(0, 70, 12)),
@@ -245,8 +240,8 @@ func _pose_at_rest() -> Dictionary:
 		"spin": 0.0, "lift": 0.0}
 
 
-## The pose [param t] of the way through the clip: each channel eased between
-## the keys either side of it.
+## the pose at t through the clip: each channel eased between the keys
+## either side of it.
 func _sample(t: float) -> Dictionary:
 	var pose := _pose_at_rest()
 	for channel in pose.keys():

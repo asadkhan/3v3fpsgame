@@ -1,12 +1,11 @@
 extends GameState
-## [b]ROUND_END[/b] - the pause after a round, while the result is shown.
+## ROUND_END - the pause after a round, while the result is shown.
 ##
-## This is the one place a round gets resolved. Crediting the score, telling
-## the rest of the game the round is over, and deciding whether the match
-## continues all happen together here, so they cannot get out of step with
-## each other.
+## the one place a round gets resolved: crediting the score, announcing the
+## round is over, and deciding whether the match continues all happen here
+## together so they can't get out of step.
 
-## Emitted every frame with the seconds left before the next phase.
+## fires every frame with the seconds left before the next phase.
 signal resolution_updated(remaining: float)
 
 
@@ -16,11 +15,11 @@ func enter(_previous: GameState) -> void:
 	var match_data := get_match()
 	var winner := match_data.last_round_winner
 
-	# A round with no winner is not scored, and does not stop the match.
+	# a round with no winner isn't scored and doesn't stop the match.
 	if is_authority():
 		if winner != Team.Side.NONE:
 			match_data.add_round_win(winner)
-		# Paid before the streaks move on, so a first loss earns the base amount.
+		# paid before the streak advances, so a first loss earns the base amount.
 		Economy.pay_round(winner)
 		match_data.record_round_result(winner)
 
@@ -34,9 +33,7 @@ func update(delta: float) -> void:
 		_advance()
 
 
-## Either the match is won, or we go round again. Reading
-## [member MatchState.winning_team] rather than tracking a flag here means a
-## win is detected the same way everywhere.
+## either the match is won, or we go another round.
 func _advance() -> void:
 	var match_data := get_match()
 	if match_data.is_match_over():

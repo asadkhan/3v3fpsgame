@@ -1,35 +1,31 @@
 class_name UITheme
 extends RefCounted
-## The game's visual language for 2D UI, in one place: colours, text sizes and
-## the [Theme] every menu and the HUD are built with.
+## the game's visual language for 2d ui, in one place: colours, text sizes,
+## and the Theme every menu and the hud are built with.
 ##
-## [b]The SIGNALFALL identity.[/b] A near-future signal war at a sun-bleached
-## desert relay. Two working colours carry the whole game: [b]amber[/b] is
-## "signal" - the core, tracers, highlights, anything to act on - and
-## [b]cyan[/b] is "tech" - the crosshair, shields, the Echo Field, barriers.
-## Team blue and red are only ever used for sides. The world is warm sandstone
-## so both read clearly against it.
+## signalfall identity: amber is "signal" (core, tracers, highlights,
+## anything to act on), cyan is "tech" (crosshair, shields, echo field,
+## barriers). team blue/red are only ever used for sides.
 ##
-## Built in code rather than as a hand-edited [code].tres[/code] so the whole
-## palette is readable in one file and a colour change is one constant.
-## [method build] is cached, so every screen shares the same [Theme] object.
+## built in code rather than a hand-edited .tres so the whole palette is
+## readable in one file. build() is cached, so every screen shares one Theme.
 
 # --- Palette ----------------------------------------------------------------
 
-## Team colours. The same hues tint the player capsules in the world
-## ([constant Player.TEAM_COLOURS]), so a colour means one side everywhere.
+## team colours. same hues tint the player capsules in the world
+## (Player.TEAM_COLOURS), so a colour means one side everywhere.
 const ALPHA := Color(0.3, 0.72, 1.0)
 const BRAVO := Color(1.0, 0.36, 0.3)
 
-## The game's name, in one place.
+## the game's name, in one place.
 const GAME_TITLE := "SIGNALFALL"
 const GAME_TAGLINE := "3v3 TACTICAL SHOOTER"
 
 const TEXT := Color(0.95, 0.94, 0.9)
 const TEXT_DIM := Color(0.66, 0.66, 0.68)
-## Signal amber - the accent for everything important.
+## signal amber - the accent for everything important.
 const ACCENT := Color(1.0, 0.72, 0.28)
-## Tech cyan - crosshair, shields, Echo Field, barriers.
+## tech cyan - crosshair, shields, echo field, barriers.
 const TECH := Color(0.36, 0.86, 1.0)
 const DANGER := Color(1.0, 0.3, 0.28)
 const GOOD := Color(0.45, 0.95, 0.6)
@@ -50,9 +46,8 @@ static var _theme: Theme = null
 static var _font: Font = null
 
 
-## The house typeface: Bahnschrift - a condensed, engineered sans that reads
-## instantly at small sizes and suits the tactical tone - falling back to
-## common system sans-serifs where it is not installed.
+## house typeface: bahnschrift, falls back to common system sans-serifs
+## where it's not installed.
 static func font() -> Font:
 	if _font != null:
 		return _font
@@ -74,8 +69,8 @@ static func team_colour(side: int) -> Color:
 			return TEXT_DIM
 
 
-## The shared theme: dark translucent panels, flat buttons with an accent edge,
-## outlined text that stays readable over any part of the 3D world.
+## shared theme: dark translucent panels, flat buttons with an accent edge,
+## outlined text readable over any part of the 3d world.
 static func build() -> Theme:
 	if _theme != null:
 		return _theme
@@ -127,7 +122,7 @@ static func _box(colour: Color, radius: int, padding: int, border: Color = Color
 	return box
 
 
-## A label in the house style.
+## a label in the house style.
 static func label(text: String, size: int = SIZE_BODY, colour: Color = TEXT,
 		align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
 	var l := Label.new()
@@ -140,9 +135,9 @@ static func label(text: String, size: int = SIZE_BODY, colour: Color = TEXT,
 	return l
 
 
-## Pins [param control] to a point of its parent ([param anchor], 0..1 on each
-## axis) with the given offsets from that point. Screen-size independent, which
-## setting `position` after an anchor preset is not.
+## pins control to a point of its parent (anchor, 0..1 on each axis) with
+## the given offsets from that point. screen-size independent, unlike
+## setting `position` after an anchor preset.
 static func pin(control: Control, anchor: Vector2, left: float, top: float, right: float, bottom: float) -> void:
 	control.anchor_left = anchor.x
 	control.anchor_right = anchor.x

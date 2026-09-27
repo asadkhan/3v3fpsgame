@@ -1,17 +1,15 @@
 extends GameState
-## [b]WARMUP[/b] - the one-off countdown before the very first round, so
-## players have a moment to load in and get their bearings.
+## WARMUP - the one-off countdown before the very first round, so players get
+## a moment to load in and get their bearings.
 ##
-## This only ever runs once per match. Every round after the first goes
-## [b]ROUND_END[/b] -> [b]BUY[/b] directly.
+## only ever runs once per match. every round after goes ROUND_END -> BUY
+## directly.
 ##
-## Because it is a timed state it exposes [signal countdown_updated] rather
-## than making the UI poll it. That is the pattern every timed phase here
-## uses: the state owns the clock, the UI just listens. The clock itself is
-## inherited from [GameState] - this file only decides what happens when it
-## reaches zero.
+## exposes countdown_updated instead of making the UI poll - same pattern as
+## every timed phase: the state owns the clock, UI just listens. clock itself
+## comes from GameState; this file only decides what happens at zero.
 
-## Emitted every frame with the seconds left, for the HUD countdown.
+## emitted every frame with the seconds left, for the HUD countdown
 signal countdown_updated(remaining: float)
 
 

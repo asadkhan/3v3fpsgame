@@ -1,7 +1,7 @@
 class_name HudCrosshair
 extends Control
-## A static crosshair: a centre dot and four short lines, outlined so it reads
-## on any background. The hit marker ([HitMarker]) draws on top of it.
+## static crosshair: centre dot, four short lines, outlined so it reads on
+## any background. HitMarker draws on top of it.
 
 const GAP := 5.0
 const LENGTH := 7.0
@@ -16,8 +16,8 @@ func _ready() -> void:
 	resized.connect(queue_redraw)
 
 
-## 0..1 aim amount from the local player; the lines close in as it rises, so
-## the crosshair shows the tighter spread aiming buys.
+## 0..1 aim amount from the local player; lines close in as it rises to show
+## the tighter spread aiming buys.
 var aim_amount: float = 0.0:
 	set(value):
 		if not is_equal_approx(value, aim_amount):
@@ -25,8 +25,8 @@ var aim_amount: float = 0.0:
 			queue_redraw()
 
 
-## Spray bloom in degrees from the held weapon; the lines open with it, so
-## the crosshair shows how much the spray has spread.
+## spray bloom in degrees from the held weapon; lines open with it to show
+## how much the spray has spread.
 var bloom: float = 0.0:
 	set(value):
 		if absf(value - bloom) > 0.01:

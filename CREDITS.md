@@ -31,7 +31,7 @@ the project.
 ## Other
 
 - **Mixamo** (https://www.mixamo.com, Adobe): the player character "Ch15" and
-  its rifle animations, downloaded by the project owner. Mixamo's terms allow
+  its rifle animations. Mixamo's terms allow
   royalty-free use in games but not redistribution of the raw files on their
   own.
 

@@ -1,18 +1,15 @@
 extends GameState
-## [b]BUY[/b] - the preparation / buy window at the start of every round.
+## BUY - the prep/buy window at the start of every round.
 ##
-## Round one is reached from [b]WARMUP[/b], and every later round from
-## [b]ROUND_END[/b]. Both paths come through here, which is what makes this the
-## right place to bump the round counter and tell the rest of the game a round
-## is being set up.
+## round one arrives from WARMUP, every later round from ROUND_END. both
+## paths go through here, so this is where the round counter bumps and
+## the rest of the game hears a round is being set up.
 ##
-## [b]What this state does not do: spawn players.[/b] States are node-free (see
-## [GameState]) and have no business knowing where a map keeps its spawn
-## markers. The match scene ([Playtest]) listens for this phase and respawns
-## every body at its side's spawn - on the host, through the networked respawn
-## path in [method Player.server_respawn_at]. The buy menu itself is Chapter 8.
+## doesn't spawn players - states are node-free and don't know where a
+## map keeps its spawn markers. the match scene (Playtest) listens for
+## this phase and respawns everyone at their side's spawn.
 
-## Emitted every frame with the seconds left in the buy window.
+## emitted every frame with the seconds left in the buy window.
 signal countdown_updated(remaining: float)
 
 
@@ -20,7 +17,7 @@ func enter(_previous: GameState) -> void:
 	_start_countdown(get_rules().round_start_seconds)
 
 	var match_data := get_match()
-	# On a client the round number arrives from the host with the phase.
+	# on a client the round number arrives from the host with the phase.
 	if is_authority():
 		match_data.start_round()
 	EventBus.round_started.emit(match_data.round_number)

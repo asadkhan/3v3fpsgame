@@ -1,14 +1,14 @@
 class_name MuzzleFlashMesh
 extends RefCounted
-## Builds the muzzle flash sprite: two crossed additive quads with a soft
-## radial glow, so it reads from the side as well as from behind. Shared by the
-## viewmodel's own flash ([Weapon]) and the flash a [Tracer] shows for other
-## players' shots. Placeholder art until the effects pass.
+## builds the muzzle flash sprite: two crossed additive quads plus a soft
+## radial glow, so it reads from the side and from behind. shared by the
+## viewmodel's own flash and the one Tracer shows for other players' shots.
+## placeholder art.
 
 static var _texture: GradientTexture2D = null
 
 
-## A new flash node of roughly [param size] metres across.
+## a new flash node roughly `size` metres across.
 static func create(size: float) -> MeshInstance3D:
 	var root := MeshInstance3D.new()
 	root.name = "FlashMesh"
@@ -46,7 +46,7 @@ static func material() -> StandardMaterial3D:
 	return mat
 
 
-## A soft white-to-transparent radial glow, generated once.
+## soft white-to-transparent radial glow, generated once.
 static func glow_texture() -> GradientTexture2D:
 	if _texture != null:
 		return _texture

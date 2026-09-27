@@ -1,27 +1,22 @@
 class_name HitMarker
 extends Control
-## The cross that flashes in the middle of the screen when a shot connects.
+## the cross that flashes in the middle of the screen when a shot connects.
 ##
-## [b]Drawn rather than composed out of labels.[/b] Four [Control] children with
-## their own anchors would work, but every one of them would be something to
-## keep positioned and to keep in sync, for a shape that is four lines. [method
-## _draw] is the whole widget.
+## drawn instead of built from Control children - it's just four lines, so
+## _draw() is the whole widget.
 ##
-## [b]It is a child of the player, not of the HUD.[/b] It is a direct
-## consequence of this player's own shot connecting, so it belongs to the player
-## that fired. When Chapter 4 adds five more players, the other five need no
-## hit marker at all - their hits are not news to you. Chapter 8 replaces it
-## with the real HUD; nothing else has to know it exists.
+## a child of the player, not the HUD, since it's a direct result of this
+## player's own shot connecting. other players don't need one - their hits
+## aren't news to you.
 
-## How long the cross stays fully visible, in seconds. Long enough to register
-## at 60 fps without lingering into the next shot.
+## how long the cross stays fully visible, in seconds. long enough to
+## register at 60fps without lingering into the next shot.
 @export var hold_time: float = 0.2
 
-## How long the fade out takes after the hold.
+## how long the fade out takes after the hold
 @export var fade_time: float = 0.1
 
-## Distance from the centre of the screen to the start of each tick, and the
-## length of the tick.
+## distance from screen centre to the start of each tick, and the tick length
 @export var gap: float = 7.0
 @export var length: float = 9.0
 
@@ -33,14 +28,13 @@ var _age: float = 0.0
 var _showing: bool = false
 var _colour: Color = normal_colour
 
-## Ticks drawn per hit. A headshot or a kill gets a slightly longer, warmer
-## cross so the player can tell a body shot from a lethal one without reading a
-## number - which is the entire reason a hit marker exists.
+## a headshot or kill gets a slightly longer, warmer cross so you can tell a
+## body shot from a lethal one without reading a number.
 var _tick_length: float = length
 
 
-## Flashes the cross. [param zone] is a [enum Damageable.HitZone]; [param
-## killed] is whether the shot finished the target off.
+## flashes the cross. zone is a Damageable.HitZone; killed is whether the
+## shot finished the target off.
 func flash(zone: int, killed: bool) -> void:
 	_age = 0.0
 	_showing = true
@@ -58,8 +52,7 @@ func flash(zone: int, killed: bool) -> void:
 	queue_redraw()
 
 
-## Whether the cross is currently on screen. The test harness asserts on this
-## rather than on pixels.
+## whether the cross is currently on screen
 func is_showing() -> bool:
 	return _showing
 
@@ -85,17 +78,16 @@ func _draw() -> void:
 	var colour := _colour
 	colour.a *= alpha
 
-	# Four ticks at the diagonals, pointing outwards. Drawn as a gap in the
-	# middle rather than a continuous cross, because a solid cross sitting on top
-	# of the crosshair hides the thing the player is aiming with.
-	# Pops out and settles: bigger for the first few frames.
+	# four ticks at the diagonals, pointing outwards. a gap in the middle
+	# instead of a solid cross, so it doesn't hide the crosshair.
+	# pops out and settles: bigger for the first few frames
 	var pop := 1.0 + 0.45 * (1.0 - clampf(_age / 0.09, 0.0, 1.0))
 	var width := 2.5 if _colour != normal_colour else 2.0
 	for direction: Vector2 in [Vector2(-1.0, -1.0), Vector2(1.0, -1.0), Vector2(-1.0, 1.0), Vector2(1.0, 1.0)]:
 		var d := direction.normalized()
 		draw_line(centre + d * gap * pop, centre + d * (gap + _tick_length) * pop, Color(0, 0, 0, colour.a * 0.6), width + 2.0, true)
 		draw_line(centre + d * gap * pop, centre + d * (gap + _tick_length) * pop, colour, width, true)
-	# A kill also throws a ring outwards.
+	# a kill also throws a ring outwards
 	if _colour == kill_colour:
 		var t := clampf(_age / (hold_time + fade_time), 0.0, 1.0)
 		draw_arc(centre, lerpf(10.0, 34.0, t), 0.0, TAU, 40, Color(colour, colour.a * (1.0 - t)), 2.0, true)

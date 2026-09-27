@@ -1,19 +1,17 @@
 class_name PlayerAim
 extends Node
-## Aiming down sights. Tracks how far into the aim the player is ([member
-## amount], 0 at the hip to 1 fully aimed, blended over the weapon's
-## [member WeaponData.ads_time]) and turns the held weapon's ADS numbers into
-## the multipliers [Player] applies: field of view, mouse sensitivity, spread,
-## recoil, movement speed and fire interval.
+## aiming down sights. tracks how far into the aim the player is (amount, 0
+## hip to 1 fully aimed, blended over WeaponData.ads_time) and turns the
+## weapon's ADS numbers into the multipliers Player applies: fov, mouse
+## sensitivity, spread, recoil, move speed, fire interval.
 ##
-## Local only. Aiming changes what the shooter's own machine does - the spread
-## it rolls, the fire rate its trigger allows, how fast it moves - and every one
-## of those already reaches the host through the shot and transform paths, so
-## there is nothing extra to replicate.
+## local only - aiming changes what the shooter's own machine does, and all
+## of that already reaches the host through the shot/transform paths, so
+## nothing extra needs replicating.
 ##
-## Input: [code]aim[/code] (right mouse). Held by default; the
-## [code]input/aim_toggle[/code] setting makes it a toggle. Sprinting,
-## reloading, dying, switching weapons or freeing the mouse drops the aim.
+## input: aim (right mouse, held by default - input/aim_toggle makes it a
+## toggle). sprinting, reloading, dying, switching weapons or freeing the
+## mouse drops the aim.
 
 ## 0 = hip, 1 = fully aimed.
 var amount: float = 0.0
@@ -27,7 +25,7 @@ func is_aiming() -> bool:
 	return amount > 0.5
 
 
-## Called by the player every physics frame, before movement and combat.
+## called by the player every physics frame, before movement and combat.
 func update(delta: float) -> void:
 	var data := _data()
 	var wants := false
@@ -45,7 +43,7 @@ func update(delta: float) -> void:
 	amount = move_toward(amount, 1.0 if wants else 0.0, delta / duration)
 
 
-## Drops straight back to the hip - on death, a weapon switch, a respawn.
+## drops straight back to the hip - on death, a weapon switch, a respawn.
 func reset() -> void:
 	amount = 0.0
 	_toggled = false
@@ -96,13 +94,12 @@ func fire_interval_scale() -> float:
 	return _blend(data.ads_fire_interval_multiplier) if data != null else 1.0
 
 
-## How far to move the viewmodel from its hip position.
+## how far to move the viewmodel from its hip position.
 ##
-## With a model that has a Sight marker, the offset is computed so the sight
-## ends up on the centre of the screen at [member WeaponData.ads_sight_distance]
-## in front of the eye - so a new model lines up without hand-tuning. The
-## weapon mount sits at the eye, so centring the sight is just cancelling its
-## sideways and vertical position.
+## with a Sight marker on the model, the offset is computed so the sight
+## lands on screen centre at ads_sight_distance in front of the eye - new
+## models line up without hand-tuning. weapon mount sits at the eye, so
+## centring the sight just cancels its sideways/vertical position.
 func viewmodel_offset() -> Vector3:
 	var data := _data()
 	if data == null:
@@ -114,8 +111,8 @@ func viewmodel_offset() -> Vector3:
 	return data.ads_viewmodel_offset * amount
 
 
-## Whether the view is fully through a magnified scope: the model hides and the
-## HUD draws the scope overlay.
+## whether the view is fully through a magnified scope: model hides, hud
+## draws the scope overlay.
 func is_scoped() -> bool:
 	var data := _data()
 	return data != null and data.scope_overlay and amount > 0.92

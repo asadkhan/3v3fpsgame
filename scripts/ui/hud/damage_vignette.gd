@@ -1,7 +1,7 @@
 class_name HudDamageVignette
 extends TextureRect
-## A red edge-of-screen flash when the local player takes damage, stronger for
-## bigger hits, plus a faint persistent tint while health is low.
+## a red edge-of-screen flash when the local player takes damage, stronger
+## for bigger hits, plus a faint persistent tint while health is low.
 
 var _flash: float = 0.0
 var _low_health: float = 0.0

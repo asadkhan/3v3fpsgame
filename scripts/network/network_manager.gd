@@ -1,187 +1,167 @@
 extends Node
-## Owns the multiplayer peer and all connection state. Registered as the
-## [code]NetworkManager[/code] autoload.
+## owns the multiplayer peer and all connection state. registered as the
+## NetworkManager autoload.
 ##
-## Everything netcode-related goes through here, and nothing else in the game
-## touches [ENetMultiplayerPeer] directly. Two reasons: the rest of the game
-## can then ask simple questions ("am I the host?", "who is connected?")
-## without caring about ENet, and there is exactly one place to look when
-## connections misbehave.
+## everything netcode-related goes through here - nothing else touches
+## ENetMultiplayerPeer directly, so the rest of the game can just ask
+## "am i the host?" / "who's connected?" without caring about ENet.
 ##
 ## ## Authority
 ##
-## Chapter 4 put the authority rules here, in one place, because scattering
-## them across the player and the match scene is how two peers end up both
+## authority rules live here in one place so two peers can't both end up
 ## thinking they own a body:
 ##
-## - **A client owns its own movement.** Its [Player] runs the full Chapter 2
-##   physics locally and replicates its transform. The host does not simulate
-##   remote players and does not need to - it receives their snapshots and
-##   applies them.
-## - **The host owns health, team, death and respawns.** They cross the wire as
-##   host-sent RPCs with a sender check ([method Player._net_state_receive],
-##   [method Player._net_respawn_at]), so no amount of client enthusiasm can
-##   write them.
-## - **The host owns the match flow.** [GameManager] replicates the phase, score
-##   and countdown to clients; a client never advances a phase itself.
-## - **The host resolves every shot.** A client sends an aim ray; the host
-##   re-derives the ray from its own copy of the world and decides what was hit.
-##   The client is told what happened so it can draw it.
+## - a client owns its own movement. its Player runs physics locally and
+##   replicates its transform. the host never simulates remote players,
+##   just receives their snapshots and applies them.
+## - the host owns health, team, death and respawns, sent as host-only RPCs
+##   with a sender check, so a client can't just write these itself.
+## - the host owns match flow. GameManager replicates phase/score/countdown
+##   to clients; a client never advances a phase on its own.
+## - the host resolves every shot. a client sends an aim ray, the host
+##   re-derives it and decides what got hit, then tells the client.
 ##
-## The one asymmetry worth naming: the host's own player is both authoritative
-## for its transform [b]and[/b] a remote body to nobody, so it takes the same
-## validating path by calling it directly - Godot refuses an RPC addressed to
-## the local peer.
+## one asymmetry worth remembering: the host's own player is authoritative
+## for its own transform but also would be a remote body to nobody, so it
+## takes the same validating path by calling it directly - Godot refuses
+## an RPC addressed to the local peer.
 
 # --- Signals ------------------------------------------------------------
 
-## This machine started a server.
+## this machine started a server.
 signal hosting_started(port: int)
 
-## We are now connected to a server as a client.
+## we're now connected to a server as a client.
 signal join_succeeded
 
-## Joining failed. [param reason] is safe to show in the UI.
+## joining failed. reason is safe to show in the UI.
 signal join_failed(reason: String)
 
-## A peer connected. [param peer_id] is 0 for the host itself on a client.
+## a peer connected. peer_id is 0 for the host itself on a client.
 signal peer_connected(peer_id: int)
 
-## A peer disconnected.
+## a peer disconnected.
 signal peer_disconnected(peer_id: int)
 
-## We lost the server we were connected to.
+## we lost the server we were connected to.
 signal server_disconnected
 
-## The roster changed: somebody joined, left, or changed health. The dev UI
-## listens to this rather than polling.
+## roster changed: somebody joined, left, or changed health. dev UI listens
+## to this instead of polling.
 signal roster_updated
 
-## Host only. A peer has been given a side and should now be spawned.
-## [param player_name] is what the scoreboard will show.
+## host only. a peer has been given a side and should now be spawned.
+## player_name is what the scoreboard will show.
 signal peer_registered(peer_id: int, team_side: int, player_name: String)
 
-## Host only. A peer is gone and their body should be removed from every
-## machine. Raised before the node is freed so listeners can still look it up.
+## host only. a peer is gone and their body should be removed everywhere.
+## raised before the node is freed so listeners can still look it up.
 signal peer_unregistered(peer_id: int)
 
-## A client has finished loading its match scene and is ready to be given a
-## body. Host only, and raised by [method request_spawn].
+## a client finished loading its match scene and is ready for a body.
+## host only, raised by request_spawn().
 signal spawn_requested(peer_id: int)
 
 # --- Session configuration ----------------------------------------------
 
-## Default port for a local or LAN match.
+## default port for a local or LAN match.
 const DEFAULT_PORT := 27015
 
-## Loopback, for testing two instances on one machine.
+## loopback, for testing two instances on one machine.
 const DEFAULT_ADDRESS := "127.0.0.1"
 
-## Hard ceiling on a session, whatever the rules ask for. A mistyped
-## [code]match_rules.tres[/code] should not be able to open a server for a
-## thousand players. This is a transport safety limit, not a game rule - the
-## actual cap comes from [method get_max_players].
+## hard ceiling on a session no matter what the rules ask for, so a bad
+## match_rules.tres can't open a server for a thousand players. transport
+## safety limit, not a game rule - the real cap is get_max_players().
 const ABSOLUTE_MAX_PLAYERS := 16
 
-## Godot's first peer id is always the server. It is not a magic number in the
-## way a hard-coded port is: this is the identity ENet itself hands the host,
-## and every "the host is authoritative" check in the project reads it from
-## here rather than repeating the literal.
+## Godot's first peer id is always the server - this is the id ENet itself
+## hands the host, so every "is the host" check reads it from here.
 const SERVER_PEER_ID := 1
 
 var _peer: ENetMultiplayerPeer = null
 var _is_online: bool = false
 var _is_host: bool = false
 
-## Who is in the session. Owned, not an autoload - this object dies with the
-## manager, which is correct, because the roster is a property of the session
-## and not of the application.
+## who's in the session. owned, not an autoload - dies with the manager,
+## since the roster belongs to the session, not the app.
 var players := PlayerRegistry.new()
 
 
 func _ready() -> void:
-	# Connection teardown must still run if the tree is paused mid-round.
+	# connection teardown must still run if the tree is paused mid-round.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
 	players.capacity = get_max_players()
 
-	# Connected once, here, rather than on every join: `multiplayer` outlives
-	# any individual peer, so these fire correctly across reconnects.
+	# connected once here rather than on every join: `multiplayer` outlives
+	# any individual peer, so these keep firing correctly across reconnects.
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
 	multiplayer.connection_failed.connect(_on_connection_failed)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
 
-	# One place that pushes the roster out, rather than a broadcast call at each
-	# of the five places that can change it. A missed call site here is the kind
-	# of bug that only shows up under a specific sequence - a client whose team
-	# never arrives, with no error anywhere - and the cost of avoiding it is
-	# one connection.
+	# one place that pushes the roster out instead of a broadcast call at
+	# every spot that can change it.
 	roster_updated.connect(_on_roster_changed)
 
 
 # --- State --------------------------------------------------------------
 
-## Whether we are connected to a session at all.
+## whether we're connected to a session at all.
 var is_online: bool:
 	get: return _is_online
 
-## Whether this machine is the server. Clients must never run authoritative
-## game logic, so this gates most decisions in Chapters 4 and 5.
+## whether this machine is the server. clients must never run authoritative
+## game logic, so this gates most of those decisions.
 var is_host: bool:
 	get: return _is_host
 
-## Our own network id, or 0 when offline.
+## our own network id, or 0 when offline.
 var local_peer_id: int:
 	get: return _peer.get_unique_id() if _peer != null else 0
 
-## Peers the transport reports, [b]excluding[/b] this machine.
+## peers the transport reports, excluding this machine.
 ##
-## Godot's [method MultiplayerAPI.get_peers] never includes the local peer, so
-## on the host this is "every client" and on a client it is "the host and every
-## other client". Kept as a raw transport query, deliberately: it answers a
-## transport question. For "how many players are in the match", use
-## [method get_player_count], which does include this machine and does not
-## change shape depending on whether you are the one hosting.
+## MultiplayerAPI.get_peers() never includes the local peer, so on the host
+## this is "every client", on a client it's "host + every other client".
+## for "how many players are in the match" use get_player_count() instead,
+## which does include this machine.
 func get_connected_peers() -> PackedInt32Array:
 	if not _is_online:
 		return PackedInt32Array()
 	return multiplayer.get_peers()
 
 
-## Session size implied by the match rules: two teams of
-## [member MatchRules.players_per_team]. "3v3" is therefore stated once, in
-## [code]data/match_rules.tres[/code], rather than as a 6 here and a 3 there.
-## Clamped so a bad rules file cannot produce an absurd session.
+## session size implied by the match rules: two teams of players_per_team.
+## "3v3" is stated once in data/match_rules.tres, not as a 6 here and a 3
+## there. clamped so a bad rules file can't produce an absurd session.
 func get_max_players() -> int:
 	return clampi(GameManager.match_rules.get_team_size(), 2, ABSOLUTE_MAX_PLAYERS)
 
 
-## Total players in the match, [b]including[/b] this machine.
+## total players in the match, including this machine.
 ##
-## Read from the roster rather than from the transport, for two reasons that
-## both bite in a real session. The transport does not count the host, so a
-## one-player session reads as zero. And the roster is the thing the team
-## assignment and the six-player cap are actually enforced against, so a count
-## taken from anywhere else could disagree with whether a new peer was accepted.
+## read from the roster, not the transport: the transport doesn't count the
+## host (a one-player session would read as zero), and the roster is what
+## team assignment and the player cap are actually enforced against.
 func get_player_count() -> int:
 	return players.size()
 
 
-## Whether the session has room for another player.
+## whether the session has room for another player.
 func has_open_slot() -> bool:
 	return players.has_open_slot()
 
 
 # --- Roster ---------------------------------------------------------------
 
-## Adds a peer to the roster and assigns them a side. Host-only.
+## adds a peer to the roster and assigns them a side. host-only.
 ##
-## Returns the assigned [enum Team.Side], or [constant Team.Side.NONE] if the
-## session is full. The capacity refusal itself is
-## [method PlayerRegistry.register]'s - this is the host check, the log line,
-## and the roster notification around it.
+## returns the assigned Team.Side, or Team.Side.NONE if the session is full
+## (PlayerRegistry.register handles the actual capacity check; this wraps
+## the host check, logging and roster notification around it).
 func register_peer(peer_id: int, player_name: String = "") -> int:
 	if not _is_host:
 		push_warning("NetworkManager: only the host may assign peers. Ignoring register_peer(%d)." % peer_id)
@@ -198,9 +178,8 @@ func register_peer(peer_id: int, player_name: String = "") -> int:
 	return side
 
 
-## Removes a peer from the roster. Host-only, except that a client calling it
-## for itself is allowed - that is the "I am leaving" path, and it only ever
-## removes local state.
+## removes a peer from the roster. host-only, except a client calling it for
+## itself is fine - that's just the "I am leaving" path.
 func unregister_peer(peer_id: int) -> void:
 	if not _is_host and peer_id != local_peer_id:
 		return
@@ -208,11 +187,10 @@ func unregister_peer(peer_id: int) -> void:
 		roster_updated.emit()
 
 
-## The [Player] node for a peer, or null if it is not spawned here.
+## the Player node for a peer, or null if not spawned here.
 ##
-## Looked up through the scene tree rather than kept in a parallel dictionary,
-## because a node reference that outlives the node is a crash waiting for a
-## disconnect, and the tree already knows the answer correctly at all times.
+## looked up through the scene tree instead of cached in a dictionary - a
+## stale node reference is a crash waiting to happen on disconnect.
 func get_player_for(peer_id: int) -> Player:
 	for node in get_tree().get_nodes_in_group(&"players"):
 		var player := node as Player
@@ -221,7 +199,7 @@ func get_player_for(peer_id: int) -> Player:
 	return null
 
 
-## Every [Player] in this scene, for iteration that does not care who owns what.
+## every Player in this scene, for iteration that doesn't care who owns what.
 func get_players() -> Array[Player]:
 	var found: Array[Player] = []
 	for node in get_tree().get_nodes_in_group(&"players"):
@@ -231,23 +209,17 @@ func get_players() -> Array[Player]:
 	return found
 
 
-## The one player this machine drives, or null when we are a spectator with no
-## body of our own.
-##
-## Also the offline answer. With no session there is no peer id to match on -
-## [member local_peer_id] is 0 - but there is still exactly one player, and
-## every piece of tooling that wants "the player I am looking through" wants it
-## in single-player too. Scoping this to sessions would have meant the debug
-## overlay, the harness and the UI each reimplementing the offline case.
+## the one player this machine drives, or null if we're a spectator with no
+## body of our own. also handles offline: no session means no peer id to
+## match on, but there's still exactly one player to find.
 func get_local_player() -> Player:
 	if not _is_online:
 		return _only_player()
 	return get_player_for(local_peer_id)
 
 
-## The single body in the scene, if there is exactly one. Null when there are
-## none, and null when there are several, because "pick one of these" is a guess
-## and a guess that happens to be wrong is worse than an honest null.
+## the single body in the scene, if there's exactly one. null if there are
+## none or several - guessing which one is worse than an honest null.
 func _only_player() -> Player:
 	var found: Player = null
 	for node in get_tree().get_nodes_in_group(&"players"):
@@ -262,23 +234,18 @@ func _only_player() -> Player:
 
 # --- Session control ----------------------------------------------------
 
-## Starts a server and waits for players to connect.
-## [param max_players] of 0 means "use the session size from the match rules".
-## Returns [constant OK] on success, or an [enum Error] to pass to
-## [method @GlobalScope.error_string].
+## starts a server and waits for players to connect.
+## max_players of 0 means "use the session size from the match rules".
+## returns OK on success, or an Error for error_string().
 func host_game(port: int = DEFAULT_PORT, max_players: int = 0) -> Error:
 	leave_game()
 
 	var cap := mini(max_players if max_players > 0 else get_max_players(), ABSOLUTE_MAX_PLAYERS)
 
-	# ENet's second argument counts *clients*, not participants: the host is not
-	# in it, because the host is the thing being connected to. Passing the
-	# session size straight through therefore allows one more player than the
-	# rules allow, and the excess is caught by the registry refusing to
-	# register - which works, but leaves a peer connected to a visibly full
-	# session with no way to tell them why. One less here means ENet turns the
-	# seventh player away at the handshake, which is the only place that can be
-	# turned away cleanly.
+	# ENet's second argument counts *clients*, not participants - the host
+	# isn't one of them. passing the full cap through would let one extra
+	# player connect before the registry refuses them; subtracting 1 makes
+	# ENet reject the extra player at the handshake instead, which is cleaner.
 	var peer := ENetMultiplayerPeer.new()
 	var error := peer.create_server(port, cap - 1)
 	if error != OK:
@@ -292,10 +259,9 @@ func host_game(port: int = DEFAULT_PORT, max_players: int = 0) -> Error:
 	players.capacity = cap
 	players.clear()
 
-	# The host is a peer like any other and has to be in the roster, or it would
-	# be the one participant with no body and no side. Registering it here
-	# rather than waiting for a connection event is deliberate: ENet never
-	# raises `peer_connected` for the server about itself.
+	# the host has to be in the roster too, or it'd be the one participant
+	# with no body and no side. registered here directly since ENet never
+	# raises peer_connected for the server about itself.
 	register_peer(SERVER_PEER_ID, local_display_name())
 	players.update(SERVER_PEER_ID, {"level": Profile.level})
 
@@ -304,8 +270,8 @@ func host_game(port: int = DEFAULT_PORT, max_players: int = 0) -> Error:
 	return OK
 
 
-## Connects to a server. Use [signal join_succeeded] or [signal join_failed]
-## to find out how it went - this returns before the attempt completes.
+## connects to a server. use join_succeeded/join_failed to find out how it
+## went - this returns before the attempt completes.
 func join_game(address: String = DEFAULT_ADDRESS, port: int = DEFAULT_PORT) -> Error:
 	leave_game()
 
@@ -326,14 +292,11 @@ func join_game(address: String = DEFAULT_ADDRESS, port: int = DEFAULT_PORT) -> E
 	return OK
 
 
-## Disconnects and returns to a fully offline state. Safe to call when
-## already offline, and safe to call mid-round.
+## disconnects and returns to a fully offline state. safe to call when
+## already offline, and safe mid-round.
 func leave_game() -> void:
-	# Every peer has to be told their body is going away before the peer is
-	# closed, or a client is left holding bodies it can no longer reconcile.
-	# Doing this on the way out as well as on the way in is what makes a host
-	# quit - the single most common thing to happen in a dev session - leave
-	# every client in a clean, playable, offline state instead of a frozen one.
+	# every peer needs to be told their body is going away before the peer
+	# closes, or clients are left holding bodies they can't reconcile.
 	for peer_id in players.peer_ids():
 		peer_unregistered.emit(peer_id)
 	players.clear()
@@ -366,43 +329,35 @@ func _on_peer_connected(id: int) -> void:
 		roster_updated.emit()
 		return
 
-	# Register immediately so the roster is authoritative, but defer the
+	# register immediately so the roster is authoritative, but defer the
 	# spawn until the client confirms its match scene is ready via
-	# [method request_spawn]. The host's own peer (id 1) has no client to
-	# handshake with, so we register and notify immediately.
+	# request_spawn(). the host's own peer (id 1) has no client to handshake
+	# with, so register and notify immediately.
 	var side := register_peer(id)
 	if id == SERVER_PEER_ID:
 		peer_registered.emit(id, side, players.display_name_of(id))
 
 
-## Client to host: "my match scene is up, please give me a body."
+## client to host: "my match scene is up, please give me a body."
 ##
-## [b]This handshake exists because there is otherwise a race, and the race
-## loses a player.[/b] The host learns a peer exists from ENet's handshake and
-## could spawn its body immediately - but a spawned body is a
-## [MultiplayerSpawner] message, and a client that has not yet added its own
-## spawner has nowhere to put it. The message is dropped, the client believes it
-## is in a match, and the roster says six players while the client can see one.
-## Nothing errors; the session is just quietly short a person.
-##
-## So the client says when it is ready instead, and the host spawns then. The
-## host's own player needs no handshake: it is spawned by its own match scene
-## the moment that scene exists, which is the same condition.
+## this handshake exists to avoid a race: if the host spawned a body the
+## instant ENet's handshake completes, a client that hasn't added its
+## MultiplayerSpawner yet would silently drop the spawn message and end up
+## a player short with nothing erroring. so the client says when it's ready
+## instead, and the host spawns then.
 @rpc("any_peer", "call_remote", "reliable")
 func request_spawn(player_name: String = "", player_level: int = 1) -> void:
 	if not multiplayer.is_server():
 		return
 
-	# Only a peer the host has already registered may ask. Without this, a
-	# client that connected to a full session and was refused could still ask
-	# for a body, and the host would spawn one for a peer that is in nobody's
-	# roster - a player with no side, no cap count and no way to be cleaned up.
+	# only a peer the host already registered may ask, or a refused/full-session
+	# client could still get a body spawned for it with no roster entry.
 	var sender := multiplayer.get_remote_sender_id()
 	if not players.has_peer(sender):
 		push_warning("NetworkManager: spawn requested by unregistered peer %d; refused." % sender)
 		return
 
-	# The client's chosen name, cleaned. Arrives here rather than at connect
+	# the client's chosen name, cleaned. arrives here rather than at connect
 	# time because ENet's handshake carries no payload.
 	var clean := sanitize_name(player_name)
 	var changes := {"level": clampi(player_level, 1, 999)}
@@ -411,15 +366,15 @@ func request_spawn(player_name: String = "", player_level: int = 1) -> void:
 	players.update(sender, changes)
 	roster_updated.emit()
 
-	# Phase first, so the client is in the host's phase - with the host's score
-	# and countdown - before its body arrives.
+	# phase first, so the client has the host's score/countdown before its
+	# body arrives.
 	GameManager.send_snapshot_to(sender)
 	peer_registered.emit(sender, players.team_of(sender), players.display_name_of(sender))
 	spawn_requested.emit(sender)
 
 
-## [param wanted], with a number added if someone else in the session already
-## goes by it - two "Player867"s on one scoreboard are unreadable.
+## wanted, with a number appended if someone else already goes by it - two
+## "Player867"s on one scoreboard is unreadable.
 func _unique_name(wanted: String, peer_id: int) -> String:
 	var taken := {}
 	for other: int in players.peer_ids():
@@ -435,9 +390,9 @@ func _unique_name(wanted: String, peer_id: int) -> String:
 
 func _on_peer_disconnected(id: int) -> void:
 	peer_disconnected.emit(id)
-	# On any machine, not just the host's: a client also needs to stop
-	# believing a body for this peer exists, because the spawner despawn arrives
-	# as a separate message and there is a frame where both are half-true.
+	# on any machine, not just the host: a client also needs to stop
+	# believing this peer's body exists, since the spawner despawn is a
+	# separate message that can arrive a frame later.
 	peer_unregistered.emit(id)
 	if _is_host:
 		players.unregister(id)
@@ -449,7 +404,7 @@ func _on_connected_to_server() -> void:
 
 
 func _on_connection_failed() -> void:
-	# ENet leaves the peer half-open on failure, so clean up here rather than
+	# ENet leaves the peer half-open on failure, so clean up here instead of
 	# leaving is_online true with nothing behind it.
 	var reason := "The host did not respond."
 	push_warning("NetworkManager: " + reason)
@@ -458,21 +413,17 @@ func _on_connection_failed() -> void:
 
 
 func _on_server_disconnected() -> void:
-	# leave_game() raises peer_unregistered for every peer and empties the
-	# roster, so the client's bodies come down before anyone tries to route to
-	# a match that no longer exists. A host quitting mid-round is a completely
-	# ordinary thing to do during development, and it must not leave a client
-	# with three frozen teammates and a live mouse.
+	# leave_game() clears the roster and despawns bodies before anyone tries
+	# to route into a match that no longer exists.
 	leave_game()
 	last_disconnect_reason = "The host left the match."
 	server_disconnected.emit()
-	# There is no match without a host. Staying in the phase would hand this
-	# client an offline authority that plays empty rounds forever; back to the
-	# menu instead, where the reason is shown.
+	# no match without a host - back to the menu instead of playing empty
+	# rounds with offline authority.
 	GameManager.return_to_menu()
 
 
-## A player's profile level, for display: this machine's own from [Profile],
+## a player's profile level, for display: this machine's own from Profile,
 ## everyone else's from the roster the host sends.
 func level_of(peer_id: int) -> int:
 	if not _is_online or peer_id == local_peer_id:
@@ -480,16 +431,16 @@ func level_of(peer_id: int) -> int:
 	return int(players.get_entry(peer_id).get("level", 1))
 
 
-## Why the last session ended, shown once on the main menu. Cleared there.
+## why the last session ended, shown once on the main menu. cleared there.
 var last_disconnect_reason: String = ""
 
 
-## Longest name the game will display.
+## longest name the game will display.
 const MAX_NAME_LENGTH := 16
 
 
-## The name this machine plays under: the player's saved choice, or a generated
-## one that is then saved so it stays the same between sessions.
+## the name this machine plays under: the player's saved choice, or a
+## generated one that then gets saved so it stays the same between sessions.
 func local_display_name() -> String:
 	var chosen := sanitize_name(GameConfig.display_name)
 	if chosen.is_empty():
@@ -498,8 +449,8 @@ func local_display_name() -> String:
 	return chosen
 
 
-## Trims, strips control characters and caps the length. Applied on the host to
-## whatever a client sends, because a name is shown on every screen.
+## trims, strips control characters and caps the length. applied on the host
+## to whatever a client sends, since a name gets shown everywhere.
 static func sanitize_name(raw: String) -> String:
 	var out := ""
 	for character in raw.strip_edges():
@@ -508,7 +459,7 @@ static func sanitize_name(raw: String) -> String:
 	return out.substr(0, MAX_NAME_LENGTH).strip_edges()
 
 
-## One line for the dev UI: role, peer id, and roster size.
+## one line for the dev UI: role, peer id, and roster size.
 func status_line() -> String:
 	if not _is_online:
 		return "Offline"
@@ -518,15 +469,12 @@ func status_line() -> String:
 
 # --- Roster replication ---------------------------------------------------
 
-## Host only. Pushes the whole roster to every client.
+## host only. pushes the whole roster to every client.
 ##
-## A full snapshot rather than an increment, and that is the point. The
-## alternative - "peer X joined", "peer Y left", "peer Z changed team" - is
-## three messages, three orderings to get right, and a client that joins
-## mid-session has missed all of them. A snapshot has no such state: whatever a
-## client holds is the last complete truth the host sent, and applying it
-## twice is harmless. Six players is about two hundred bytes, so there is
-## nothing to save by being clever.
+## a full snapshot rather than increments on purpose - "peer joined/left/
+## changed team" messages need ordering and a late-joining client misses all
+## of them. a snapshot has no such state: applying it twice is harmless, and
+## six players is only a couple hundred bytes anyway.
 func _on_roster_changed() -> void:
 	if not _is_host:
 		return
@@ -537,23 +485,22 @@ func _on_roster_changed() -> void:
 		_receive_roster.rpc(entries)
 
 
-## Replaces this machine's roster with the host's, then primes every body
+## replaces this machine's roster with the host's, then primes every body
 ## that already exists so a late-joining client sees correct health/team
 ## before the next damage event arrives.
 ##
-## Authority-only, and replaces rather than merges. A client that merged would
-## keep entries the host has already dropped, so a peer who left would stay on
-## the scoreboard forever - and on a client the whole roster comes from the
-## host, so there is nothing local worth preserving.
+## authority-only, and replaces rather than merges - merging would keep
+## entries the host already dropped, leaving departed peers stuck on the
+## scoreboard forever.
 @rpc("authority", "call_remote", "reliable")
 func _receive_roster(entries: Array) -> void:
 	if multiplayer.is_server():
 		return
 	players.replace_all(entries)
 
-	# Bodies may already exist (spawner fired first) or may not yet (late join).
-	# For any body that is present, seed its mirror fields so the first frame
-	# of networked state is the host's truth, not the defaults.
+	# bodies may already exist (spawner fired first) or not yet (late join).
+	# for any body present, seed its mirror fields so the first networked
+	# frame is the host's truth, not the defaults.
 	for entry in entries:
 		var peer_id := int(entry.get("peer_id", 0))
 		if peer_id <= 0:

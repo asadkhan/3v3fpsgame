@@ -1,9 +1,8 @@
 class_name WeaponModel
 extends Node3D
-## Root of a weapon model scene whose source file carries no usable materials
-## (the CC0 FBX guns ship their PBR maps as loose PNGs). Applies [member
-## material] to every mesh under it, so the same scene works as the first-
-## person viewmodel and as the third-person gun.
+## root of a weapon model whose source file has no usable materials (the
+## CC0 FBX guns ship their PBR maps as loose PNGs). slaps `material` onto
+## every mesh under it so the same scene works as viewmodel and third-person gun.
 
 @export var material: Material
 

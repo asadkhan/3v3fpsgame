@@ -1,8 +1,8 @@
 class_name HudDamageDirection
 extends Control
-## Red arcs around the crosshair pointing to where damage came from. Each hit
-## keeps its world position, so the arc swings as you turn towards (or away
-## from) the attacker, and fades over [constant LIFETIME].
+## red arcs around the crosshair pointing to where damage came from. each
+## hit keeps its world position, so the arc swings as you turn toward (or
+## away from) the attacker, and fades over LIFETIME.
 
 const LIFETIME := 1.6
 const RADIUS := 130.0
@@ -46,7 +46,7 @@ func _draw() -> void:
 		to.y = 0.0
 		if to.length_squared() < 0.01:
 			continue
-		# Screen angle: 0 is straight ahead (up on screen), clockwise positive.
+		# screen angle: 0 is straight ahead (up on screen), clockwise positive.
 		var angle := atan2(to.normalized().dot(right.normalized()), to.normalized().dot(forward.normalized()))
 		var fade := 1.0 - float(hit.age) / LIFETIME
 		var colour := Color(0.95, 0.12, 0.08, 0.85 * fade * fade)

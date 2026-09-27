@@ -1,53 +1,50 @@
 class_name PlayerViewFeel
 extends Node
-## The procedural motion that makes the first-person view feel physical rather
-## than bolted to the mouse: weapon sway, walk and sprint bob, the sprint pose,
-## landing impacts, idle breathing, and a matching (gentler) camera bob and
-## sprint field-of-view push.
+## procedural motion that makes the first-person view feel physical instead of
+## glued to the mouse: weapon sway, walk/sprint bob, sprint pose, landing dip,
+## idle breathing, plus a gentler matching camera bob and sprint FOV push.
 ##
-## Purely cosmetic and local: it only ever offsets the viewmodel mount and the
-## camera's local transform. The aim ray is built from the head, which this
-## never touches, so nothing here can move where a bullet goes. Aiming down
-## sights damps almost all of it - a steady view is part of what aiming buys.
+## purely cosmetic and local - only offsets the viewmodel mount and the
+## camera's local transform. the aim ray comes from the head, untouched here,
+## so nothing in this file can move where a bullet goes. aiming down sights
+## damps almost all of it.
 ##
-## [Player] feeds it the mouse movement ([method add_look]) and calls
-## [method update] each physics frame; it reads the results back through
-## [method weapon_offset], [method weapon_rotation], [method camera_offset],
-## [method camera_roll] and [method fov_scale].
+## Player feeds it mouse movement (add_look) and calls update() each physics
+## frame, then reads back weapon_offset, weapon_rotation, camera_offset,
+## camera_roll and fov_scale.
 
 # --- Tuning -----------------------------------------------------------------
 
-## How far the weapon lags behind the mouse, per pixel of movement.
+## how far the weapon lags behind the mouse, per pixel of movement
 const SWAY_PER_PIXEL := 0.0006
 const SWAY_MAX := 0.08
-## How quickly sway settles back (higher = snappier).
+## how quickly sway settles back (higher = snappier)
 const SWAY_RETURN := 7.0
 
-## Bob amplitudes in metres. Deliberately small: bob should be felt, not
-## watched.
+## bob amplitudes in metres, kept small - felt, not watched
 const BOB_WEAPON := Vector2(0.007, 0.005)
 const BOB_CAMERA := 0.012
 const SPRINT_BOB_SCALE := 1.35
 
-## Metres per footstep. The bob is locked to the stride - one side-to-side
-## sway per two steps, one dip per step - so it lines up with the footstep
-## sounds ([constant Player.STEP_STRIDE]) instead of running on its own clock.
+## metres per footstep. bob is locked to stride - one side sway per two
+## steps, one dip per step - so it matches the footstep sounds
+## (Player.STEP_STRIDE) instead of running on its own clock.
 const STRIDE := 2.3
 
-## How quickly the bob's output follows its target. Smooths starting,
-## stopping and speed changes so nothing snaps.
+## how fast the bob output follows its target. smooths starts, stops and
+## speed changes so nothing snaps.
 const BOB_SMOOTHING := 10.0
 
-## Sprint pose: the gun drops and cants away.
+## sprint pose: gun drops and cants away
 const SPRINT_POS := Vector3(0.025, -0.045, 0.03)
 const SPRINT_ROT := Vector3(-0.22, 0.3, 0.16)
 
-## Landing: metres of dip per m/s of fall speed, and how fast it recovers.
+## landing: metres of dip per m/s of fall speed, and recovery speed
 const LAND_DIP_PER_SPEED := 0.006
 const LAND_DIP_MAX := 0.09
 const LAND_RECOVERY := 7.0
 
-## Sprint field of view push, as a multiplier.
+## sprint FOV push, as a multiplier
 const SPRINT_FOV := 1.06
 
 # --- State ------------------------------------------------------------------
@@ -71,7 +68,7 @@ var _bob_camera_out := Vector3.ZERO
 @onready var _player: Player = get_parent() as Player
 
 
-## Mouse movement in pixels, from the player's look handler.
+## mouse movement in pixels, from the player's look handler
 var _air: float = 0.0
 
 
@@ -83,24 +80,24 @@ func update(delta: float, velocity: Vector3, on_floor: bool, sprinting: bool, ai
 	_time += delta
 	var steady := 1.0 - 0.8 * aim_amount
 
-	# Sway: mouse movement pushes the weapon the other way, building up over
-	# a flick, then it drifts back to centre.
+	# sway: mouse movement pushes the weapon the other way, builds up over a
+	# flick, then drifts back to centre
 	_sway -= _look_accum * SWAY_PER_PIXEL
 	_sway = _sway.clamp(Vector2.ONE * -SWAY_MAX, Vector2.ONE * SWAY_MAX)
 	_look_accum = Vector2.ZERO
 	_sway = _sway.lerp(Vector2.ZERO, 1.0 - exp(-SWAY_RETURN * delta))
 
-	# Bob: phase advances with ground distance, so it matches the footsteps.
+	# bob: phase advances with ground distance, matches the footsteps
 	var horizontal := Vector2(velocity.x, velocity.z).length()
 	var moving := on_floor and horizontal > 0.5
 	_bob_weight = move_toward(_bob_weight, 1.0 if moving else 0.0, delta * 4.0)
 	if moving:
-		# A full phase cycle is two steps (left and right foot).
+		# a full phase cycle is two steps (left and right foot)
 		_bob_phase = fmod(_bob_phase + horizontal * delta * TAU / (2.0 * STRIDE), TAU * 100.0)
 
-	# Figure-of-eight: side-to-side once per two steps, a smooth dip on every
-	# step. Pure sines, so there is no hard turnaround at the bottom - that
-	# corner (from an abs(cos) curve) was what made the old bob look forced.
+	# figure-of-eight: side-to-side once per two steps, smooth dip every step.
+	# pure sines so there's no hard turnaround at the bottom (an abs(cos)
+	# curve made the old version look forced).
 	var bob := _bob_amount()
 	var target_weapon := Vector3(
 		sin(_bob_phase) * BOB_WEAPON.x,
@@ -114,13 +111,13 @@ func update(delta: float, velocity: Vector3, on_floor: bool, sprinting: bool, ai
 	_bob_weapon_out = _bob_weapon_out.lerp(target_weapon, follow)
 	_bob_camera_out = _bob_camera_out.lerp(target_camera, follow)
 
-	# Eased rather than linear, so going into and out of the sprint pose reads
-	# as a movement of the arms rather than a slide.
+	# eased rather than linear, so the sprint pose reads as the arms moving,
+	# not sliding
 	_sprint_linear = move_toward(_sprint_linear, 1.0 if sprinting else 0.0, delta * 4.5)
 	_sprint = smoothstep(0.0, 1.0, _sprint_linear)
 
-	# Landing: remember the fall speed while airborne, spend it as a dip on
-	# touchdown, then spring back with a little overshoot.
+	# landing: remember fall speed while airborne, spend it as a dip on
+	# touchdown, spring back with a little overshoot
 	if not on_floor:
 		_fall_speed = maxf(_fall_speed, -velocity.y)
 	elif not _was_on_floor:
@@ -130,8 +127,7 @@ func update(delta: float, velocity: Vector3, on_floor: bool, sprinting: bool, ai
 	_land_velocity += (-_land * LAND_RECOVERY * LAND_RECOVERY - _land_velocity * 2.0 * LAND_RECOVERY) * delta
 	_land += _land_velocity * delta
 
-	# The weapon lags behind vertical motion: dips as you jump, rises as you
-	# fall.
+	# weapon lags behind vertical motion: dips as you jump, rises as you fall
 	var target_air := clampf(-velocity.y * 0.005, -0.035, 0.035) if not on_floor else 0.0
 	_air = lerpf(_air, target_air, 1.0 - exp(-8.0 * delta))
 
@@ -147,12 +143,12 @@ func _bob_amount() -> float:
 
 func weapon_offset() -> Vector3:
 	var offset := _bob_weapon_out
-	# Idle breathing, only noticeable when standing still.
+	# idle breathing, only noticeable when standing still
 	offset.y += sin(_time * 1.6) * 0.0025 * (1.0 - _bob_weight)
 	offset += SPRINT_POS * _sprint
 	offset.y += _land * 0.6
 	offset.y += _air
-	# Sway also nudges the position a touch, not just the angle.
+	# sway also nudges the position a touch, not just the angle
 	offset.x += _sway.x * 0.12
 	offset.y -= _sway.y * 0.12
 	return offset * _steady
@@ -160,7 +156,7 @@ func weapon_offset() -> Vector3:
 
 func weapon_rotation() -> Vector3:
 	var rotation := Vector3(_sway.y, _sway.x, _sway.x * 0.6)
-	# The hand rolls slightly with the side-to-side sway of the walk.
+	# hand rolls slightly with the side-to-side sway of the walk
 	rotation.z -= _bob_weapon_out.x * 1.6
 	rotation += SPRINT_ROT * _sprint
 	rotation.x += _land * 1.5

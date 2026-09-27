@@ -1,6 +1,6 @@
 class_name HudAlivePips
 extends Control
-## A row of bars, one per player on a side: lit while alive, dimmed once dead.
+## a row of bars, one per player on a side: lit while alive, dimmed once dead
 
 var colour: Color = UITheme.TEXT
 var right_to_left: bool = false

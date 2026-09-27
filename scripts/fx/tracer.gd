@@ -1,17 +1,14 @@
 class_name Tracer
 extends MeshInstance3D
-## A bullet tracer: a short bright streak racing from the muzzle to where the
-## round stopped, then gone. Optionally leaves a brief flash at the muzzle - used
-## for other players' shots, whose viewmodel (and its flash) nobody can see.
-##
-## Placeholder art until the effects pass; the look is three numbers below.
+## bullet tracer: a bright streak from muzzle to impact point, then gone.
+## can also flash at the muzzle, for other players' shots you can't see fire.
 
 const SPEED := 420.0          # metres per second
 const STREAK_LENGTH := 3.0
 const THICKNESS := 0.018
 const FLASH_TIME := 0.05
-## Shortest time a tracer stays on screen. At full speed a close-range streak
-## would cross in under a frame and never be seen; short ones slow down instead.
+## shortest time a tracer stays visible - close shots slow down so they don't
+## flash by in under a frame.
 const MIN_VISIBLE_TIME := 0.05
 
 static var _material: StandardMaterial3D = null
@@ -27,7 +24,7 @@ var _flash_left: float = 0.0
 var _speed: float = SPEED
 
 
-## Call before adding to the tree.
+## call before adding to the tree.
 func setup(from: Vector3, to: Vector3, with_flash: bool) -> void:
 	_from = from
 	_to = to

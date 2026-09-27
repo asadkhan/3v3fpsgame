@@ -1,11 +1,10 @@
 class_name ShellCasing
 extends MeshInstance3D
-## A spent brass case thrown out of the ejection port: spins, falls, bounces
-## off the floor with a tinkle, lies there for a few seconds and fades.
+## a spent brass case thrown out of the ejection port: spins, falls,
+## bounces off the floor with a tinkle, lies there a few seconds, fades.
 ##
-## Integrated by hand with a ray per step rather than as a physics body - there
-## can be dozens in the air during a spray, and none of them should ever push
-## anything.
+## integrated by hand with a ray per step rather than a physics body -
+## there can be dozens in the air during a spray and none should push anything.
 
 const LIFETIME := 4.0
 const GRAVITY := 11.0
@@ -20,7 +19,7 @@ var _bounces: int = 0
 var _resting: bool = false
 
 
-## Adds a case to [param parent]: a pistol case or a rifle case.
+## adds a case to parent: a pistol case or a rifle case.
 static func spawn(parent: Node, at: Transform3D, velocity: Vector3, pistol: bool) -> void:
 	var casing := ShellCasing.new()
 	parent.add_child(casing)
@@ -30,8 +29,7 @@ static func spawn(parent: Node, at: Transform3D, velocity: Vector3, pistol: bool
 		casing.setup(at, velocity, 0.045, 0.005)
 
 
-## [param length] and [param radius] in metres: about 45 x 5 mm for a rifle,
-## 20 x 4.5 mm for a pistol.
+## length and radius in metres: about 45x5mm for a rifle, 20x4.5mm for a pistol.
 func setup(at: Transform3D, velocity: Vector3, length: float, radius: float) -> void:
 	mesh = _mesh(length, radius)
 	material_override = _material()
@@ -89,7 +87,7 @@ func _physics_process(delta: float) -> void:
 			Audio.play_at(&"casing", global_position, -14.0 + _bounces * -4.0, 0.25, 18.0)
 		if _velocity.length() < 0.5 or _bounces >= 4:
 			_resting = true
-			# Lying on its side on the floor.
+			# lying on its side on the floor.
 			global_basis = Basis(Vector3.UP, randf() * TAU) * Basis(Vector3.FORWARD, PI * 0.5)
 		return
 	global_position = to

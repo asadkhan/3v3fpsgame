@@ -1,8 +1,9 @@
 class_name HudBuyMenu
 extends PanelContainer
-## The buy menu: open with B during the buy phase. One card per primary weapon
-## with its price and headline numbers; buying is a request the host approves
-## (see [PlayerLoadout]), so a card greys out rather than failing silently.
+## the buy menu: open with B during the buy phase. one card per primary
+## weapon with its price and headline numbers; buying is a request the
+## host approves (see PlayerLoadout), so a card greys out rather than
+## failing silently.
 
 var _credits: Label
 var _grid: HBoxContainer

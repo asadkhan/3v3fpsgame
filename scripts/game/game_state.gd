@@ -1,14 +1,12 @@
 class_name GameState
 extends RefCounted
-## Base class for every phase of the game. One instance of a subclass exists
-## for the active phase; [GameManager] creates it, ticks it, and throws it away.
+## base class for every phase of the game. one instance of a subclass exists
+## for the active phase; GameManager creates it, ticks it, and throws it away.
 ##
-## The point of this pattern is that [GameManager] never contains a chain of
-## [code]if phase == ...[/code] branches. Each phase owns its own enter, tick
-## and exit behaviour, so adding one is a new file rather than an edit to a
-## switch statement that six other systems have to be read alongside.
+## keeps GameManager from turning into a pile of "if phase == ..." branches -
+## each phase owns its own enter/tick/exit, so adding one is a new file.
 ##
-## [b]Adding a phase:[/b]
+## adding a phase:
 ## [codeblock]
 ## 1. Create a script in res://scripts/game/states/ extending this class.
 ## 2. Override enter() / update() / exit() with whatever the phase needs.
@@ -16,38 +14,25 @@ extends RefCounted
 ## 4. Register the script and its transitions in GameManager.
 ## [/codeblock]
 ##
-## [b]Note:[/b] states are plain objects, not nodes. They cannot own children,
-## run their own [code]_process[/code], or create timers by themselves. Anything
-## that needs to spawn something should ask [member game_manager], which is the
-## one place allowed to touch the scene tree. Keeping states node-free is what
-## lets the tick stay in one predictable place.
+## states are plain objects, not nodes - no children, no own _process, no
+## timers. anything that needs the scene tree goes through game_manager.
 
-## The active [GameManager].
+## the active GameManager.
 ##
-## Deliberately left untyped. Two obvious alternatives both fail: typing it as
-## [GameManager] is a circular reference, because [GameManager] preloads every
-## state script; typing it as [Node] makes the compiler reject reads such as
-## [code]game_manager.match_state[/code], since [Node] has no such property.
-## An untyped reference resolves at runtime, and [method get_match] hands back
-## a properly typed result so nothing downstream has to care.
+## left untyped on purpose: typing it GameManager is a circular reference
+## (GameManager preloads every state script), typing it Node breaks reads
+## like game_manager.match_state. get_match() hands back a typed result
+## so nothing downstream has to care.
 var game_manager
 
-## Seconds left on this state's countdown, or 0 for states that are not timed.
-##
-## Every timed phase used to declare its own copy of this alongside its own
-## copy of the decrement-and-check loop. That is four copies of the same five
-## lines, and a bug fixed in one of them would have left the other three
-## quietly wrong. The countdown lives here instead; subclasses call
-## [method _start_countdown] and [method _tick_countdown].
-##
-## No [method exit] reset is needed. [GameManager] builds a fresh state object
-## on every transition, so this always starts at zero for a new phase.
+## seconds left on this state's countdown, or 0 if untimed.
+## lives here instead of duplicated in every timed phase; subclasses just
+## call _start_countdown() / _tick_countdown().
 var _remaining: float = 0.0
 
-## The wall-clock moment ([method Time.get_ticks_msec]) the countdown reaches
-## zero. Counting against the real clock rather than summing frame deltas keeps
-## a 20-second buy phase 20 seconds long even when the host stutters or the
-## engine clamps a long frame.
+## wall-clock moment (Time.get_ticks_msec) the countdown hits zero. counting
+## against the real clock instead of summing deltas keeps a 20s buy phase
+## actually 20 seconds even through a stutter or a clamped frame.
 var _deadline_ms: int = 0
 
 
@@ -55,82 +40,73 @@ func _init(manager = null) -> void:
 	game_manager = manager
 
 
-## Called once, when this state becomes the active phase.
-## [param previous] is the state being left, or [code]null[/code] on the very
-## first transition. Use it for teardown-order-sensitive logic; normal cleanup
-## belongs in [method exit].
+## called once when this state becomes active. previous is null on the very
+## first transition. use for teardown-order-sensitive stuff; normal cleanup
+## goes in exit().
 func enter(_previous: GameState) -> void:
 	pass
 
 
-## Called once, when this state stops being the active phase.
-## [param next_state] is the state being entered, or [code]null[/code] if the
-## game is shutting down. Always release timers and connections here.
+## called once when this state stops being active. next_state is null if
+## the game is shutting down. always release timers/connections here.
 func exit(_next_state: GameState) -> void:
 	pass
 
 
-## Called every frame by [GameManager] while this state is active, including
-## while the tree is paused - that is what makes buy-phase and round-end
-## countdowns keep running when gameplay is frozen.
+## called every frame while this state is active, even while the tree is
+## paused - that's what keeps buy-phase/round-end countdowns running when
+## gameplay is frozen.
 func update(_delta: float) -> void:
 	pass
 
 
-## The match in progress. This is the single accessor states need for it, so
-## the untyped [member game_manager] is reached through in exactly one place.
+## the match in progress.
 func get_match() -> MatchState:
 	return game_manager.match_state as MatchState
 
 
-## The rules for the match in progress - round length, buy window, rounds to
-## win. Phases read their duration from here rather than hard-coding it, so
-## retuning a match is an edit to [code]data/match_rules.tres[/code].
+## rules for the match in progress - round length, buy window, rounds to win.
 func get_rules() -> MatchRules:
 	return game_manager.match_rules as MatchRules
 
 
 # --- Countdown helpers ----------------------------------------------------
-# Shared by every timed phase. A timed state is then three lines in
-# [method enter] and three in [method update], with no bookkeeping of its own.
+# shared by every timed phase so each one is just a couple lines in enter()
+# and update(), no bookkeeping of its own.
 
-## Seconds left on this phase's countdown, or 0 for untimed phases. For the HUD.
+## seconds left on this phase's countdown, or 0 if untimed. for the HUD.
 func get_time_remaining() -> float:
 	return _remaining
 
 
-## Arms the countdown for [param seconds]. Call from [method enter].
+## arms the countdown for `seconds`. call from enter().
 func _start_countdown(seconds: float) -> void:
 	_remaining = maxf(seconds, 0.0)
 	_deadline_ms = Time.get_ticks_msec() + int(_remaining * 1000.0)
 
 
-## Updates the countdown from the real clock and returns the time left, which
-## never goes below zero. Call from [method update], then compare
-## [member _remaining] against zero to detect the frame the phase should end.
-## [param _delta] is unused: frame time is not trusted for match timing.
+## updates the countdown from the real clock, returns time left (never below
+## zero). call from update(), then check _remaining against zero.
 func _tick_countdown(_delta: float) -> float:
 	_remaining = maxf(float(_deadline_ms - Time.get_ticks_msec()) / 1000.0, 0.0)
 	return _remaining
 
 
-## Asks [GameManager] to move to [param phase]. Always go through this rather
-## than calling [code]change_state[/code] yourself, so the transition table is
-## enforced in one place. Returns false if the move was rejected.
+## asks GameManager to move to `phase`. always go through this instead of
+## calling change_state directly. returns false if refused.
 func request_state(phase: int) -> bool:
 	if game_manager == null:
 		push_error("GameState.request_state() called before a GameManager was attached.")
 		return false
-	# A client's copy of a timed phase still counts down for display, but the
-	# host decides when it ends. Returning quietly here is what stops every
-	# client logging a refused transition on every frame after its timer hits 0.
+	# a client's copy of a timed phase still counts down for display, but the
+	# host decides when it actually ends - stay quiet here so clients don't spam
+	# refused-transition logs once their timer hits 0.
 	if not is_authority():
 		return false
 	return game_manager.change_state(phase)
 
 
-## Whether this machine decides the match (offline, or the host). States gate
-## any change to the score or round counter on this, because on a client those
-## numbers arrive from the host instead.
+## whether this machine decides the match (offline, or host). states gate
+## score/round changes on this since a client gets those from the host.
 func is_authority() -> bool:
 	return game_manager != null and game_manager.is_authority()

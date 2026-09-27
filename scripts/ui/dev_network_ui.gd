@@ -1,41 +1,22 @@
 class_name DevNetworkUI
 extends CanvasLayer
-## Development-only host / join panel: the four buttons you need to get two or
-## three instances of the game talking to each other, and nothing else.
+## dev-only host/join panel: the buttons you need to get two or three game
+## instances talking to each other, nothing else.
 ##
-## [b]This whole file is disposable and Chapter 8 deletes it.[/b] It is a
-## separate scene for the same reason [DevOverlay] is: removing it must not touch
-## the permanent router, the match scene, or the [NetworkManager] that actually
-## does the work. Every button here calls one [NetworkManager] method and does
-## no networking of its own - if this file could host a game, deleting it would
-## be a design change rather than a cleanup.
+## disposable, gets deleted eventually. separate scene so removing it never
+## touches the router, match scene, or NetworkManager. every button just
+## calls one NetworkManager method.
 ##
-## ## Why a UI at all
-##
-## A development lobby is the minimum needed to *see* a network working, and
-## seeing it working is the only way to know the authority rules are right. A
-## roster that says "peer 3  Player 3  BRAVO  alive" answers at a glance the
-## questions a logging statement would take a console window and a timestamp to
-## answer. Chapter 8 replaces it with a real lobby, which will have team select
-## and a ready-up state, and which is allowed to be a real design rather than
-## three buttons and a text field.
-##
-## ## Why it sits in a [CanvasLayer] on its own
-##
-## It is added to the router, like [DevOverlay], so it draws over the 3D world
-## from wherever the current phase routes to and survives the scene changing
-## underneath it. A UI that had to be instanced into the match scene would be
-## destroyed every time the phase changed, which is the moment you most want to
-## press Leave.
+## sits in its own CanvasLayer on the router, like DevOverlay, so it draws
+## over the 3d world and survives scene changes underneath it.
 
-## Port offered by default. Matches [constant NetworkManager.DEFAULT_PORT], but
-## is editable here because the whole point of a development lobby is to run
-## two games on one machine, and the second one needs to be able to aim at a
-## different port if the first is still lingering in TIME_WAIT.
+## port offered by default, matches NetworkManager.DEFAULT_PORT. editable
+## here since running two instances on one machine sometimes needs a
+## different port if the first is still in TIME_WAIT.
 const DEFAULT_PORT := 27015
 
-## Last address typed, kept across a phase change so a failed join can be
-## retried without retyping it.
+## last address typed, kept across a phase change so a failed join doesn't
+## need retyping.
 const ADDRESS_KEY := "user://dev_network_address"
 
 @onready var _address_edit: LineEdit = $Panel/Rows/AddressRow/AddressEdit
@@ -46,15 +27,12 @@ const ADDRESS_KEY := "user://dev_network_address"
 @onready var _local_label: Label = $Panel/Rows/LocalLabel
 @onready var _roster_label: Label = $Panel/Rows/RosterLabel
 
-## Last thing that happened, shown under the buttons. A connection that
-## silently does nothing is the single most confusing failure in a network
-## chapter, and the fix is almost always visible in one line of text.
+## last thing that happened, shown under the buttons.
 var _last_event: String = ""
 
 
 func _ready() -> void:
-	# Survives a paused tree, so Leave still works if someone pauses to look at
-	# the roster.
+	# survives a paused tree, so Leave still works while paused.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
 	_address_edit.text = _load_address()
@@ -80,11 +58,8 @@ func _ready() -> void:
 
 func _on_host_pressed() -> void:
 	if NetworkManager.is_online:
-		# Hosting while already in a session would replace the peer underneath
-		# live bodies and every synchroniser authority with it, leaving a set of
-		# players that exist and are connected to nobody. Leaving first is
-		# slower but it is the only version that ends in a state anybody can
-		# reason about.
+		# hosting while already in a session would orphan every live body's
+		# authority, so leave first instead.
 		_set_event("Already in a session - left it, hosting now.")
 		NetworkManager.leave_game()
 	NetworkManager.host_game(DEFAULT_PORT)
@@ -107,17 +82,15 @@ func _on_leave_pressed() -> void:
 	_set_event("Left the session.")
 
 
-## Enter in the address box is Join. Without this, joining needs the mouse, and
-## the mouse is captured by the player as soon as the match scene appears -
-## so pressing Enter is the difference between a working two-instance test and
-## a person alt-tabbing to click a button.
+## enter in the address box also joins, since the mouse gets captured by
+## the player as soon as the match scene appears.
 func _on_address_submitted(_text: String) -> void:
 	_address_edit.release_focus()
 	_on_join_pressed()
 
 
-## The address field must not hold the keyboard once the player is back in
-## the game: WASD would type into it and Enter (start match) would submit it.
+## address field must give up focus once back in the game, or WASD/Enter
+## would type into it / resubmit it.
 func _process(_delta: float) -> void:
 	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and _address_edit.has_focus():
 		_address_edit.release_focus()
@@ -141,9 +114,7 @@ func _on_join_failed(reason: String) -> void:
 
 
 func _on_server_disconnected() -> void:
-	# Wording matters here. The host leaving is the most common thing to happen
-	# during a development session, and a client that says only "disconnected"
-	# reads as a crash.
+	# host leaving is common during dev, and just "disconnected" reads like a crash.
 	_set_event("The host left. This instance is offline again.")
 	_refresh()
 
@@ -175,10 +146,7 @@ func _roster_text() -> String:
 func _set_event(message: String) -> void:
 	_last_event = message
 	print("[NetUI] ", message)
-	# The roster is the useful part and it is only a few lines, so the event is
-	# appended under it rather than replacing it. A panel that only ever shows
-	# the newest line loses the history you actually wanted - "join failed" then
-	# "connected" is a sequence, and seeing only the second is misleading.
+	# roster stays visible, event appended below it instead of replacing it.
 	_roster_label.text = "%s\n\n%s" % [_roster_text(), _last_event]
 
 

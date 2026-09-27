@@ -1,38 +1,38 @@
 class_name MatchTracker
 extends Node
-## Turns what happens in a match into the numbers and moments players care
-## about: damage, assists, headshot kills, first bloods, objective plays, and
-## the callouts - FIRST BLOOD, DOUBLE KILL, TRIPLE KILL, ACE, CLUTCH.
+## turns match events into the numbers and moments players care about:
+## damage, assists, headshot kills, first bloods, objective plays, and
+## callouts - FIRST BLOOD, DOUBLE KILL, TRIPLE KILL, ACE, CLUTCH.
 ##
-## [b]Host-authoritative[/b], like every other number in the match. The host
-## listens to the gameplay events it alone raises (damage, deaths, plants and
-## defuses), updates each [PlayerState], and sends changed players' stats to
-## everyone a few times a second. Callouts are sent as they happen and raised
-## on every machine as [signal EventBus.player_callout].
+## host-authoritative, like every other number in the match. the host listens
+## to the gameplay events it alone raises (damage, deaths, plants, defuses),
+## updates each PlayerState, and sends changed stats to everyone a few times
+## a second. callouts fire immediately, raised everywhere via
+## EventBus.player_callout.
 ##
-## Lives in the match scene as [code]Tracker[/code].
+## lives in the match scene as Tracker.
 
 const GROUP := &"match_tracker"
 
-## Callout kinds, raised through [signal EventBus.player_callout].
+## callout kinds, raised through EventBus.player_callout
 const FIRST_BLOOD := &"first_blood"
 const DOUBLE_KILL := &"double_kill"
 const TRIPLE_KILL := &"triple_kill"
 const ACE := &"ace"
 const CLUTCH := &"clutch"
 
-## Seconds between stat broadcasts while something has changed.
+## seconds between stat broadcasts while something has changed
 const SEND_INTERVAL := 0.25
 
 # --- Host-only round state ------------------------------------------------------
 
-## victim peer -> {attacker peer: true} for the victim's current life.
+## victim peer -> {attacker peer: true} for the victim's current life
 var _damagers: Dictionary = {}
-## peer -> kills this round.
+## peer -> kills this round
 var _round_kills: Dictionary = {}
 var _first_blood_done: bool = false
 ## side -> the peer who became that side's last player alive against two or
-## more opponents this round.
+## more opponents this round
 var _clutch_candidate: Dictionary = {}
 
 var _dirty: Dictionary = {}
@@ -58,7 +58,7 @@ func _process(delta: float) -> void:
 	_flush()
 
 
-## Sends every changed player's stats now.
+## sends every changed player's stats now
 func _flush() -> void:
 	for peer_id in _dirty:
 		var player := NetworkManager.get_player_for(peer_id)
@@ -95,7 +95,7 @@ func _on_player_died(victim_id: int, killer_id: int, headshot: bool) -> void:
 		_dirty[killer_id] = true
 		if headshot:
 			killer.state.headshot_kills += 1
-		# Assists: everyone else on the killer's side who damaged this life.
+		# assists: everyone else on the killer's side who damaged this life
 		for damager_id in _damagers.get(victim_id, {}):
 			if damager_id == killer_id:
 				continue
@@ -124,8 +124,8 @@ func _on_player_died(victim_id: int, killer_id: int, headshot: bool) -> void:
 		_check_clutch_candidates()
 
 
-## When a side is down to one player facing two or more, that player is in a
-## clutch. Remembered until the round ends; it counts if their side wins.
+## when a side is down to one player facing two or more, that player is in a
+## clutch. remembered until the round ends, counts if their side wins.
 func _check_clutch_candidates() -> void:
 	var alive := {Team.Side.ALPHA: [], Team.Side.BRAVO: []}
 	for player in NetworkManager.get_players():
@@ -170,13 +170,13 @@ func _on_phase_changed(_previous: int, current: int) -> void:
 					hero.state.clutches += 1
 					_dirty[peer_id] = true
 					_callout(peer_id, CLUTCH)
-			# Everyone's final numbers for the round, straight away.
+			# everyone's final numbers for the round, straight away
 			for player in NetworkManager.get_players():
 				_dirty[player.peer_id] = true
 			_flush()
 		GamePhase.Phase.MATCH_END, GamePhase.Phase.LOBBY:
-			# LOBBY after MATCH_END is a rematch: the host has just reset every
-			# player's numbers, and clients need to hear it now, not a round later.
+			# LOBBY after MATCH_END is a rematch: host just reset everyone's
+			# numbers, clients need to hear it now, not a round later
 			for player in NetworkManager.get_players():
 				_dirty[player.peer_id] = true
 			_flush()
@@ -214,7 +214,7 @@ func _is_authority() -> bool:
 	return not NetworkManager.is_online or multiplayer.is_server()
 
 
-## Human-readable callout text.
+## human-readable callout text
 static func callout_text(kind: StringName) -> String:
 	match kind:
 		FIRST_BLOOD: return "FIRST BLOOD"

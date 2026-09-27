@@ -1,39 +1,37 @@
 class_name PlayerState
 extends RefCounted
-## Everything we know about one player: who they are, which side they are on,
-## how much health they have, and how they are doing on the scoreboard.
+## everything we know about one player: identity, team, health, scoreboard.
 ##
-## Deliberately [b]not[/b] an autoload. Every player needs their own instance,
-## so a singleton would be wrong by definition. Each player node owns one, and
-## in Chapter 4 the network layer decides which peer is authoritative for it.
+## not an autoload - every player needs its own instance. each player node
+## owns one, and network code decides which peer is authoritative for it.
 ##
-## Being a plain object rather than a node means it can be created for a
-## remote player we have not even spawned a scene for yet.
+## plain object, not a node, so it can exist for a remote player before
+## we've even spawned a scene for them.
 
-## Health a player starts each life with.
+## health a player starts each life with.
 const MAX_HEALTH := 100
 
-## Network id of the peer controlling this player.
+## network id of the peer controlling this player.
 var peer_id: int = 0
 
-## Name shown on the scoreboard.
+## name shown on the scoreboard.
 var display_name: String = "Player"
 
-## Which side this player is on, a [enum Team.Side].
+## which side this player is on.
 var team: int = Team.Side.NONE
 
 var health: int = MAX_HEALTH
 var is_alive: bool = true
 
-## Shield points, absorbed before [member health]. Bought in the buy phase;
-## kept across rounds while alive, lost on death. Not restored by [method respawn].
+## shield points, absorbed before health. bought in the buy phase, kept
+## across rounds while alive, lost on death. not restored by respawn().
 var shield: int = 0
 
-## Credits for the buy menu. Host-authoritative; mirrored to clients.
+## credits for the buy menu. host-authoritative, mirrored to clients.
 var credits: int = 0
 
-## The bought primary weapon's id, or &"" when only the sidearm is carried.
-## Kept across rounds while the player survives; lost on death.
+## bought primary weapon's id, or "" if only carrying the sidearm.
+## kept across rounds while alive, lost on death.
 var primary_id: StringName = &""
 
 var kills: int = 0
@@ -50,11 +48,11 @@ var defuses: int = 0
 var aces: int = 0
 var clutches: int = 0
 
-## The player's level from their local profile, shown next to their name.
+## player's level from their local profile, shown next to their name.
 var level: int = 1
 
-## Whether the current death has been credited to the scoreboard yet. Guards
-## [method record_death] against double counting.
+## whether the current death has already been credited to the scoreboard.
+## guards record_death() against double counting.
 var _death_recorded: bool = false
 
 
@@ -62,7 +60,7 @@ func _init(p_peer_id: int = 0, p_display_name: String = "Player", p_team: int = 
 	setup(p_peer_id, p_display_name, p_team)
 
 
-## Fills in identity. Call once when the player slot is created.
+## fills in identity. call once when the player slot is created.
 func setup(p_peer_id: int, p_display_name: String, p_team: int = Team.Side.NONE) -> void:
 	peer_id = p_peer_id
 	display_name = p_display_name
@@ -78,10 +76,9 @@ func is_on_team(p_team: int) -> bool:
 	return team == p_team
 
 
-## Applies damage and returns how much was actually removed, shield and health
-## together. The shield soaks damage first; whatever is left comes off health.
-## A player at 1 health hit for 30 still only loses 1, so the caller can tell
-## the difference between "nearly dead" and "dead".
+## applies damage, returns how much was actually removed (shield + health).
+## shield soaks damage first, then health. a player at 1 hp hit for 30 still
+## only loses 1, so the caller can tell "nearly dead" from "dead".
 func apply_damage(amount: float) -> float:
 	if not is_alive or amount <= 0.0:
 		return 0.0
@@ -96,31 +93,24 @@ func apply_damage(amount: float) -> float:
 	return float(absorbed + before - health)
 
 
-## Restores health, never above [constant MAX_HEALTH]. Does not revive.
+## restores health, capped at MAX_HEALTH. does not revive.
 func heal(amount: float) -> void:
 	if amount <= 0.0:
 		return
 	health = mini(MAX_HEALTH, health + int(round(amount)))
 
 
-## Full reset back to [constant MAX_HEALTH] and alive. Keeps identity, team
-## and score, so it doubles as "start of a new round" and "spawn".
+## full reset to MAX_HEALTH and alive. keeps identity/team/score, so it
+## doubles as both "new round" and "spawn".
 func respawn() -> void:
 	health = MAX_HEALTH
 	is_alive = true
 	_death_recorded = false
 
 
-## Credits the death on the scoreboard, once.
-##
-## Guarded by its own flag rather than by [member is_alive], because reaching
-## zero health through [method apply_damage] already clears that - so checking
-## it here would silently refuse to credit a death caused by gunfire, and the
-## player would never appear on the scoreboard. Dying and being *counted* are
-## separate concerns and need separate guards.
-##
-## Returns false if this death was already recorded, so a double kill cannot
-## be counted twice.
+## credits the death on the scoreboard, once. guarded by its own flag rather
+## than is_alive (which apply_damage already clears), so dying and being
+## *counted* stay separate concerns. returns false if already recorded.
 func record_death() -> bool:
 	if _death_recorded:
 		return false
@@ -139,8 +129,8 @@ func record_assist() -> void:
 	assists += 1
 
 
-## Resets only the scoreboard numbers, leaving identity and health alone.
-## Used when a new match starts on the same players.
+## resets only the scoreboard numbers, leaves identity/health alone.
+## used when a new match starts on the same players.
 func reset_score() -> void:
 	kills = 0
 	deaths = 0
@@ -154,9 +144,9 @@ func reset_score() -> void:
 	clutches = 0
 
 
-## Combat score for the match: damage, plus a bonus per kill, assist and
-## objective play. Divided by rounds played this is the per-round figure the
-## scoreboard shows - it rewards impact, not just the last hit.
+## combat score: damage plus a bonus per kill, assist and objective play.
+## divided by rounds played, this is the per-round figure on the scoreboard -
+## rewards overall impact, not just the last hit.
 func combat_score() -> int:
 	return damage_dealt + kills * 150 + assists * 50 + (plants + defuses) * 50
 
@@ -165,12 +155,12 @@ func combat_score_per_round(rounds: int) -> int:
 	return int(round(float(combat_score()) / float(maxi(rounds, 1))))
 
 
-## Share of kills that were headshots, 0..100.
+## share of kills that were headshots, 0..100.
 func headshot_percent() -> int:
 	return int(round(100.0 * headshot_kills / maxf(kills, 1)))
 
 
-## Everything the scoreboard and the result screen need, as plain data for an RPC.
+## everything the scoreboard and result screen need, as plain data for an RPC.
 func stats_to_dict() -> Dictionary:
 	return {
 		"kills": kills, "deaths": deaths, "assists": assists,

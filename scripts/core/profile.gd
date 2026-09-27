@@ -1,22 +1,18 @@
 extends Node
-## The player's persistent profile: level, XP and career totals, saved to
-## [code]user://profile.cfg[/code]. Registered as the [code]Profile[/code]
-## autoload.
+## the player's persistent profile: level, xp and career totals, saved to
+## user://profile.cfg. autoload: Profile.
 ##
-## Progression is deliberately simple and always moving: every finished match
-## pays XP - more for winning and for playing well - and levels come quickly at
-## first and steadily after. A title marks every few levels. It is local to the
-## machine (there is no account server), so it is a motivator rather than a
-## competitive rank; nothing in a match depends on it except the level shown
-## beside your name.
+## every finished match pays xp (more for winning and playing well), levels
+## come quick at first then steady out, a title every few levels. local to
+## the machine only - no account server, so it's a motivator, not a rank.
 
 const PATH := "user://profile.cfg"
 
-## Emitted after a match result has been recorded.
+## fires after a match result has been recorded.
 signal changed
 
 var level: int = 1
-## XP into the current level.
+## xp into the current level.
 var xp: int = 0
 var matches: int = 0
 var wins: int = 0
@@ -42,7 +38,7 @@ const XP_MVP := 150
 const XP_ACE := 100
 const XP_CLUTCH := 75
 
-## Titles by level, lowest first.
+## titles by level, lowest first.
 const TITLES := [
 	[1, "Recruit"], [5, "Operative"], [10, "Specialist"], [15, "Veteran"],
 	[20, "Elite"], [30, "Vanguard"], [40, "Legend"],
@@ -53,7 +49,7 @@ func _ready() -> void:
 	_load()
 
 
-## XP needed to go from [param at_level] to the next.
+## xp needed to go from at_level to the next.
 static func xp_for_level(at_level: int) -> int:
 	return 1000 + 150 * (at_level - 1)
 
@@ -82,7 +78,7 @@ func headshot_rate() -> int:
 	return int(round(100.0 * headshot_kills / maxf(kills, 1)))
 
 
-## Records a finished match and pays its XP. Returns the breakdown for the
+## records a finished match and pays its xp. returns the breakdown for the
 ## result screen: {"lines": [[label, xp], ...], "total", "level_before",
 ## "xp_before", "level_after", "xp_after"}.
 func record_match(state: PlayerState, won: bool, rounds_won: int, rounds_played: int, was_mvp: bool) -> Dictionary:

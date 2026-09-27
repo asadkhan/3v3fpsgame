@@ -1,33 +1,27 @@
 class_name PlayerModel
 extends Node3D
-## The body other players see: a rigged soldier, animated from what the network
-## says this player is doing.
+## the body other players see: a rigged soldier animated from what the
+## network says this player is doing.
 ##
-## Character and animations: Mixamo's "Ch15" operator (urban camo, plate
-## carrier, helmet, goggles, mask) with Mixamo rifle animations, downloaded by
-## the project owner from mixamo.com. Falls back to the earlier soldiers
-## ("Military man" / "Solider" by madtrollstudio, CC BY 3.0, with Mesh2Motion
-## CC0 animations) if the Mixamo files are missing. Everything is retargeted
-## onto Godot's humanoid skeleton at import (bone maps in
-## [code]assets/characters/retarget/[/code]), so any animation plays on any
-## character.
+## uses Mixamo's "Ch15" operator model + rifle animations if present, else
+## falls back to the older soldier models with Mesh2Motion animations.
+## everything retargets onto Godot's humanoid skeleton at import (bone maps
+## in assets/characters/retarget/), so any animation plays on any character.
 ##
-## Animations are addressed by role ([constant ROLES]): the set in use maps each
-## role to a clip. Layers, bottom to top:
-## - legs: a 2D blend of idle, run, backpedal and strafes by the body's velocity
-##   in its own frame; the same for crouching; an in-air pose.
-## - upper body: for the fallback set, whose clips hold no rifle, a two-handed
-##   hold overridden onto the spine and arms. The Mixamo clips already hold one.
-## - [PlayerModelAim]: bends spine and neck with the aim pitch.
-## - two-bone IK: each hand onto the held gun's [code]HandR[/code] /
-##   [code]HandL[/code] marker, so the gun is really held whatever it is.
-## Death plays one of the falls and holds the last frame.
+## animations are addressed by role, mapped to a clip. layers bottom to top:
+## - legs: 2D blend of idle/run/backpedal/strafe by velocity, same for
+##   crouching, plus an in-air pose.
+## - upper body: fallback clips hold no rifle, so a two-handed hold gets
+##   overridden onto spine and arms. Mixamo clips already hold the gun.
+## - PlayerModelAim: bends spine/neck with aim pitch.
+## - two-bone IK: hands onto the held gun's HandR/HandL markers.
+## death plays one of the falls and holds the last frame.
 
 const MIXAMO_DIR := "res://assets/characters/mixamo/"
 const MIXAMO_MODEL := MIXAMO_DIR + "ch15_soldier.scn"
-## role -> [file, loops, strip travel]. Strip travel: the clip was exported
-## with root motion, so its forward drift is removed and the body's own
-## (networked) movement carries it instead.
+## role -> [file, loops, strip travel]. strip travel means the clip has root
+## motion baked in, so its forward drift gets removed and the networked
+## movement carries the body instead.
 const MIXAMO_ANIMS := {
 	&"idle": ["rifle_idle", true, false],
 	&"run": ["rifle_run", true, true],
@@ -61,23 +55,23 @@ const FALLBACK_ANIMS := {
 	&"hold": [&"Pistol_Aim_Neutral", true, false],
 }
 const DEATHS := [&"death_a", &"death_b", &"death_c"]
-## Bones the upper-body hold overrides (fallback set only).
+## bones the upper-body hold overrides (fallback set only).
 const UPPER_BONES := [&"Spine", &"Chest", &"UpperChest", &"Neck", &"Head",
 	&"LeftShoulder", &"LeftUpperArm", &"LeftLowerArm", &"LeftHand",
 	&"RightShoulder", &"RightUpperArm", &"RightLowerArm", &"RightHand"]
-## Team colour washed over the Mixamo operator's urban camo: cool grey-blue
+## team colour washed over the Mixamo operator's urban camo: cool grey-blue
 ## for Alpha, sand for Bravo.
 const TEAM_TINT := {
 	Team.Side.ALPHA: Color(0.66, 0.8, 1.0),
 	Team.Side.BRAVO: Color(1.0, 0.78, 0.52),
 	Team.Side.NONE: Color(1, 1, 1),
 }
-## Scale that puts the model's eyes at the player's eye height (1.62 m).
+## scale that puts the model's eyes at the player's eye height (1.62 m).
 const MODEL_SCALE := 0.98
 
 static var _library: AnimationLibrary = null
 static var _mixamo: int = -1
-## Metres per second the run clip covers at 1x, measured from its root motion.
+## metres per second the run clip covers at 1x, measured from its root motion.
 static var _run_speed: float = 3.3
 
 var skeleton: Skeleton3D = null
@@ -97,7 +91,7 @@ static func uses_mixamo() -> bool:
 	return _mixamo == 1
 
 
-## Builds (or rebuilds, on a team change) the soldier for [param team].
+## builds (or rebuilds, on a team change) the soldier for `team`.
 func build(team: int) -> void:
 	if team == _team and _model != null:
 		return
@@ -107,12 +101,12 @@ func build(team: int) -> void:
 		_model.queue_free()
 	var path: String = MIXAMO_MODEL if uses_mixamo() else FALLBACK_MODELS.get(team, FALLBACK_MODELS[Team.Side.NONE])
 	_model = (load(path) as PackedScene).instantiate() as Node3D
-	# Imported characters face +Z; the player faces -Z.
+	# imported characters face +Z; the player faces -Z.
 	_model.rotation.y = PI
 	_model.scale = Vector3.ONE * MODEL_SCALE
 	add_child(_model)
 	skeleton = _model.get_node("%GeneralSkeleton") as Skeleton3D
-	# The character's own preview animations are not ours to play.
+	# the character's own preview animations aren't ours to play.
 	for own: AnimationPlayer in _model.find_children("*", "AnimationPlayer", true, false):
 		own.queue_free()
 	for mesh: MeshInstance3D in _model.find_children("*", "MeshInstance3D", true, false):
@@ -164,8 +158,8 @@ func build(team: int) -> void:
 	_dead = false
 
 
-## A glowing band in the side's colour round each upper arm: the one thing
-## that tells a teammate from an enemy at a glance, from any angle, in shade.
+## glowing band in the team colour round each upper arm - tells teammate
+## from enemy at a glance, from any angle.
 func _add_armbands(team: int) -> void:
 	if team == Team.Side.NONE:
 		return
@@ -176,7 +170,7 @@ func _add_armbands(team: int) -> void:
 	material.emission = colour
 	material.emission_energy_multiplier = 1.4
 	material.roughness = 0.6
-	# The skeleton may carry the importer's scale; the band is sized in metres.
+	# skeleton may carry the importer's scale; the band is sized in metres.
 	var unit := 1.0 / maxf(skeleton.global_basis.get_scale().x, 0.0001)
 	for side in ["Left", "Right"]:
 		var bone := skeleton.find_bone("%sUpperArm" % side)
@@ -206,8 +200,8 @@ func _add_armbands(team: int) -> void:
 static var _tint_cache: Dictionary = {}
 
 
-## The operator's own textured material with the team colour washed over it,
-## matte like cloth rather than the importer's default.
+## operator's own textured material with team colour washed over it, matte
+## like cloth instead of the importer's default.
 static func _tinted(source: BaseMaterial3D, team: int) -> BaseMaterial3D:
 	var key := "%d_%d" % [source.get_instance_id(), team]
 	if not _tint_cache.has(key):
@@ -220,7 +214,7 @@ static func _tinted(source: BaseMaterial3D, team: int) -> BaseMaterial3D:
 	return _tint_cache[key]
 
 
-## Camouflage per side: woodland greens for Alpha, desert tans for Bravo.
+## camouflage per side: woodland greens for Alpha, desert tans for Bravo.
 const CAMO := {
 	Team.Side.ALPHA: [Color(0.3, 0.32, 0.2), Color(0.17, 0.19, 0.12), Color(0.4, 0.36, 0.26)],
 	Team.Side.BRAVO: [Color(0.72, 0.6, 0.42), Color(0.55, 0.43, 0.28), Color(0.82, 0.72, 0.55)],
@@ -229,8 +223,8 @@ const CAMO := {
 static var _kit_cache: Dictionary = {}
 
 
-## The worn-kit material ([code]soldier_cloth.gdshader[/code]) over the
-## model's flat atlas: fabric weave, team camouflage, dust towards the boots.
+## worn-kit material (soldier_cloth.gdshader) over the model's flat atlas:
+## fabric weave, team camo, dust towards the boots.
 static func _field_kit(atlas: Texture2D, team: int) -> ShaderMaterial:
 	var key := "%s_%d" % [atlas.resource_path, team]
 	if _kit_cache.has(key):
@@ -293,8 +287,8 @@ static func _shared_library() -> AnimationLibrary:
 	return _library
 
 
-## Removes the hips' steady travel across the ground from a root-motion clip,
-## keeping its sway and bob, and returns how far it had travelled.
+## removes the hips' steady travel across the ground from a root-motion clip
+## (keeping its sway/bob), returns how far it had travelled.
 static func _strip_travel(anim: Animation) -> float:
 	var track := anim.find_track(NodePath("%GeneralSkeleton:Hips"), Animation.TYPE_POSITION_3D)
 	if track < 0 or anim.track_get_key_count(track) < 2:
@@ -311,8 +305,8 @@ static func _strip_travel(anim: Animation) -> float:
 	return drift.length()
 
 
-## A copy of [param source] with only the skeleton's tracks: the source files
-## also animate their own armature node, which does not exist here.
+## copy of source with only the skeleton's tracks - the source files also
+## animate their own armature node, which doesn't exist here.
 static func _skeleton_only(source: Animation) -> Animation:
 	var anim := source.duplicate(true) as Animation
 	for i in range(anim.get_track_count() - 1, -1, -1):
@@ -379,9 +373,9 @@ static func _clip(anim_name: StringName) -> AnimationNodeAnimation:
 
 # --- Per frame ----------------------------------------------------------------------
 
-## [param local_velocity] is the body's velocity in its own frame (x right,
-## z back), [param crouch] 0 standing to 1 crouched, [param pitch] the aim in
-## radians (up positive), [param gun] the held third-person gun (or null).
+## local_velocity is the body's velocity in its own frame (x right, z back),
+## crouch is 0 standing to 1 crouched, pitch is aim in radians (up positive),
+## gun is the held third-person gun (or null).
 func update(delta: float, local_velocity: Vector3, crouch: float, airborne: bool, pitch: float,
 		gun: Node3D, walk_speed: float) -> void:
 	if _tree == null or _dead:
@@ -395,14 +389,14 @@ func update(delta: float, local_velocity: Vector3, crouch: float, airborne: bool
 	_smooth_f(&"parameters/crouch_mix/blend_amount", clampf(crouch, 0.0, 1.0), delta * 8.0)
 	_smooth_f(&"parameters/air/blend_amount", 1.0 if airborne else 0.0, delta * 6.0)
 	var two_handed := gun != null and gun.find_child("HandL", true, false) != null
-	# The fallback clips hold no rifle, so a two-handed hold goes over them;
-	# one-handed (the knife), the free arm swings with the legs instead.
+	# fallback clips hold no rifle, so a two-handed hold goes over them;
+	# one-handed (knife), the free arm just swings with the legs.
 	_smooth_f(&"parameters/upper/blend_amount", 1.0 if two_handed and not uses_mixamo() else 0.0, delta * 8.0)
 	_aim.pitch = pitch
 
 	if uses_mixamo():
-		# The clips hold a rifle properly with both hands: the gun goes into
-		# them instead of the arms being pulled onto the gun.
+		# clips already hold the rifle properly, so the gun goes into the
+		# hands instead of pulling the arms onto the gun.
 		for ik in _iks:
 			ik.influence = 0.0
 		_mount_gun(gun, two_handed)
@@ -410,8 +404,8 @@ func update(delta: float, local_velocity: Vector3, crouch: float, airborne: bool
 		_place_hands(gun, two_handed)
 
 
-## Puts [param gun] in the animated hands: its grip in the right hand, its
-## barrel running through the left (one-handed, along the aim).
+## puts gun in the animated hands: grip in the right hand, barrel running
+## through the left (or along the aim if one-handed).
 func _mount_gun(gun: Node3D, two_handed: bool) -> void:
 	if gun == null or skeleton == null:
 		return
@@ -462,7 +456,7 @@ func _place_hands(gun: Node3D, two_handed: bool) -> void:
 		var target := _ik_targets[i * 2]
 		var pole := _ik_targets[i * 2 + 1]
 		target.global_position = marker.global_position
-		# The elbow points outwards and down, as a rifle is really held.
+		# elbow points outwards and down, like a rifle is really held.
 		var side := 1.0 if i == 0 else -1.0
 		pole.global_position = marker.global_position + global_basis * Vector3(0.35 * side, -0.45, 0.25)
 
@@ -490,7 +484,7 @@ func play_death(clip_override: StringName = &"") -> void:
 	var clip: StringName = clip_override if clip_override != &"" else DEATHS[randi() % DEATHS.size()]
 	if not _player.has_animation(clip):
 		clip = &"death_c"
-	# Not looping (set on load), so it holds the last frame.
+	# not looping (set on load), so it holds the last frame.
 	_player.play(clip, 0.1)
 
 

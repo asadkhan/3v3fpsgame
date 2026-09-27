@@ -1,25 +1,23 @@
 class_name Team
 extends RefCounted
-## The two sides of a match.
+## the two sides of a match.
 ##
-## This lives in its own tiny script so that [PlayerState] and [MatchState]
-## can both talk about teams without either of them depending on the other.
-## Add more values here if the game ever grows past two sides.
+## kept separate so PlayerState and MatchState can both talk about teams
+## without depending on each other. add more sides here if that ever happens.
 
 enum Side {
-	NONE,   ## Not assigned to a team yet.
-	ALPHA,  ## Team 1.
-	BRAVO,  ## Team 2.
+	NONE,   ## no team yet.
+	ALPHA,  ## team 1.
+	BRAVO,  ## team 2.
 }
 
-## Every side a player can actually be assigned to. Used when filling a lobby.
-## Typed as ints rather than as [enum Side] on purpose: a script-local enum
-## used as a type annotation does not match `Team.Side` when it is passed in
-## from another script, so cross-script enums are declared as plain ints.
+## sides a player can actually be put on (used when filling a lobby).
+## plain ints, not enum Side, because a script-local enum type doesn't
+## match Team.Side coming in from another script.
 const ASSIGNABLE: Array[int] = [Side.ALPHA, Side.BRAVO]
 
 
-## Turns a [enum Side] value into something printable in the UI and console.
+## printable name for a side.
 static func side_name(side: int) -> String:
 	match side:
 		Side.ALPHA:
@@ -30,7 +28,7 @@ static func side_name(side: int) -> String:
 			return "NONE"
 
 
-## The other side. Returns [constant Side.NONE] for unassigned players.
+## the other side. unassigned players get NONE back.
 static func opposing_side(side: int) -> int:
 	match side:
 		Side.ALPHA:

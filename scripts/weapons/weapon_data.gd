@@ -1,259 +1,207 @@
 class_name WeaponData
 extends Resource
-## The stats for one weapon. Data only - no firing logic lives here.
+## the stats for one weapon. data only - no firing logic lives here.
 ##
-## [b]Why this is a Resource and not a RefCounted:[/b] the other three data
-## types ([PlayerState], [MatchState], [Team]) are runtime state that changes
-## as the game runs, so [RefCounted] is right for them. A weapon's stats never
-## change during a match, and they are authored by hand in the editor and
-## saved to [code]res://data/[/code] as [code].tres[/code] files. That is
-## precisely what a [Resource] is for: it shows up in the Inspector, it can be
-## saved and loaded from disk, and one instance can be shared by every player
-## using that weapon instead of being rebuilt per spawn.
+## it's a Resource (not RefCounted) because these numbers never change during
+## a match and are authored by hand in the editor, saved as .tres files.
+## one instance is shared by every player using that weapon.
 ##
-## [b]Why there is no behaviour here:[/b] Chapter 3 adds firing, recoil,
-## reloads and ballistics. Keeping [b]what a weapon is[/b] separate from
-## [b]what a weapon does[/b] is what lets the weapon logic be written and
-## tested against plain numbers, and it means rebalancing is an edit to a
-## [code].tres[/code] file rather than a change to code.
+## to make one: FileSystem dock -> right-click res://data/ -> New Resource ->
+## WeaponData. see res://data/weapons/halberd.tres for an example.
 ##
-## [b]Creating one:[/b] in the FileSystem dock, right-click [code]res://data/[/code]
-## -> Create New -> Resource, search for [b]WeaponData[/b], then fill in the
-## Inspector. See [code]res://data/weapons/halberd.tres[/code] for a
-## filled-in example.
-##
-## [b]Warning - do not change these values at runtime.[/b] [method load] is
-## cached, so every player holding the Halberd gets the [b]same[/b] instance,
-## not a copy. Writing [code]weapon.damage = 50[/code] would silently buff
-## everyone using that weapon, and the change would not be saved. Per-player
-## state that genuinely does change - ammo in the magazine, whether the trigger
-## is held, current recoil - belongs in a separate runtime object in Chapter 3,
-## not on this class. Use [method Resource.duplicate] if a private copy is
-## genuinely needed.
+## warning: don't change these values at runtime. load() caches resources, so
+## every player holding the same weapon shares one instance - writing
+## weapon.damage = 50 would silently buff everyone and never get saved.
+## per-player state (ammo, trigger held, current recoil) lives on the
+## runtime Weapon object instead. duplicate() if you genuinely need a copy.
 
-## How a weapon is fired. Determines whether holding the trigger keeps
-## shooting, which the trigger logic in Chapter 3 will branch on.
+## how a weapon is fired - whether holding the trigger keeps shooting.
 enum FireMode {
-	SEMI_AUTO, ## One shot per click. Player must release and re-click.
-	AUTO,      ## Keeps firing while the trigger is held.
-	BURST,     ## Fires a fixed group per click. Added in Chapter 3.
+	SEMI_AUTO, ## one shot per click, must release and re-click.
+	AUTO,      ## keeps firing while the trigger is held.
+	BURST,     ## fires a fixed group per click.
 }
 
-## Broad category. Chapter 5's buy menu and any future AI use this to decide
-## what a weapon is for; it is not a behaviour switch.
+## broad category, used by the buy menu to sort/label - not a behaviour switch.
 enum Category {
-	PISTOL, ## Cheap sidearm. Always available, low damage.
-	SUBMACHINE_GUN, ## High rate of fire, low range and damage.
-	RIFLE, ## The general-purpose full auto weapon.
-	SNIPER, ## Slow, very high damage, needs a scope.
-	SHOTGUN, ## Many pellets, huge falloff. Defined here, implemented later.
-	HEAVY, ## Slow, high damage, expensive.
+	PISTOL, ## cheap sidearm, always available, low damage.
+	SUBMACHINE_GUN, ## high rate of fire, low range and damage.
+	RIFLE, ## the general-purpose full auto weapon.
+	SNIPER, ## slow, very high damage, needs a scope.
+	SHOTGUN, ## many pellets, huge falloff.
+	HEAVY, ## slow, high damage, expensive.
 }
 
 # --- Identity -----------------------------------------------------------
 
-## Stable identifier used in saves, the network, and the buy menu. Keep it
-## lowercase and unique; never show this to a player.
+## stable id used in saves, network and buy menu. lowercase, unique, never
+## shown to a player.
 @export var weapon_id: StringName = &""
 
-## Name shown in the HUD and buy menu. This is player-facing, so it should be
-## the weapon's real name in the game, not a placeholder.
+## name shown in the hud and buy menu - the weapon's real name, not a placeholder.
 @export var display_name: String = "Unnamed"
 
 @export var category: Category = Category.RIFLE
 
 # --- Damage -------------------------------------------------------------
 
-## Damage at point-blank range, before falloff.
+## damage at point-blank range, before falloff.
 @export var damage: float = 25.0
 
-## Multiplier applied when the shot lands on the head. A value of 2.0 means a
-## headshot does double damage.
+## headshot damage multiplier. 2.0 = double damage.
 @export var headshot_multiplier: float = 2.0
 
-## The fraction of [member damage] still dealt at maximum range. 0.5 means a
-## shot at maximum range does half damage. 1.0 disables falloff.
+## fraction of damage still dealt at max range. 0.5 = half damage at max
+## range. 1.0 disables falloff.
 @export_range(0.0, 1.0, 0.05) var falloff_multiplier: float = 0.5
 
-## Distance in metres at which [member falloff] reaches full effect. Beyond
-## this the weapon does [member falloff_multiplier] x [member damage].
+## distance in metres where falloff reaches full effect.
 @export var max_range: float = 50.0
 
 # --- Fire behaviour -----------------------------------------------------
 
 @export var fire_mode: FireMode = FireMode.AUTO
 
-## Seconds between shots. A value of 0.1 is 600 rounds per minute. A
-## designer-facing rounds-per-minute field is deliberately left out: it is the
-## same number with a worse rounding error, and two ways to say one thing is
-## how balance values drift apart.
+## seconds between shots. 0.1 = 600 rounds per minute. (no separate rpm
+## field - it's the same number with worse rounding, keep one source of truth.)
 @export_range(0.01, 2.0, 0.01) var fire_interval: float = 0.1
 
-## Shots per trigger pull in [constant FireMode.BURST].
+## shots per trigger pull in burst mode.
 @export_range(1, 10) var burst_count: int = 3
 
-## Cone half-angle in degrees that shots can land in, from straight down the
-## crosshair. 0.0 is perfect accuracy; higher values are worse. Chapter 3
-## turns this into actual aim deviation.
+## cone half-angle in degrees shots can land in. 0 = perfect accuracy,
+## higher = worse.
 @export_range(0.0, 10.0, 0.1) var spread_degrees: float = 0.5
 
 # --- Ammunition ---------------------------------------------------------
 
-## Rounds loaded per magazine.
+## rounds loaded per magazine.
 @export_range(1, 100) var magazine_size: int = 30
 
-## Seconds to complete a reload.
+## seconds to complete a reload.
 @export_range(0.0, 10.0, 0.1) var reload_time: float = 2.5
 
-## [b]No reserve ammo count on purpose.[/b] In a round-based tactical shooter
-## players re-buy at the start of every round, so a per-match reserve would be
-## a stat that is never meaningfully consulted. If the design later adds a
-## limited-ammo mode, that is the moment to add it - and it belongs here
-## rather than being tracked per player.
-##
-## This was re-confirmed when Chapter 3 was specified: reserve ammunition is
-## infinite for now. The [Weapon] runtime object still exposes a
-## [member Weapon.reserve_ammo] slot, so a finite-reserve mode can be switched
-## on later without reshaping the weapon API.
+## no reserve ammo count on purpose - players re-buy every round, so reserve
+## ammo is infinite for now. Weapon still exposes reserve_ammo so a
+## limited-ammo mode could be added later without reshaping the api.
 
 # --- Economy ------------------------------------------------------------
 
-## Cost in the buy menu, Chapter 5. Zero means it cannot be bought and is
-## issued automatically.
+## buy menu cost. zero means it can't be bought and is issued automatically.
 @export var price: int = 0
 
 # --- Recoil -------------------------------------------------------------
-# Added in Chapter 3. Chapter 1 authored the damage, ballistics and ammunition
-# numbers but had no field for recoil, because recoil is a firing behaviour
-# rather than a statistic - and at the time nothing fired. It belongs here for
-# the same reason [member damage] does: it is a per-weapon balance number a
-# designer sets in the Inspector, not something the firing code should invent.
 
-## How far one shot kicks the camera upwards, in degrees. Applied as a decaying
-## offset on top of the player's own aim rather than by rotating the player, so
-## the view always returns to where the player was actually looking. See
-## [method Player.add_recoil].
+## how far one shot kicks the camera upwards, in degrees. applied as a
+## decaying offset on top of the player's own aim, so the view always
+## returns to where they were actually looking. see Player.add_recoil.
 @export_range(0.0, 10.0, 0.05) var recoil_kick_degrees: float = 0.7
 
-## Random sideways jitter per shot, in degrees, on top of the pattern.
+## random sideways jitter per shot, in degrees, on top of the pattern.
 @export_range(0.0, 5.0, 0.05) var recoil_yaw_degrees: float = 0.25
 
-## The spray pattern (see [method recoil_pattern]). Learnable on purpose: the
-## first [member recoil_vertical_shots] rounds climb straight up by
-## [member recoil_kick_degrees] each, to at most [member recoil_max_pitch];
-## after that the spray sways side to side by up to [member recoil_sway_degrees]
-## in the same shape every time, so it can be learned and pulled against.
+## spray pattern (see recoil_pattern): first recoil_vertical_shots rounds
+## climb straight up by recoil_kick_degrees each, up to recoil_max_pitch;
+## after that it sways side to side by up to recoil_sway_degrees, same
+## shape every time, so it's learnable and can be pulled against.
 @export_range(0, 30) var recoil_vertical_shots: int = 6
-## The opening rounds of a spray barely climb (each kicks this fraction of
-## [member recoil_kick_degrees]), so tapping and short bursts stay on target.
+## opening rounds of a spray barely climb (each kicks this fraction of
+## recoil_kick_degrees), so taps and short bursts stay on target.
 @export_range(0, 10) var recoil_flat_shots: int = 2
 @export_range(0.0, 1.0, 0.05) var recoil_flat_scale: float = 0.2
 @export_range(0.0, 20.0, 0.1) var recoil_max_pitch: float = 5.0
 @export_range(0.0, 10.0, 0.05) var recoil_sway_degrees: float = 1.2
-## How much of the pattern moves the camera; the rest moves the bullets away
-## from the crosshair, so a spray climbs above where the crosshair sits.
+## how much of the pattern moves the camera vs. the bullets, so a spray
+## climbs above where the crosshair sits.
 @export_range(0.0, 1.0, 0.05) var recoil_view_fraction: float = 0.55
-## Seconds off the trigger for the pattern to reset to the first shot.
+## seconds off the trigger for the pattern to reset to the first shot.
 @export_range(0.05, 2.0, 0.01) var recoil_reset_time: float = 0.35
-## Extra spread per round of a spray, in degrees, up to [member spray_bloom_max]
-## - the first shot is as accurate as [member spread_degrees] allows.
+## extra spread per round of a spray, in degrees, up to spray_bloom_max -
+## first shot is as accurate as spread_degrees allows.
 @export_range(0.0, 2.0, 0.01) var spray_bloom: float = 0.1
 @export_range(0.0, 10.0, 0.05) var spray_bloom_max: float = 1.5
-## How hard the gun rears up in the hands per shot, in degrees, and how much the
-## camera shakes. The heavier the gun, the bigger both.
+## how hard the gun rears up in the hands per shot, and how much the camera
+## shakes. heavier gun = bigger both.
 @export_range(0.0, 20.0, 0.1) var viewmodel_kick_degrees: float = 3.0
 @export_range(0.0, 2.0, 0.05) var camera_shake: float = 0.3
 
-## How quickly the camera returns to the player's true aim, in degrees per
-## second. Fast recovery keeps a burst from permanently walking the view off
-## target, which is the "uncontrollable recoil" the Chapter 3 brief rules out.
+## how fast the camera returns to true aim, degrees per second. higher =
+## snappier recovery, keeps a burst from permanently walking the view off target.
 @export_range(1.0, 180.0, 1.0) var recoil_recovery_degrees: float = 55.0
 
-## How far the viewmodel is pushed back along its own axis when fired, in
-## metres. Purely cosmetic - the muzzle flash and the tracer are what tell the
-## player a shot happened.
+## how far the viewmodel pushes back along its axis when fired, in metres.
+## purely cosmetic.
 @export_range(0.0, 0.3, 0.005) var viewmodel_kick: float = 0.045
 
 # --- Movement penalty ---------------------------------------------------
-# Also a Chapter 3 addition, and also per-weapon because the Chapter 3 brief
-# lists it as one of the things that should differ between weapons.
 
-## Multiplier applied to the player's movement speed while this weapon is
-## equipped. 1.0 is no penalty. Values below 1.0 make carrying a heavy weapon a
-## real cost without touching the player's own speed exports.
+## movement speed multiplier while this weapon is equipped. 1.0 = no penalty,
+## below 1.0 makes a heavy weapon cost something.
 @export_range(0.1, 1.0, 0.01) var move_speed_multiplier: float = 0.95
 
-## Whether holding this weapon prevents sprinting. A rifle that can be
-## sprint-fired and a rifle that cannot are very different weapons, and that
-## should be a decision in the data rather than an if-statement in the player.
+## whether holding this weapon prevents sprinting.
 @export var blocks_sprint: bool = false
 
 # --- Aiming down sights -------------------------------------------------------
-# A precision option, not a requirement: a light zoom that tightens the spread
-# and steadies the recoil, paid for with slower movement (and, on some weapons,
-# a slightly slower fire rate). Hip fire stays viable. Each value is a
-# multiplier applied at full aim, blended in over [member ads_time].
+# a light zoom that tightens spread and steadies recoil, paid for with slower
+# movement (and sometimes slower fire rate). hip fire stays viable. each
+# value is a multiplier at full aim, blended in over ads_time.
 
-## Field-of-view magnification while aimed. 1.0 = no zoom.
+## fov magnification while aimed. 1.0 = no zoom.
 @export_range(1.0, 4.0, 0.05) var ads_zoom: float = 1.2
 
-## Seconds to go from hip to fully aimed (and back).
+## seconds to go from hip to fully aimed (and back).
 @export_range(0.0, 1.0, 0.01) var ads_time: float = 0.15
 
-## Spread while aimed, as a fraction of [member spread_degrees].
+## spread while aimed, as a fraction of spread_degrees.
 @export_range(0.0, 1.0, 0.05) var ads_spread_multiplier: float = 0.5
 
-## Recoil kick while aimed, as a fraction of the hip kick.
+## recoil kick while aimed, as a fraction of the hip kick.
 @export_range(0.0, 1.0, 0.05) var ads_recoil_multiplier: float = 0.8
 
-## Movement speed while aimed, on top of [member move_speed_multiplier].
+## movement speed while aimed, on top of move_speed_multiplier.
 @export_range(0.1, 1.0, 0.01) var ads_move_multiplier: float = 0.76
 
-## Time between shots while aimed, as a multiple of [member fire_interval].
-## Above 1.0 fires slower.
+## time between shots while aimed, as a multiple of fire_interval. above
+## 1.0 fires slower.
 @export_range(0.5, 2.0, 0.01) var ads_fire_interval_multiplier: float = 1.0
 
-## Where the weapon moves while aimed, relative to its hip position: towards
-## the centre of the screen and slightly closer. Tuned per model so its sights
-## line up with the crosshair.
+## where the weapon moves while aimed, relative to hip position: towards
+## screen centre and slightly closer. tuned per model to line sights up
+## with the crosshair.
 @export var ads_viewmodel_offset: Vector3 = Vector3(-0.22, 0.03, 0.02)
 
 # --- Presentation -------------------------------------------------------------
 
-## The weapon's model scene (see [code]scenes/weapons/models/[/code]): the mesh
-## turned to point down -Z at real-world scale, with a [code]Muzzle[/code]
-## marker where tracers and the flash start and a [code]Sight[/code] marker
-## that aiming lines up with the eye. Used for the first-person viewmodel and
-## for the gun other players see in this player's hands. Null keeps the
-## placeholder block model.
+## the weapon's model scene (scenes/weapons/models/): mesh pointing down -Z
+## at real-world scale, with a Muzzle marker for tracers/flash and a Sight
+## marker aiming lines up with. used for both the first-person viewmodel and
+## the gun other players see. null keeps the placeholder block model.
 @export var viewmodel_scene: PackedScene
 
-## How far in front of the eye the [code]Sight[/code] marker sits when fully
-## aimed, in metres. With a Sight marker this replaces
-## [member ads_viewmodel_offset] - the alignment is computed from the model.
+## how far in front of the eye the Sight marker sits when fully aimed, in
+## metres. with a Sight marker this replaces ads_viewmodel_offset.
 @export_range(0.05, 0.6, 0.01) var ads_sight_distance: float = 0.26
 
-## Aiming shows a scope overlay (reticle and dark surround) and hides the
-## weapon model once fully aimed - for guns fitted with a magnified scope.
+## aiming shows a scope overlay (reticle + dark surround) and hides the
+## weapon model once fully aimed - for scoped guns.
 @export var scope_overlay: bool = false
 
 @export_group("Melee")
-## A blade rather than a gun: no ammo, no reload, no tracer. The primary attack
-## ([member damage], [member fire_interval]) is a quick slash; the alternate
-## (right mouse) is a heavy stab. Both reach [member max_range] and land
-## partway through the swing, not on the click.
+## a blade instead of a gun: no ammo, no reload, no tracer. primary attack
+## (damage, fire_interval) is a quick slash; alternate (right mouse) is a
+## heavy stab. both reach max_range and land partway through the swing.
 @export var is_melee: bool = false
 @export var heavy_damage: float = 80.0
 @export var heavy_interval: float = 1.0
-## Seconds from the click to the blade connecting.
+## seconds from the click to the blade connecting.
 @export var melee_hit_delay: float = 0.12
 @export var heavy_hit_delay: float = 0.36
-## Damage multiplier from behind (the victim facing away from the attacker).
+## damage multiplier from behind (victim facing away from attacker).
 @export var backstab_multiplier: float = 2.0
 
 
-## Whether this weapon can be picked in a buy menu at all.
-## Where the [param shot]-th round of a spray goes (0 is the first), as
+## where the shot-th round of a spray goes (0 is the first), as
 ## (pitch up, yaw right) in degrees off the aim.
 func recoil_pattern(shot: float) -> Vector2:
 	var flat := float(recoil_flat_shots)
@@ -262,7 +210,7 @@ func recoil_pattern(shot: float) -> Vector2:
 	var climb := minf(lifted, float(recoil_vertical_shots)) * recoil_kick_degrees
 	var over := maxf(shot - float(recoil_vertical_shots), 0.0)
 	var pitch := minf(climb + over * recoil_kick_degrees * 0.12, recoil_max_pitch)
-	# One slow swing each way then back, the same every spray: right first.
+	# one slow swing each way then back, same every spray: right first.
 	var yaw := recoil_sway_degrees * sin(over * 0.55) if over > 0.0 else 0.0
 	return Vector2(pitch, yaw)
 
@@ -271,40 +219,34 @@ func is_buyable() -> bool:
 	return price > 0
 
 
-## Damage dealt at [param distance] metres, after linear falloff. This is the
-## one piece of maths kept on the data class, because both the shot logic in
-## Chapter 3 and the HUD's range indicator need to agree on the answer, and
-## two copies of a formula always drift apart.
+## damage dealt at distance metres, after linear falloff. kept here so the
+## shot logic and the hud's range indicator always agree.
 func damage_at_distance(distance: float) -> float:
 	if distance <= 0.0 or max_range <= 0.0:
 		return damage
 
-	# Clamped so shots past max_range stop losing health rather than going
-	# negative and healing the target.
+	# clamped so shots past max_range stop losing health instead of healing
+	# the target.
 	var t: float = clampf(distance / max_range, 0.0, 1.0)
 	return damage * lerpf(1.0, falloff_multiplier, t)
 
 
-## Rounds per minute, for display. Derived from [member fire_interval] rather
-## than stored, so the two can never disagree.
+## rounds per minute, for display. derived from fire_interval so they can
+## never disagree.
 func rounds_per_minute() -> float:
 	return 60.0 / maxf(fire_interval, 0.0001)
 
 
-## Rough cost-to-damage ratio, useful when balancing the roster in Chapter 5.
-## Deliberately crude - it compares raw damage only, and ignores fire rate,
-## accuracy and range, so treat it as a starting point for questions rather
-## than an answer.
+## rough cost-to-damage ratio for balancing. crude - ignores fire rate,
+## accuracy and range.
 func value_per_damage() -> float:
 	if damage <= 0.0:
 		return 0.0
 	return float(price) / damage
 
 
-## Fills in anything left blank and warns about values that will not work.
-## Call this when loading a weapon so a typo in a .tres file is reported once,
-## where it can be found, rather than surfacing later as a weapon that will
-## not fire.
+## warns about values that won't work. call when loading a weapon so a typo
+## in a .tres file is caught here instead of surfacing as a gun that won't fire.
 func validate() -> bool:
 	var ok := true
 

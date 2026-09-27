@@ -1,9 +1,9 @@
 class_name HudPauseMenu
 extends PanelContainer
-## The Esc menu: shown whenever the mouse is released during a match. The game
-## keeps running underneath - this is a multiplayer game, nothing pauses.
-## Holds the two settings players reach for first (sensitivity and field of
-## view, saved through [GameConfig]) and the way out of the match.
+## the esc menu: shown whenever the mouse is released during a match. game
+## keeps running underneath - multiplayer, nothing actually pauses. holds
+## the settings players reach for first (sensitivity, fov, saved via
+## GameConfig) plus the way out of the match.
 
 var _sensitivity: HSlider
 var _sensitivity_value: Label
@@ -96,7 +96,7 @@ func _ready() -> void:
 
 
 func _slider_row(parent: Control, title: String) -> Array:
-	# Saved once the drag ends, not on every step of it.
+	# saved once the drag ends, not on every step.
 	var header := HBoxContainer.new()
 	parent.add_child(header)
 	var name_label := UITheme.label(title, UITheme.SIZE_SMALL, UITheme.TEXT)
@@ -149,8 +149,8 @@ func _on_resume() -> void:
 		player.capture_mouse(true)
 
 
-## Visible while the mouse is free, except where another panel already offers
-## the same way out (the match result screen).
+## visible while the mouse is free, except where another panel already
+## offers the same way out (the match result screen).
 func update_view() -> void:
 	var in_match := not GameManager.is_in(GamePhase.Phase.MAIN_MENU)
 	visible = in_match and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED \

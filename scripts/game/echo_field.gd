@@ -1,75 +1,71 @@
 class_name EchoField
 extends Node3D
-## The Echo Field - a tactical reconnaissance mechanic (Chapter 6).
+## a tactical recon gadget: drops a field that detects and records nearby
+## activity (movement, shooting, objective interaction) and turns it into
+## short-lived echo indicators.
 ##
-## When deployed, creates a temporary field that detects and records
-## relevant activity (movement, shooting, objective interaction) within
-## its radius. The field then produces short-lived "echo" indicators
-## showing approximate location and type of activity.
+## server-authoritative: detection runs on the host (or locally offline).
+## one field per player, child of the Player scene.
 ##
-## Server-authoritative: all detection logic runs on the host (or locally when
-## offline). One field per player, instanced as a child of the [Player] scene.
+## two gotchas with its placement:
+## - it's top_level, so once dropped it stays put instead of following
+##   the player.
+## - multiplayer authority is inherited from the owning client, so the
+##   host's state broadcast can't be an `authority` rpc - it's `any_peer`
+##   with an explicit check that the host sent it.
 ##
-## [b]Two things about its placement that are easy to get wrong.[/b]
-## - It is [member Node3D.top_level], so once dropped it stays where it was put
-##   instead of following the player that carries it around.
-## - Its multiplayer authority is inherited from the player, i.e. the owning
-##   client. So the host's state broadcast cannot be an `authority` RPC - it is
-##   `any_peer` with an explicit check that the host sent it, the same pattern
-##   [method Player._confirm_shot] uses.
-##
-## [b]Not done yet (Chapter 6 work):[/b] echoes are detected and stored, but no
-## UI draws them and they are not sent to the owning team's clients.
+## not done yet: echoes are detected and stored, but nothing draws them
+## and they aren't sent to the owning team's clients.
 
-## Emitted when an echo event is recorded (for UI/haptic feedback). Server only.
+## emitted when an echo event is recorded (for ui/haptic feedback). server only.
 signal echo_detected(event_type: int, position: Vector3, timestamp: float)
 
-## Emitted when the field expires naturally.
+## emitted when the field expires naturally.
 signal field_expired
 
-## Emitted when the field is deployed.
+## emitted when the field is deployed.
 signal field_deployed(position: Vector3, owner_peer_id: int)
 
-## Group every field joins, so shots can be reported to fields in range.
+## group every field joins, so shots can be reported to fields in range.
 const GROUP := &"echo_fields"
 
-## Activity type constants
+## activity type constants
 const ECHO_MOVEMENT = 0
 const ECHO_SHOOTING = 1
 const ECHO_OBJECTIVE = 2
 const ECHO_ABILITY = 3
 
-## How long the field stays active, in seconds.
+## how long the field stays active, in seconds.
 @export_range(2.0, 30.0) var duration: float = 8.0
 
-## Detection radius, in metres.
+## detection radius, in metres.
 @export_range(3.0, 20.0) var detection_radius: float = 10.0
 
-## Cooldown between deployments, in seconds.
+## cooldown between deployments, in seconds.
 @export_range(5.0, 60.0) var cooldown: float = 25.0
 
-## How long each echo marker remains visible, in seconds.
+## how long each echo marker stays visible, in seconds.
 @export_range(0.5, 5.0) var echo_lifetime: float = 2.0
 
-## Team that owns this field (for filtering).
+## team that owns this field (for filtering).
 var owning_team: int = Team.Side.NONE
 
-## Peer ID of the player who deployed this field.
+## peer id of the player who deployed this field.
 var owner_peer_id: int = 0
 
-## Whether the field is currently active.
+## whether the field is currently active.
 var is_active: bool = false
 
-## Remaining time on the field.
+## remaining time on the field.
 var time_remaining: float = 0.0
 
-## Cooldown timer.
+## cooldown timer.
 var _cooldown_remaining: float = 0.0
 
-## Detected echo events waiting to be displayed.
+## detected echo events waiting to be displayed.
 var _pending_echoes: Array[Dictionary] = []
 
-## Visual representation.
+## visual representation.
 var _field_mesh: MeshInstance3D = null
 var _detection_area: Area3D = null
 var _pulse_phase: float = 0.0
@@ -77,14 +73,14 @@ var _pulse_phase: float = 0.0
 
 func _ready() -> void:
 	name = "EchoField"
-	# Detached from the carrying player's transform; see the class notes.
+	# detached from the carrying player's transform; see the class notes.
 	top_level = true
 	add_to_group(GROUP)
 	_build_field()
 
 
 func _build_field() -> void:
-	# Visual field boundary
+	# visual field boundary
 	var mesh_instance := MeshInstance3D.new()
 	mesh_instance.name = "FieldMesh"
 
@@ -96,8 +92,8 @@ func _build_field() -> void:
 
 	var material := StandardMaterial3D.new()
 	material.albedo_color = Color(0.2, 0.8, 1.0, 0.3)
-	# Alpha blending and emission have to be switched on explicitly; the pulse
-	# below animates both and did nothing while they were off.
+	# alpha blending and emission need to be on explicitly, or the pulse
+	# below animates nothing.
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.emission_enabled = true
@@ -109,7 +105,7 @@ func _build_field() -> void:
 	add_child(mesh_instance)
 	_field_mesh = mesh_instance
 
-	# Detection area
+	# detection area
 	_detection_area = Area3D.new()
 	_detection_area.name = "DetectionArea"
 	_detection_area.collision_layer = 0
@@ -141,7 +137,7 @@ func _process(delta: float) -> void:
 
 	time_remaining = maxf(time_remaining - delta, 0.0)
 
-	# Pulse animation
+	# pulse animation
 	_pulse_phase += delta * 3.0
 	if _field_mesh != null:
 		var pulse := sin(_pulse_phase) * 0.2 + 0.8
@@ -150,7 +146,7 @@ func _process(delta: float) -> void:
 			mat.albedo_color = Color(0.2, 0.8, 1.0, pulse * 0.3)
 			mat.emission_energy_multiplier = pulse * 2.0
 
-	# Fade out stored echoes
+	# fade out stored echoes
 	var i := _pending_echoes.size() - 1
 	while i >= 0:
 		_pending_echoes[i]["lifetime"] = float(_pending_echoes[i]["lifetime"]) - delta
@@ -158,20 +154,18 @@ func _process(delta: float) -> void:
 			_pending_echoes.remove_at(i)
 		i -= 1
 
-	# Expiry is decided by the authority, which tells everyone else.
+	# expiry is decided by the authority, which tells everyone else.
 	if time_remaining <= 0.0 and _is_authority():
 		_deactivate()
 
 
 # --- Deployment -----------------------------------------------------------
 
-## Asks to deploy the field at [param position]. Called by the owning player on
-## its own machine; routes to whoever is authoritative.
+## asks to deploy the field at position. called by the owning player on its
+## own machine; routes to whoever is authoritative.
 ##
-## The host (and offline play) validates immediately. A client sends the request
-## to the host - previously it called the handler directly, which on a client
-## returned at the server check and on the host looked up "remote sender 0",
-## so the field could never be deployed online by anyone.
+## host (and offline play) validates immediately. a client sends the
+## request to the host instead of calling the handler directly.
 func request_deploy(position: Vector3) -> void:
 	if _is_authority():
 		_server_deploy(_owner_peer(), position)
@@ -186,13 +180,13 @@ func _rpc_request_deploy(position: Vector3) -> void:
 	_server_deploy(multiplayer.get_remote_sender_id(), position)
 
 
-## Validation and activation. Authority only.
+## validation and activation. authority only.
 func _server_deploy(sender: int, position: Vector3) -> void:
 	var player := get_parent() as Player
 	if player == null or not player.state.is_alive:
 		return
 
-	# A peer may only deploy their own field.
+	# a peer may only deploy their own field.
 	if NetworkManager.is_online and sender != player.peer_id:
 		push_warning("EchoField: peer %d tried to deploy player %d's field; refused." % [
 			sender, player.peer_id])
@@ -201,7 +195,7 @@ func _server_deploy(sender: int, position: Vector3) -> void:
 	if _cooldown_remaining > 0.0 or is_active:
 		return
 
-	# Must land on the floor, and not somewhere far from the player.
+	# must land on the floor, and not somewhere far from the player.
 	if position.distance_to(player.global_position) > 4.0:
 		return
 	var space_state := get_world_3d().direct_space_state
@@ -221,7 +215,7 @@ func _activate(position: Vector3, peer_id: int, team: int) -> void:
 		_sync_field_state.rpc(true, position, peer_id, team, duration)
 
 
-## Deactivates the field early or on expiration. Authority only.
+## deactivates the field early or on expiration. authority only.
 func _deactivate() -> void:
 	if not is_active:
 		return
@@ -231,7 +225,7 @@ func _deactivate() -> void:
 		_sync_field_state.rpc(false, global_position, 0, Team.Side.NONE, 0.0)
 
 
-## Host to everyone. `any_peer` + sender check; see the class notes.
+## host to everyone. `any_peer` + sender check; see the class notes.
 @rpc("any_peer", "call_remote", "reliable")
 func _sync_field_state(active: bool, position: Vector3, peer_id: int, team: int, dur: float) -> void:
 	if multiplayer.get_remote_sender_id() != NetworkManager.SERVER_PEER_ID:
@@ -256,13 +250,13 @@ func _apply_active(active: bool, position: Vector3, peer_id: int, team: int, dur
 	else:
 		time_remaining = 0.0
 	_field_mesh.visible = active
-	# Detection only runs where it is decided.
+	# detection only runs where it's decided (authority).
 	_detection_area.set_deferred(&"monitoring", active and _is_authority())
 
 
 # --- Detection -------------------------------------------------------------
 
-## Detects players entering the field.
+## detects players entering the field.
 func _on_body_entered(body: Node3D) -> void:
 	if not is_active or not _is_authority():
 		return
@@ -271,15 +265,15 @@ func _on_body_entered(body: Node3D) -> void:
 	if player == null or not player.state.is_alive:
 		return
 
-	# Don't detect own team's activity
+	# don't detect own team's activity
 	if player.state.team == owning_team:
 		return
 
 	_record_echo(ECHO_MOVEMENT, player.global_position, player.state.team)
 
 
-## Public method for external systems to report activity (e.g., shooting, a
-## future objective). Authority only; ignored elsewhere.
+## lets external systems report activity (shooting, a future objective).
+## authority only; ignored elsewhere.
 func report_activity(activity_type: int, position: Vector3, source_team: int) -> void:
 	if not is_active or not _is_authority():
 		return
@@ -302,7 +296,7 @@ func _record_echo(activity_type: int, position: Vector3, source_team: int) -> vo
 
 # --- Queries ---------------------------------------------------------------
 
-## Returns all currently visible echoes for UI rendering.
+## returns all currently visible echoes for ui rendering.
 func get_active_echoes() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for echo in _pending_echoes:
@@ -311,12 +305,12 @@ func get_active_echoes() -> Array[Dictionary]:
 	return result
 
 
-## Returns whether this field is on cooldown.
+## returns whether this field is on cooldown.
 func is_on_cooldown() -> bool:
 	return _cooldown_remaining > 0.0
 
 
-## Returns cooldown progress (0.0 to 1.0).
+## returns cooldown progress (0.0 to 1.0).
 func get_cooldown_progress() -> float:
 	if cooldown <= 0.0:
 		return 1.0

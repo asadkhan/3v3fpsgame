@@ -1,28 +1,26 @@
 class_name ImpactEffect
 extends Node3D
-## The spark where a round stops. Spawned by [WeaponFx], lives for a fraction of
-## a second and deletes itself.
+## the spark where a round stops. spawned by WeaponFx, lives a fraction of a
+## second and deletes itself.
 ##
-## It draws itself from code rather than from a scene file because the only
-## interesting part is the curve: it swells from nothing, fades out, and dies.
-## Everything it knows is three numbers on the script, and a [QuadMesh] with a
-## transparent material is a better fit for that than a hand-authored node tree
-## that would then need a second script to animate.
+## built from code instead of a scene file since the only interesting part is
+## the curve - swells, fades, dies - and a QuadMesh with a transparent
+## material handles that fine on its own.
 ##
-## [b]Local only.[/b] Nothing spawns this directly. The weapon asks for an
-## impact and a presentation node on the machine that pulled the trigger decides
-## whether to draw one, which is what keeps Chapter 4 from painting a spark in
-## the wrong place on a client that never fired.
+## local only. nothing spawns this directly - the weapon asks for an impact
+## and a presentation node on the shooter's own machine decides whether to
+## draw one, so a client that never fired doesn't paint a spark in the wrong
+## place.
 
-## How long the effect lives, in seconds.
+## how long the effect lives, in seconds
 @export var lifetime: float = 0.22
 
-## Size at the moment of impact, and the size it grows to before vanishing.
+## size at the moment of impact, and the size it grows to before vanishing
 @export var start_scale: float = 0.06
 @export var end_scale: float = 0.16
 
-## Colour of a hit on flesh versus a hit on scenery. The caller decides which,
-## because only the weapon knows what it hit.
+## colour for flesh hits vs scenery hits - caller decides, since only the
+## weapon knows what it hit
 @export var world_colour: Color = Color(1.0, 0.78, 0.45, 0.9)
 @export var flesh_colour: Color = Color(0.9, 0.2, 0.2, 0.95)
 
@@ -31,21 +29,18 @@ extends Node3D
 var _age: float = 0.0
 
 
-## Positions the effect against a surface and picks the colour from the hit zone.
-## Called immediately after instancing, before the node is added to the tree, so
-## it is never visible for a frame in the wrong place.
+## positions the effect against a surface and picks the colour from the hit
+## zone. call right after instancing, before adding to the tree, so it's
+## never visible in the wrong place for a frame.
 ##
-## [param flesh]: the round hit a body, so the colours are blood rather than
-## dust. Call after the effect has been added to the tree.
+## flesh: hit a body, so blood colours instead of dust.
 func setup(at: Vector3, normal: Vector3, zone: int, flesh: bool = false) -> void:
 	position = at
-	# Lifted off the surface by the tiniest amount. Sitting exactly on the
-	# surface means the quad is half-buried in the wall it is supposed to be
-	# marking, and the whole effect z-fights and disappears.
+	# lift off the surface a tiny bit, otherwise the quad z-fights with the
+	# wall it's marking and disappears
 	position += normal.normalized() * 0.012
 
-	# Oriented to face along the surface normal, so the mark lies flat on a
-	# wall and flat on the floor rather than only ever facing the world.
+	# orient along the surface normal so the mark lies flat on a wall or floor
 	var up := normal.normalized() if normal.length_squared() > 0.001 else Vector3.UP
 	var reference := Vector3.RIGHT if absf(up.dot(Vector3.RIGHT)) < 0.9 else Vector3.FORWARD
 	var basis := Basis.looking_at(up, reference)
@@ -53,7 +48,7 @@ func setup(at: Vector3, normal: Vector3, zone: int, flesh: bool = false) -> void
 
 	var material := StandardMaterial3D.new()
 	material.albedo_color = flesh_colour if flesh or zone == Damageable.HitZone.HEAD else world_colour
-	# A soft round glow rather than a bare quad, which read as a white square.
+	# soft round glow instead of a bare quad, which read as a white square
 	material.albedo_texture = MuzzleFlashMesh.glow_texture()
 	material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD if not flesh else BaseMaterial3D.BLEND_MODE_MIX
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -67,13 +62,13 @@ func setup(at: Vector3, normal: Vector3, zone: int, flesh: bool = false) -> void
 	_spawn_debris(at, up, flesh)
 
 
-## How long the debris lives.
+## how long the debris lives
 const DEBRIS_LIFETIME := 0.5
 
 
-## A one-shot burst of small bits thrown out of the surface: grey dust off a
-## wall, red off a body. A sibling of this effect rather than a child, so it is
-## not scaled by the spark's swell and outlives the spark.
+## a one-shot burst of small bits thrown off the surface: grey dust off a
+## wall, red off a body. a sibling of this effect rather than a child, so it
+## isn't scaled by the spark's swell and can outlive it.
 func _spawn_debris(at: Vector3, normal: Vector3, flesh: bool) -> void:
 	if not is_inside_tree():
 		return
@@ -108,7 +103,7 @@ func _spawn_debris(at: Vector3, normal: Vector3, flesh: bool) -> void:
 	particles.emitting = true
 	get_tree().create_timer(DEBRIS_LIFETIME + 0.2).timeout.connect(particles.queue_free)
 
-	# The cloud the round kicks up, and what it throws off.
+	# the cloud the round kicks up, and what it throws off
 	if flesh:
 		BattleFx.burst(get_parent(), BattleFx.blood_mist(normal), at)
 	else:
@@ -124,8 +119,8 @@ func _process(delta: float) -> void:
 		return
 
 	var t := _age / lifetime
-	# Swells fast then holds, rather than growing linearly. A linear growth
-	# reads as a bubble; this reads as an impact.
+	# swells fast then holds, instead of growing linearly (linear reads as a
+	# bubble, this reads as an impact)
 	var grow := ease(t, 0.4)
 	scale = Vector3.ONE * lerpf(start_scale, end_scale, grow)
 

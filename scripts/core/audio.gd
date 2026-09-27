@@ -1,25 +1,21 @@
 extends Node
-## Sound. Registered as the [code]Audio[/code] autoload.
+## sound. registered as the Audio autoload.
 ##
-## [b]Every sound is synthesised here at startup[/b] - noise bursts, filtered
-## thumps and tuned tones - so the game has a full, consistent soundscape with
-## no asset files and no licensing to track. They are placeholders in the sense
-## that the art pass may replace them with recorded ones: [method play] and
-## [method play_at] take a sound's name, so swapping one in means loading a file
-## into [member _library] under the same name and nothing else changes.
+## everything's synthesized here at startup - no audio assets needed. to swap
+## in a real recording later, just load a file into _library under the same
+## name, play() and play_at() don't care.
 ##
-## Two ways to play:
-## - [method play]: flat, for things that happen to you - your own gun, hit
+## two ways to play:
+## - play(): flat, for stuff that happens to you - your own gun, hit
 ##   confirmations, UI, round stings.
-## - [method play_at]: positioned in the world and heard through the current
-##   camera, for everything a tactical player needs to locate - other players'
-##   shots and footsteps, the planted core.
+## - play_at(): positioned in the world, for anything you need to locate -
+##   other players' shots and footsteps, the planted core.
 ##
-## Volume follows [code]GameConfig.master_volume[/code].
+## volume follows GameConfig.master_volume.
 
 const RATE := 22050
 
-## Name -> AudioStreamWAV.
+## sound name -> AudioStreamWAV.
 var _library: Dictionary = {}
 
 var _flat_players: Array[AudioStreamPlayer] = []
@@ -41,13 +37,12 @@ func _ready() -> void:
 		if key == "audio/master_volume":
 			_apply_volume())
 	_build_library()
-	# A low-pass on the master bus, opened wide; a nearby blast closes it for
-	# a moment so the world sounds muffled.
+	# low-pass on the master bus, wide open; a nearby blast closes it briefly
+	# to muffle the world.
 	_muffle = AudioEffectLowPassFilter.new()
 	_muffle.cutoff_hz = 20500.0
 	AudioServer.add_bus_effect(0, _muffle)
-	# Every button in the game answers the pointer: a soft tick and a slight
-	# grow on hover, a click on press.
+	# every button gets a hover tick + grow, and a click on press
 	get_tree().node_added.connect(_on_node_added)
 
 
@@ -55,7 +50,7 @@ var _muffle: AudioEffectLowPassFilter = null
 var _muffle_tween: Tween = null
 
 
-## Muffles everything and rings the ears, for [param strength] 0..1 of a blast.
+## muffles everything and rings the ears. strength is 0..1 of a blast.
 func concuss(strength: float) -> void:
 	if _muffle == null:
 		return
@@ -85,7 +80,7 @@ func _on_node_added(node: Node) -> void:
 	button.pressed.connect(func() -> void: play(&"ui_click", -8.0, 0.05))
 
 
-## Two thumps, lub-dub.
+## two thumps, lub-dub
 func _heartbeat() -> AudioStreamWAV:
 	var seconds := 0.5
 	var count := int(seconds * RATE)
@@ -110,8 +105,8 @@ func _apply_volume() -> void:
 
 # --- Playing ------------------------------------------------------------------
 
-## Plays [param sound_name] flat (not positioned). [param volume_db] and a
-## random pitch spread keep repeated sounds from sounding mechanical.
+## plays sound_name flat (not positioned). random pitch spread keeps repeated
+## sounds from sounding robotic.
 func play(sound_name: StringName, volume_db: float = 0.0, pitch_spread: float = 0.04) -> void:
 	var stream: AudioStream = _library.get(sound_name)
 	if stream == null:
@@ -124,15 +119,14 @@ func play(sound_name: StringName, volume_db: float = 0.0, pitch_spread: float = 
 	player.play()
 
 
-## Plays [param sound_name] at [param position] in the world. Distance
-## attenuates it and muffles the high end, so a far shot sounds far.
+## plays sound_name at position in the world. distance attenuates and muffles
+## the highs, so a far shot sounds far.
 func play_at(sound_name: StringName, position: Vector3, volume_db: float = 0.0,
 		pitch_spread: float = 0.04, reach: float = 60.0) -> void:
 	var stream: AudioStream = _library.get(sound_name)
 	if stream == null or _world_voices >= MAX_WORLD_VOICES:
 		return
-	# Parented to the match scene when there is one, so a sound cut off by the
-	# match ending stops with it.
+	# parent to the match scene so the sound gets cut off when the match ends
 	var scene := get_tree().get_first_node_in_group(&"match_scene")
 	if scene == null:
 		scene = get_tree().current_scene
@@ -163,8 +157,7 @@ func has_sound(sound_name: StringName) -> bool:
 # --- Synthesis ------------------------------------------------------------------
 
 func _build_library() -> void:
-	# Weapons: a filtered noise crack over a falling low thump. Heavier guns get
-	# a lower, longer body.
+	# weapons: filtered noise crack over a falling thump, heavier guns = lower/longer body
 	_library[&"shot_rifle"] = _gunshot(0.34, 95.0, 0.35, 16.0, 1.0)
 	_library[&"shot_smg"] = _gunshot(0.22, 130.0, 0.45, 24.0, 0.85)
 	_library[&"shot_pistol"] = _gunshot(0.24, 150.0, 0.55, 22.0, 0.9)
@@ -174,7 +167,7 @@ func _build_library() -> void:
 	_library[&"reload_in"] = _click(0.1, 1300.0, 1.0)
 	_library[&"switch"] = _click(0.09, 700.0, 0.6)
 	_library[&"rack"] = _rack()
-	# Battlefield.
+	# battlefield
 	_library[&"casing"] = _tones([[4200.0, 0.0, 0.3], [6100.0, 0.0, 0.2], [8300.0, 0.0, 0.12]], 0.18, 30.0, 0.35)
 	_library[&"bullet_crack"] = _crack()
 	_library[&"shot_echo"] = _echo_tail(1.4, 0.5)
@@ -182,7 +175,7 @@ func _build_library() -> void:
 	_library[&"distant_burst"] = _distant_burst()
 	_library[&"wind"] = _looped(_wind(8.0))
 	_library[&"fire_crackle"] = _looped(_crackle(4.0))
-	# Grenades.
+	# grenades
 	_library[&"grenade_throw"] = _whoosh(0.3, 500.0, 1800.0, 0.5)
 	_library[&"grenade_bounce"] = _tones([[1150.0, 0.0, 0.25], [2380.0, 0.0, 0.12]], 0.16, 38.0, 0.5)
 	_library[&"grenade_boom"] = _boom(2.4, 1.0)
@@ -192,24 +185,24 @@ func _build_library() -> void:
 	_library[&"heartbeat"] = _heartbeat()
 	_library[&"tinnitus"] = _tones([[4100.0, 0.0, 0.35]], 2.6, 1.1, 0.25)
 	_library[&"ui_hover"] = _click(0.025, 2400.0, 0.18)
-	# Knife: air, steel, and what it meets.
+	# knife: air, steel, impact
 	_library[&"knife_swing"] = _whoosh(0.26, 700.0, 2600.0, 0.55)
 	_library[&"knife_heavy"] = _whoosh(0.4, 380.0, 1700.0, 0.7)
 	_library[&"knife_draw"] = _shing(0.55, 0.45)
 	_library[&"knife_hit"] = _thump(0.14, 110.0, 30.0, 0.9)
 	_library[&"knife_wall"] = _tones([[2650.0, 0.0, 0.2], [3980.0, 0.0, 0.14], [5310.0, 0.0, 0.08]], 0.3, 16.0, 0.5)
 
-	# Feedback on your own shots.
+	# feedback on your own shots
 	_library[&"hit_body"] = _tones([[1800.0, 0.0, 0.05]], 0.06, 60.0, 0.5)
 	_library[&"hit_head"] = _tones([[2300.0, 0.0, 0.22], [3450.0, 0.0, 0.18]], 0.24, 14.0, 0.4)
 	_library[&"kill"] = _tones([[1320.0, 0.0, 0.12], [880.0, 0.09, 0.3]], 0.4, 9.0, 0.6)
 	_library[&"hurt"] = _thump(0.18, 70.0, 18.0, 0.9)
 
-	# Movement.
+	# movement
 	_library[&"step"] = _footstep()
 	_library[&"land"] = _thump(0.16, 60.0, 22.0, 0.8)
 
-	# Objective and ability.
+	# objective and ability
 	_library[&"core_beep"] = _beep(1480.0, 0.07)
 	_library[&"core_planted"] = _tones([[660.0, 0.0, 0.15], [990.0, 0.12, 0.35]], 0.5, 6.0, 0.6)
 	_library[&"core_defused"] = _tones([[990.0, 0.0, 0.12], [1320.0, 0.1, 0.12], [1760.0, 0.2, 0.4]], 0.62, 6.0, 0.55)
@@ -218,7 +211,7 @@ func _build_library() -> void:
 	_library[&"buy"] = _tones([[1568.0, 0.0, 0.08], [2093.0, 0.07, 0.2]], 0.3, 12.0, 0.45)
 	_library[&"ui_click"] = _click(0.04, 1600.0, 0.35)
 
-	# Round stings - short tonal cues, major for good news, minor for bad.
+	# round stings - major key for good news, minor for bad
 	_library[&"round_start"] = _tones([[440.0, 0.0, 0.18], [660.0, 0.16, 0.4]], 0.6, 5.0, 0.4)
 	_library[&"fight"] = _tones([[523.0, 0.0, 0.1], [784.0, 0.0, 0.3]], 0.35, 9.0, 0.45)
 	_library[&"round_win"] = _tones([[523.0, 0.0, 0.2], [659.0, 0.12, 0.2], [784.0, 0.24, 0.5]], 0.8, 4.0, 0.45)
@@ -228,7 +221,7 @@ func _build_library() -> void:
 	_library[&"multikill"] = _tones([[880.0, 0.0, 0.08], [1175.0, 0.07, 0.08], [1760.0, 0.14, 0.3]], 0.45, 8.0, 0.5)
 
 
-## Packs mono float samples (-1..1) into a 16-bit WAV stream.
+## packs mono float samples (-1..1) into a 16-bit WAV stream
 func _to_stream(samples: PackedFloat32Array) -> AudioStreamWAV:
 	var bytes := PackedByteArray()
 	bytes.resize(samples.size() * 2)
@@ -260,7 +253,7 @@ func _gunshot(seconds: float, body_hz: float, brightness: float, decay: float, g
 		var thump := sin(phase) * exp(-t * decay * 0.7)
 		var body := low * exp(-t * decay)
 		var attack := minf(t / 0.0015, 1.0)
-		# Scaled to leave headroom: several shots overlapping must not clip.
+		# scaled down so overlapping shots don't clip
 		samples[i] = (crack * 0.8 + body * 1.2 + thump * 0.9) * attack * gain * 0.62
 	return _to_stream(samples)
 
@@ -308,8 +301,8 @@ func _footstep() -> AudioStreamWAV:
 	return _to_stream(samples)
 
 
-## Several sine notes: each [frequency, start, length] with a soft attack and an
-## exponential tail, plus a quiet octave for body.
+## sine notes: each [frequency, start, length], soft attack + exponential
+## tail, plus a quiet octave for body.
 func _tones(notes: Array, seconds: float, decay: float, gain: float) -> AudioStreamWAV:
 	var count := int(seconds * RATE)
 	var samples := PackedFloat32Array()
@@ -358,8 +351,7 @@ func _sweep(from_hz: float, to_hz: float, seconds: float, gain: float) -> AudioS
 	return _to_stream(samples)
 
 
-## Air torn by a blade: noise through a band that sweeps up and back down,
-## swelling and fading over [param seconds].
+## air torn by a blade: noise band sweeps up then back down over seconds
 func _whoosh(seconds: float, low_hz: float, high_hz: float, gain: float) -> AudioStreamWAV:
 	var count := int(seconds * RATE)
 	var samples := PackedFloat32Array()
@@ -378,7 +370,7 @@ func _whoosh(seconds: float, low_hz: float, high_hz: float, gain: float) -> Audi
 	return _to_stream(samples)
 
 
-## Steel drawn from a sheath: a short scrape, then ringing partials.
+## steel drawn from a sheath: a scrape, then ringing partials
 func _shing(seconds: float, gain: float) -> AudioStreamWAV:
 	var count := int(seconds * RATE)
 	var samples := PackedFloat32Array()
@@ -400,9 +392,8 @@ func _shing(seconds: float, gain: float) -> AudioStreamWAV:
 	return _to_stream(samples)
 
 
-## Real gunshots recorded at a range (The Free Firearm Sound Library, CC0),
-## replacing the synthesised ones under the same names. The [code]_far[/code]
-## takes were miked further off and are used for other players' shots.
+## real recorded gunshots (CC0), replacing the synthesized ones by name.
+## _far takes are miked further off, used for other players' shots.
 const RECORDINGS := ["shot_rifle", "shot_rifle_far", "shot_smg", "shot_smg_far", "shot_burst",
 	"shot_burst_far", "shot_pistol", "shot_pistol_far"]
 
@@ -414,7 +405,7 @@ func _load_recordings() -> void:
 			_library[StringName(sound)] = load(path)
 
 
-## A grenade venting smoke: a steady filtered hiss.
+## grenade venting smoke: steady filtered hiss
 func _hiss(seconds: float) -> AudioStreamWAV:
 	var count := int(seconds * RATE)
 	var samples := PackedFloat32Array()
@@ -437,7 +428,7 @@ func _looped(stream: AudioStreamWAV) -> AudioStreamWAV:
 	return stream
 
 
-## A round passing close: a sharp supersonic snap with a short hiss behind it.
+## round passing close: sharp supersonic snap with a short hiss behind it
 func _crack() -> AudioStreamWAV:
 	var count := int(0.16 * RATE)
 	var samples := PackedFloat32Array()
@@ -455,8 +446,8 @@ func _crack() -> AudioStreamWAV:
 	return _to_stream(samples)
 
 
-## The shot rolling back off the walls and hills: a dull, low, decaying rumble
-## that starts soft, swells and dies.
+## the shot echoing off walls and hills: dull decaying rumble, soft start,
+## swells then dies.
 func _echo_tail(seconds: float, gain: float) -> AudioStreamWAV:
 	var count := int(seconds * RATE)
 	var samples := PackedFloat32Array()
@@ -469,13 +460,13 @@ func _echo_tail(seconds: float, gain: float) -> AudioStreamWAV:
 		lp += (noise - lp) * 0.06
 		lp2 += (lp - lp2) * 0.08
 		var env := minf(t / 0.12, 1.0) * exp(-t * 3.2)
-		# Two or three slaps as it comes back off different distances.
+		# two or three slaps as it bounces back off different distances
 		var slaps := 1.0 + 0.8 * exp(-absf(t - 0.25) * 40.0) + 0.5 * exp(-absf(t - 0.55) * 30.0)
 		samples[i] = lp2 * env * slaps * gain * 6.0
 	return _to_stream(samples)
 
 
-## Artillery a few kilometres off: a deep thump and a long rolling rumble.
+## distant artillery: deep thump and a long rolling rumble
 func _distant_boom() -> AudioStreamWAV:
 	var seconds := 3.2
 	var count := int(seconds * RATE)
@@ -496,8 +487,8 @@ func _distant_boom() -> AudioStreamWAV:
 	return _to_stream(samples)
 
 
-## A burst of rifle fire from another fight, far across the valley: dulled
-## cracks with their echo smeared together.
+## distant rifle burst from another fight: dulled cracks with the echo
+## smeared together.
 func _distant_burst() -> AudioStreamWAV:
 	var seconds := 2.6
 	var count := int(seconds * RATE)
@@ -522,7 +513,7 @@ func _distant_burst() -> AudioStreamWAV:
 	return _to_stream(samples)
 
 
-## Wind over open ground: slow-moving filtered noise with gusts.
+## wind over open ground: slow filtered noise with gusts
 func _wind(seconds: float) -> AudioStreamWAV:
 	var count := int(seconds * RATE)
 	var samples := PackedFloat32Array()
@@ -532,13 +523,13 @@ func _wind(seconds: float) -> AudioStreamWAV:
 	for i in count:
 		var t := float(i) / RATE
 		var k := t / seconds
-		# Gusts that meet at the loop point.
+		# gusts line up at the loop point
 		var gust := 0.55 + 0.3 * sin(TAU * k * 2.0) + 0.15 * sin(TAU * k * 5.0 + 1.3)
 		var noise := randf_range(-1.0, 1.0)
 		lp += (noise - lp) * (0.02 + 0.03 * gust)
 		lp2 += (lp - lp2) * 0.3
 		samples[i] = (lp - lp2 * 0.5) * gust * 3.2
-	# Cross-fade the ends so the loop is seamless.
+	# crossfade the ends so the loop is seamless
 	var fade := int(0.4 * RATE)
 	for i in fade:
 		var w := float(i) / fade
@@ -547,7 +538,7 @@ func _wind(seconds: float) -> AudioStreamWAV:
 	return _to_stream(samples)
 
 
-## A wood fire: soft roar with random pops.
+## wood fire: soft roar with random pops
 func _crackle(seconds: float) -> AudioStreamWAV:
 	var count := int(seconds * RATE)
 	var samples := PackedFloat32Array()
@@ -564,7 +555,7 @@ func _crackle(seconds: float) -> AudioStreamWAV:
 	return _to_stream(samples)
 
 
-## A charging handle: two sharp metal clacks, back and forward.
+## charging handle: two metal clacks, back and forward
 func _rack() -> AudioStreamWAV:
 	var seconds := 0.3
 	var count := int(seconds * RATE)

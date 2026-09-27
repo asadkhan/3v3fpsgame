@@ -1,7 +1,7 @@
 class_name HudLobbyPanel
 extends PanelContainer
-## Shown in the LOBBY phase: the map, both rosters, and - for the host - the
-## button that starts the match. Offline it explains the practice range.
+## shown in the LOBBY phase: map, both rosters, and (host only) the start
+## match button. offline it just explains the practice range.
 
 var _title: Label
 var _alpha_list: VBoxContainer
@@ -13,7 +13,7 @@ var _refresh_left: float = 0.0
 
 
 func _ready() -> void:
-	# Zero height: the container grows to fit its content instead of padding it.
+	# zero height - container grows to fit its content instead of padding it.
 	UITheme.pin(self, Vector2(0.0, 0.5), 24, -160, 380, -160)
 
 	var column := VBoxContainer.new()
@@ -50,7 +50,7 @@ func _team_column(parent: Control, side: int, heading: String) -> VBoxContainer:
 	return list
 
 
-## Host only. Starts the warmup, which leads into round one.
+## host only. starts the warmup, which leads into round one.
 func start_match() -> void:
 	if GameManager.is_in(GamePhase.Phase.LOBBY) and NetworkManager.is_online and NetworkManager.is_host:
 		GameManager.change_state(GamePhase.Phase.WARMUP)

@@ -1,8 +1,8 @@
 class_name HudPlayerStatus
 extends Control
-## The local player's own numbers, along the bottom of the screen: health and
-## the Echo Field on the left, the weapon and its ammunition on the right.
-## Full-screen and click-through; the two clusters are pinned to the corners.
+## the local player's own numbers along the bottom of the screen: health and
+## the echo field on the left, weapon and ammo on the right. full-screen and
+## click-through, both clusters pinned to the corners.
 
 var _health: Label
 var _health_bar: ProgressBar
@@ -120,8 +120,8 @@ func _bar(colour: Color) -> ProgressBar:
 	return bar
 
 
-## [param spectating]: [param player] is a teammate being watched, not this
-## machine's own body - so its credits, loadout and ammo are not known here.
+## spectating: player is a teammate being watched, not this machine's own
+## body, so credits, loadout and ammo aren't known here.
 func update_view(player: Player, spectating: bool = false) -> void:
 	visible = player != null
 	if player == null:

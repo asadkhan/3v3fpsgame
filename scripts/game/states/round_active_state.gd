@@ -1,29 +1,27 @@
 extends GameState
-## [b]ROUND_ACTIVE[/b] - live combat.
+## ROUND_ACTIVE - live combat.
 ##
-## Owns the round clock and is the single place a round is allowed to end.
-## The rules, with the attacking side trying to plant the Signal Core:
+## owns the round clock, the only place a round is allowed to end. attackers
+## are trying to plant the Signal Core:
 ##
-## [b]Before a plant[/b]
-## - Defenders all dead -> attackers win.
-## - Attackers all dead -> defenders win.
-## - Time runs out -> defenders win.
+## before a plant
+## - defenders all dead -> attackers win
+## - attackers all dead -> defenders win
+## - time runs out -> defenders win
 ##
-## [b]After a plant[/b] - the clock becomes the core's detonation timer
-## ([member MatchRules.detonation_seconds]).
-## - Defenders all dead -> attackers win (nobody is left to defuse).
-## - Attackers all dead -> nothing yet; the defenders still have to defuse.
-## - Core defused -> defenders win.
-## - Core detonates -> attackers win.
+## after a plant - clock becomes the detonation timer (MatchRules.detonation_seconds)
+## - defenders all dead -> attackers win (nobody left to defuse)
+## - attackers all dead -> nothing yet, defenders still have to defuse
+## - core defused -> defenders win
+## - core detonates -> attackers win
 ##
-## Elimination is only checked when both sides actually have players, so the
-## offline practice range - one player, no opponents - never ends a round on
-## its own, and its timeout scores nobody.
+## elimination is only checked when both sides have players, so the offline
+## practice range never ends a round on its own or scores anyone on timeout.
 ##
-## Note that [method end_round] does not award the win. It records who won and
-## hands over to [b]ROUND_END[/b], which resolves the round in one place.
+## end_round() doesn't award the win - it records who won and hands off to
+## ROUND_END, which resolves the round in one place.
 
-## Emitted every frame with the seconds left in the round.
+## emitted every frame with the seconds left in the round
 signal round_time_updated(remaining: float)
 
 var _ended: bool = false
@@ -32,8 +30,8 @@ var _planted: bool = false
 
 func enter(_previous: GameState) -> void:
 	_start_countdown(get_rules().round_seconds)
-	# A client joining mid-round learns the core is planted before it enters
-	# this phase; pick that up from the objective rather than missing it.
+	# a client joining mid-round learns the core is planted before entering
+	# this phase, so check the objective directly instead of missing it
 	var objective := game_manager.get_tree().get_first_node_in_group(SignalCoreObjective.GROUP) as SignalCoreObjective
 	if objective != null and objective.is_planted():
 		_planted = true
@@ -55,7 +53,7 @@ func exit(_next_state: GameState) -> void:
 			sig.disconnect(connection[1])
 
 
-## Whether the core is down this round. The HUD reads it to relabel the clock.
+## whether the core is down this round. the HUD reads this to relabel the clock.
 func is_core_planted() -> bool:
 	return _planted
 
@@ -73,9 +71,8 @@ func update(delta: float) -> void:
 		end_round(Team.Side.NONE)
 
 
-## Ends the current round and moves to [b]ROUND_END[/b].
-## [param winner] is a [enum Team.Side]; pass [constant Team.Side.NONE] when
-## nobody won. Returns false if the transition was rejected.
+## ends the current round and moves to ROUND_END. winner is a Team.Side, pass
+## Team.Side.NONE when nobody won. returns false if the transition was rejected.
 func end_round(winner: int) -> bool:
 	if not is_authority() or _ended:
 		return false
@@ -85,7 +82,7 @@ func end_round(winner: int) -> bool:
 
 
 func _on_core_planted(_planter_id: int, _site: String) -> void:
-	# Runs on every machine, so every copy of the clock switches over together.
+	# runs on every machine, so every copy of the clock switches over together
 	_planted = true
 	_start_countdown(get_rules().detonation_seconds)
 	_queue_elimination_check()
@@ -99,10 +96,10 @@ func _on_player_died(_victim_id: int, _killer_id: int, _headshot: bool) -> void:
 	_queue_elimination_check()
 
 
-## Deferred to the end of the frame: a death is raised from inside a shot's
-## resolution, and a disconnect from inside the transport callback. Neither is a
-## good place to swap the whole game phase, and a body that is leaving is only
-## gone from the tree once the frame finishes.
+## deferred to end of frame: a death fires from inside shot resolution, a
+## disconnect from inside the transport callback - neither is a safe place to
+## swap the game phase, and a leaving body isn't gone from the tree till the
+## frame ends.
 func _queue_elimination_check() -> void:
 	if is_authority():
 		_check_elimination.call_deferred()
@@ -132,7 +129,7 @@ func _check_elimination() -> void:
 	var counts := _count_sides()
 	var present: Dictionary = counts[0]
 	var alive: Dictionary = counts[1]
-	# One side has nobody at all: a practice session or a lobby still filling.
+	# one side has nobody at all: a practice session or a lobby still filling
 	if present[Team.Side.ALPHA] == 0 or present[Team.Side.BRAVO] == 0:
 		return
 
@@ -144,7 +141,7 @@ func _check_elimination() -> void:
 	if defenders_out and (_planted or not attackers_out):
 		end_round(attackers)
 	elif defenders_out:
-		# Everyone died together before a plant: the attack failed.
+		# everyone died together before a plant: the attack failed
 		end_round(defenders)
 	elif attackers_out and not _planted:
 		end_round(defenders)

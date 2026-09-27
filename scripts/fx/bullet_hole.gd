@@ -1,11 +1,9 @@
 class_name BulletHole
 extends Decal
-## A bullet hole projected onto whatever surface a round hit. Lingers, then
-## fades out. At most [constant MAX_HOLES] exist at once; the oldest goes first,
-## so a long spray can never pile up an unbounded number of decals.
+## bullet hole decal projected onto whatever a round hit. lingers, then fades.
+## caps at MAX_HOLES, oldest gets kicked so a long spray can't pile up forever.
 ##
-## Placeholder art (a generated dark smudge with a lighter rim) until the
-## effects pass.
+## placeholder art: just a generated dark smudge with a lighter rim.
 
 const LIFETIME := 15.0
 const FADE_TIME := 2.0
@@ -18,14 +16,13 @@ static var _live: Array[BulletHole] = []
 var _age: float = 0.0
 
 
-## Places the decal on a surface at [param at] facing along [param normal].
-## Call before adding to the tree.
+## places the decal at `at` facing along `normal`. call before adding to the tree.
 func setup(at: Vector3, normal: Vector3) -> void:
 	size = Vector3(SIZE, 0.2, SIZE)
 	texture_albedo = _hole_texture()
 	cull_mask = 1
 	var n := normal.normalized() if normal.length_squared() > 0.001 else Vector3.UP
-	# A decal projects along its local -Y, so Y points out of the surface.
+	# decal projects along local -Y, so Y needs to point out of the surface.
 	var reference := Vector3.FORWARD if absf(n.dot(Vector3.FORWARD)) < 0.9 else Vector3.RIGHT
 	var x := reference.cross(n).normalized()
 	var z := x.cross(n).normalized()

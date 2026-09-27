@@ -1,26 +1,24 @@
 class_name SpectatorCamera
 extends Camera3D
-## After you die: a moment on your own death camera, then a first-person view
-## through a living teammate's eyes. Left click cycles to the next teammate.
+## after you die: a moment on your own death camera, then a first-person
+## view through a living teammate's eyes. left click cycles to the next.
 ##
-## Teammates only, never enemies - watching the other side would hand a dead
-## player information to call out. Local and purely visual: nothing here is
-## replicated or authoritative. It follows the replicated position, facing and
-## pitch of the watched body ([method Player.get_spectator_view]), smoothed so
-## the 20 Hz updates read as continuous motion.
+## teammates only, never enemies - watching the other side would hand a
+## dead player info to call out. local and purely visual, nothing here is
+## replicated or authoritative. follows the watched body's replicated
+## position/facing/pitch, smoothed so the 20hz updates look continuous.
 ##
-## Lives in the match scene as [code]Spectator[/code]; the HUD finds it through
-## [constant GROUP] to show who is being watched.
+## lives in the match scene as Spectator; the hud finds it via GROUP.
 
 const GROUP := &"spectator"
 
-## How long the death camera plays before switching to a teammate.
+## how long the death camera plays before switching to a teammate.
 const DEATH_CAM_SECONDS := 2.0
 
-## How quickly the view catches up with the watched player's replicated view.
+## how fast the view catches up with the watched player. higher = snappier.
 const FOLLOW_SHARPNESS := 18.0
 
-## The teammate being watched, or null.
+## the teammate being watched, or null.
 var target: Player = null
 
 var _dead_for: float = 0.0
@@ -35,14 +33,14 @@ func _ready() -> void:
 			fov = float(value))
 
 
-## Whether the screen is currently showing a teammate's view.
+## whether the screen is currently showing a teammate's view.
 func is_spectating() -> bool:
 	return current and target != null and is_instance_valid(target)
 
 
 func _process(delta: float) -> void:
 	_process_view(delta)
-	# The watched player's own soldier would fill the view from inside.
+	# the watched player's own soldier would fill the view from inside.
 	for player in NetworkManager.get_players():
 		if player != null and is_instance_valid(player):
 			player.set_model_hidden(is_spectating() and player == target)
@@ -59,14 +57,14 @@ func _process_view(delta: float) -> void:
 	if _dead_for < DEATH_CAM_SECONDS:
 		return
 
-	# A freed target (the watched teammate disconnected) must be dropped before
-	# it reaches the typed parameter below, which would reject it every frame.
+	# drop a freed target (watched teammate disconnected) before it hits
+	# the typed parameter below.
 	if target != null and not is_instance_valid(target):
 		target = null
 	if not _is_valid_target(target, local):
 		target = _cycle(local, 0)
 	if target == null:
-		# Nobody left to watch: stay on the death camera.
+		# nobody left to watch: stay on the death camera.
 		_release(local)
 		return
 
@@ -94,8 +92,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-## Living teammates in a stable order, and the one [param step] places after
-## the current target.
+## living teammates in a stable order, and the one step places after the
+## current target.
 func _cycle(local: Player, step: int) -> Player:
 	if local == null:
 		return null
@@ -117,7 +115,7 @@ func _is_valid_target(player: Player, local: Player) -> bool:
 		and player != local and player.state.is_alive and player.state.team == local.state.team
 
 
-## Hands the screen back to the local player's own camera.
+## hands the screen back to the local player's own camera.
 func _release(local: Player) -> void:
 	if not current:
 		return

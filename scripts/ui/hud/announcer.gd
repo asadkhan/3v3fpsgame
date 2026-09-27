@@ -1,10 +1,10 @@
 class_name HudAnnouncer
 extends Control
-## Centre-screen banners for the moments that matter: a round starting, the
-## fight beginning, a round won or lost, and your own death or kill.
+## centre-screen banners for the moments that matter: round starting, fight
+## beginning, round won/lost, your own death or kill.
 ##
-## Everything is phrased from the viewer's side - "ROUND WON" rather than
-## "ALPHA WINS" - because that is the question a player is actually asking.
+## phrased from the viewer's side - "ROUND WON" not "ALPHA WINS" - because
+## that's what the player actually wants to know.
 
 var _title: Label
 var _subtitle: Label
@@ -14,7 +14,7 @@ var _small_tween: Tween
 var _callout: Label
 var _callout_tween: Tween
 
-## The side this screen belongs to, supplied by [Hud] each frame.
+## the side this screen belongs to, supplied by Hud each frame.
 var local_team: int = Team.Side.NONE
 var local_peer: int = 0
 
@@ -118,8 +118,8 @@ func _on_phase_changed(_previous: int, current: int) -> void:
 					Audio.play(&"round_lose", -4.0, 0.0)
 
 
-## Your own standout moment gets a big line and a sting; nobody else's
-## interrupts your screen (they go to the kill feed).
+## your own standout moment gets a big line and a sting; everyone else's
+## goes to the kill feed instead.
 func _on_callout(peer_id: int, kind: StringName) -> void:
 	if peer_id != local_peer or local_peer == 0:
 		return

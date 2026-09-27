@@ -1,8 +1,8 @@
 class_name HudTopBar
 extends Control
-## Top-centre match bar: ALPHA score and players alive, the round clock and
-## phase, BRAVO's players alive and score. Read from [GameManager] and the
-## player bodies every frame - cheap, and it cannot drift out of step.
+## top-centre match bar: alpha score and players alive, round clock and
+## phase, bravo's players alive and score. reads GameManager and the player
+## bodies every frame - cheap, and can't drift out of step.
 
 const PHASE_TITLES := {
 	GamePhase.Phase.LOBBY: "LOBBY",
@@ -23,7 +23,7 @@ var _round: Label
 var _alpha_role: Label
 var _bravo_role: Label
 
-## Set by [Hud]: the core is down, so the clock is its detonation timer.
+## set by Hud: the core is down, so the clock is its detonation timer.
 var core_planted: bool = false
 
 
@@ -67,7 +67,7 @@ func _ready() -> void:
 	_bravo_role = bravo_box[1]
 
 
-## [score label, ATTACK/DEFEND label]
+## [score label, attack/defend label]
 func _score_box(parent: Control, colour: Color) -> Array:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(72, 52)

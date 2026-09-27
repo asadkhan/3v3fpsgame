@@ -1,38 +1,24 @@
 class_name BlockMap
 extends Node3D
-## Base class for a map built from box geometry described as data.
+## base class for a map built from box geometry described as data.
+## a map script extends this, fills in layout tables and calls the
+## _add_* helpers from _build(). generates geometry (colliders sized to
+## match meshes) instead of hand-placing it, so a wall moves by editing
+## one number and there are no gaps to spot by eye.
 ##
-## A map script extends this, fills in its layout tables and calls the
-## [code]_add_*[/code] helpers from [method _build]. Everything a match needs
-## from a map is provided here, under the names the rest of the game looks for:
-##
-## - [code]AlphaSpawn[/code] / [code]BravoSpawn[/code] [Marker3D]s - read by
-##   [Playtest] for spawn position and facing.
-## - Spawn barriers - solid walls that only exist during the [b]BUY[/b] phase,
-##   holding each side in its spawn while it prepares.
-## - Sites - [Area3D]s in the group [code]bomb_sites[/code] with a
-##   [code]site_name[/code] meta, for the objective (not built yet).
-##
-## [b]Why geometry is generated rather than hand-placed.[/b] Every box needs a
-## collider sized exactly like its mesh, on the world layer, with a sensible
-## material. Doing that by hand for a hundred boxes is where holes in the map
-## come from; a table of centres and sizes is reviewable at a glance and a
-## wall moves by editing one number.
-##
-## Coordinates: the floor's top surface is y = 0. Box tables give the
-## [b]footprint[/b] and height, and boxes stand on the floor unless a base
+## floor's top surface is y = 0. boxes stand on the floor unless a base
 ## height is given.
 
-## The group spawn barriers join, and the group sites join.
+## group names: spawn barriers and bomb sites.
 const BARRIER_GROUP := &"spawn_barriers"
 const SITE_GROUP := &"bomb_sites"
 
-## Shared materials by key, built once per map.
+## shared materials by key, built once per map.
 var _materials: Dictionary = {}
 var _barriers: Array[StaticBody3D] = []
 
 
-## The map's smoke, fire, dust and distant war. See [BattlefieldAtmosphere].
+## smoke, fire, dust and distant war sounds. see BattlefieldAtmosphere.
 var atmosphere: BattlefieldAtmosphere = null
 
 
@@ -49,17 +35,15 @@ func _ready() -> void:
 	_set_barriers_active(GameManager.current_phase == GamePhase.Phase.BUY)
 
 
-## Override: build the map.
+## override: build the map.
 func _build() -> void:
 	pass
 
 
 # --- Materials ------------------------------------------------------------
 
-## Registers a material under [param key]. A subtle world-space noise is
-## multiplied into the colour so large flat surfaces read as concrete or plaster
-## rather than as untextured grey-box - the cheapest step up from placeholder
-## art, and one that keeps every surface's colour exactly as authored.
+## registers a material under key. mixes in a subtle noise texture so flat
+## surfaces read as concrete/plaster instead of flat grey-box.
 func _define_material(key: StringName, colour: Color, roughness: float = 0.95, detail_scale: float = 0.35) -> void:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = colour
@@ -75,7 +59,7 @@ func _define_material(key: StringName, colour: Color, roughness: float = 0.95, d
 static var _shared_detail: NoiseTexture2D = null
 
 
-## One noise texture shared by every material and every map load.
+## one noise texture shared by every material and every map load.
 static func _detail_texture() -> NoiseTexture2D:
 	if _shared_detail != null:
 		return _shared_detail
@@ -89,7 +73,7 @@ static func _detail_texture() -> NoiseTexture2D:
 	texture.seamless = true
 	texture.generate_mipmaps = true
 	texture.noise = noise
-	# Pulled towards white so the texture only ever darkens a surface a little.
+	# pulled towards white so this only ever darkens a surface a little.
 	var ramp := Gradient.new()
 	ramp.set_color(0, Color(0.86, 0.86, 0.86))
 	ramp.set_color(1, Color(1.0, 1.0, 1.0))
@@ -102,14 +86,13 @@ func _material(key: StringName) -> Material:
 	return _materials.get(key)
 
 
-## The photo-scanned surfaces (Poly Haven, CC0) under
-## [code]assets/materials/surfaces/[/code]: ground, plaster, rock, concrete,
-## trim, wood, container, steel. Each is a world-space triplanar PBR material,
-## so any box can wear it without UVs and the texture never stretches.
+## photo-scanned surfaces (poly haven, cc0) under assets/materials/surfaces/:
+## ground, plaster, rock, concrete, trim, wood, container, steel. triplanar
+## so any box can wear one without UVs.
 const SURFACE_DIR := "res://assets/materials/surfaces/%s.tres"
 
 
-## Registers the shared surface [param surface] under [param key].
+## registers the shared surface under key.
 func _define_surface(key: StringName, surface: String) -> void:
 	_materials[key] = load(SURFACE_DIR % surface)
 
@@ -120,8 +103,8 @@ static func surface(surface_name: String) -> Material:
 
 # --- Geometry -------------------------------------------------------------
 
-## A solid box standing on the floor (or on [param base_height]) whose footprint
-## runs from [param min_xz] to [param max_xz]. The form every table uses.
+## a solid box standing on the floor (or on base_height), footprint from
+## min_xz to max_xz. the shape every layout table uses.
 func _add_block(node_name: String, min_xz: Vector2, max_xz: Vector2, height: float,
 		material_key: StringName, base_height: float = 0.0) -> StaticBody3D:
 	var size := Vector3(max_xz.x - min_xz.x, height, max_xz.y - min_xz.y)
@@ -130,7 +113,7 @@ func _add_block(node_name: String, min_xz: Vector2, max_xz: Vector2, height: flo
 	return _add_box(node_name, centre, size, material_key)
 
 
-## A solid box by centre and size.
+## a solid box by centre and size.
 func _add_box(node_name: String, centre: Vector3, size: Vector3, material_key: StringName,
 		yaw_degrees: float = 0.0) -> StaticBody3D:
 	var body := StaticBody3D.new()
@@ -148,8 +131,8 @@ func _add_box(node_name: String, centre: Vector3, size: Vector3, material_key: S
 	mesh_instance.material_override = _material(material_key)
 	body.add_child(mesh_instance)
 
-	# Sized separately from the mesh on purpose: what you can walk into must
-	# never change because somebody resized the visual.
+	# collider sized separately from the mesh, so resizing the visual never
+	# changes what you can walk into.
 	var collision := CollisionShape3D.new()
 	collision.name = "Collision"
 	var shape := BoxShape3D.new()
@@ -161,11 +144,9 @@ func _add_box(node_name: String, centre: Vector3, size: Vector3, material_key: S
 	return body
 
 
-## A flight of steps rising from [param start] towards [param direction]
-## (a unit axis on the ground plane), each [param rise] high and [param tread]
-## deep. Each step is its own box resting on the floor, so there are no joints
-## to snag on. Rise must stay under [member Player.step_height] (0.4 m) for the
-## steps to be walked rather than jumped.
+## a flight of steps rising from start towards direction, each rise high and
+## tread deep. each step is its own box, no joints to snag on. keep rise
+## under the player's step_height (0.4m) or steps get jumped instead of walked.
 func _add_stairs(node_name: String, start: Vector3, direction: Vector3, width: float,
 		steps: int, rise: float, tread: float, material_key: StringName) -> void:
 	var along := direction.normalized()
@@ -178,10 +159,10 @@ func _add_stairs(node_name: String, start: Vector3, direction: Vector3, width: f
 
 
 # --- Architectural detail ---------------------------------------------------
-# Visual only - never collision - so the play space stays exactly as authored.
+# visual only, never collision - play space stays exactly as authored.
 
-## A concrete cap along the top of a block and a plinth along its foot: what
-## turns a box into a building.
+## a concrete cap along the top of a block and a plinth along its foot -
+## what turns a box into a building.
 func _add_trim(min_xz: Vector2, max_xz: Vector2, height: float, base_height: float = 0.0) -> void:
 	var size := Vector3(max_xz.x - min_xz.x, 0.0, max_xz.y - min_xz.y)
 	var centre := Vector3((min_xz.x + max_xz.x) * 0.5, 0.0, (min_xz.y + max_xz.y) * 0.5)
@@ -194,8 +175,8 @@ func _add_trim(min_xz: Vector2, max_xz: Vector2, height: float, base_height: flo
 	plinth.name = "Plinth"
 
 
-## Dresses a cover block as a large timber crate: plank faces, and a heavier
-## frame along every edge with a cross-brace on the long sides.
+## dresses a cover block as a timber crate: plank faces, frame on every
+## edge, cross-brace on the long sides.
 func _dress_crate(body: StaticBody3D, size: Vector3) -> void:
 	var frame := _material(&"wood_frame")
 	_add_edge_frame(body, size, 0.12, frame)
@@ -215,10 +196,9 @@ func _dress_crate(body: StaticBody3D, size: Vector3) -> void:
 				brace.rotation.x = angle
 
 
-## Dresses a cover block as a sandbag emplacement: the box itself is hidden
-## (its collider stays exactly as it was) and bags of burlap are stacked over
-## its footprint, staggered course by course like a real wall - a full outer
-## ring on every course and a filled top. One [MultiMeshInstance3D] per block.
+## dresses a cover block as a sandbag emplacement: hides the box mesh
+## (collider stays put) and stacks sandbags over its footprint, staggered
+## course by course - outer ring per course, filled top. one multimesh per block.
 func _dress_sandbags(body: StaticBody3D, size: Vector3) -> void:
 	var mesh_instance := body.get_node("Mesh") as MeshInstance3D
 	mesh_instance.visible = false
@@ -231,7 +211,7 @@ func _dress_sandbags(body: StaticBody3D, size: Vector3) -> void:
 		var y := -half.y + bag.y * 0.5 + course * (size.y - bag.y) / maxf(courses - 1, 1)
 		var top := course == courses - 1
 		var stagger := 0.5 if course % 2 == 1 else 0.0
-		# Rows run along x; bags lie lengthways.
+		# rows run along x; bags lie lengthways.
 		var rows := maxi(int(size.z / bag.z), 1)
 		var per_row := maxi(int(size.x / bag.x), 1)
 		for row in rows:
@@ -268,7 +248,7 @@ static var _bag_mesh: Mesh = null
 static var _bag_material: Material = null
 
 
-## A unit sandbag: a squashed, rounded pillow (scaled per bag).
+## a unit sandbag: a squashed, rounded pillow (scaled per bag).
 static func _sandbag_mesh() -> Mesh:
 	if _bag_mesh == null:
 		var sphere := SphereMesh.new()
@@ -276,7 +256,7 @@ static func _sandbag_mesh() -> Mesh:
 		sphere.height = 1.0
 		sphere.radial_segments = 14
 		sphere.rings = 7
-		# Flattened ends and sides read as a filled bag rather than a ball.
+		# flattened ends and sides read as a filled bag, not a ball.
 		var arrays := sphere.get_mesh_arrays()
 		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 		for i in verts.size():
@@ -307,8 +287,8 @@ static func _sandbag_material() -> Material:
 	return _bag_material
 
 
-## Dresses a cover block as a steel utility module: container-steel faces and
-## a painted steel frame.
+## dresses a cover block as a steel utility module: container-steel faces
+## with a painted steel frame.
 func _dress_container(body: StaticBody3D, size: Vector3) -> void:
 	_add_edge_frame(body, size, 0.1, _material(&"steel"))
 
@@ -328,7 +308,7 @@ func _add_edge_frame(body: Node3D, size: Vector3, thickness: float, material: Ma
 				Vector3(size.x + 0.02, thickness, thickness), material)
 
 
-## A flat floor finish (concrete pad, etc.) laid just above the ground.
+## a flat floor finish (concrete pad, etc.) laid just above the ground.
 func _add_floor_pad(min_xz: Vector2, max_xz: Vector2, material_key: StringName) -> void:
 	var pad := MeshInstance3D.new()
 	pad.name = "FloorPad"
@@ -342,9 +322,9 @@ func _add_floor_pad(min_xz: Vector2, max_xz: Vector2, material_key: StringName) 
 
 # --- Props --------------------------------------------------------------------
 
-## A scanned prop model (Poly Haven, CC0, [code]assets/props/[/code]) standing
-## at [param at]. With [param solid], it gets a box collider fitted to its
-## mesh, on the world layer, so it blocks movement and bullets like any wall.
+## a scanned prop model (poly haven, cc0, assets/props/) standing at `at`.
+## with solid true, gets a box collider fitted to its mesh so it blocks
+## movement and bullets like any wall.
 func _add_prop(prop_name: String, at: Vector3, yaw_degrees: float = 0.0, solid: bool = true,
 		prop_scale: float = 1.0) -> Node3D:
 	var scene := load("res://assets/props/%s/%s_1k.gltf" % [prop_name, prop_name]) as PackedScene
@@ -392,7 +372,7 @@ static func _mesh_bounds(root: Node3D) -> AABB:
 
 # --- Match features ---------------------------------------------------------
 
-## Places a spawn marker. [param facing_yaw_degrees] 0 looks towards -Z.
+## places a spawn marker. facing_yaw_degrees 0 looks towards -z.
 func _add_spawn_marker(marker_name: String, at: Vector3, facing_yaw_degrees: float) -> void:
 	var marker := Marker3D.new()
 	marker.name = marker_name
@@ -401,8 +381,8 @@ func _add_spawn_marker(marker_name: String, at: Vector3, facing_yaw_degrees: flo
 	add_child(marker)
 
 
-## A wall that is solid only during the buy phase. Drawn as a faint coloured
-## sheet so a player can see why they cannot leave.
+## a wall that's solid only during the buy phase. drawn as a faint coloured
+## sheet so a player can see why they can't leave.
 func _add_spawn_barrier(node_name: String, min_xz: Vector2, max_xz: Vector2, colour: Color) -> void:
 	var body := _add_block(node_name, min_xz, max_xz, 4.0, &"barrier")
 	var mesh := body.get_node("Mesh") as MeshInstance3D
@@ -420,8 +400,8 @@ func _add_spawn_barrier(node_name: String, min_xz: Vector2, max_xz: Vector2, col
 	_barriers.append(body)
 
 
-## A site: a trigger volume for the future objective, a tinted floor patch and
-## a large letter so it can be recognised from across the map.
+## a site: a trigger volume for the objective, a tinted floor patch and a
+## large letter so it can be spotted from across the map.
 func _add_site(site_name: String, min_xz: Vector2, max_xz: Vector2, colour: Color, letter_at: Vector3,
 		letter_yaw_degrees: float) -> void:
 	var size := Vector3(max_xz.x - min_xz.x, 3.0, max_xz.y - min_xz.y)
@@ -441,7 +421,7 @@ func _add_site(site_name: String, min_xz: Vector2, max_xz: Vector2, colour: Colo
 	area.add_to_group(SITE_GROUP)
 	add_child(area)
 
-	# The painted zone: a thin unlit sheet a hair above the floor.
+	# the painted zone: a thin unlit sheet a hair above the floor.
 	var patch := MeshInstance3D.new()
 	patch.name = "Site%sFloor" % site_name
 	var plane := PlaneMesh.new()
@@ -459,7 +439,7 @@ func _add_site(site_name: String, min_xz: Vector2, max_xz: Vector2, colour: Colo
 	add_sign(site_name, letter_at, letter_yaw_degrees, colour, 4.0)
 
 
-## A large painted letter or word on a wall.
+## a large painted letter or word on a wall.
 func add_sign(text: String, at: Vector3, yaw_degrees: float, colour: Color, pixel_scale: float = 1.0) -> void:
 	var label := Label3D.new()
 	label.name = "Sign_%s" % text.replace(" ", "_")
@@ -478,9 +458,8 @@ func add_sign(text: String, at: Vector3, yaw_degrees: float, colour: Color, pixe
 
 
 # --- Set dressing (the relay-station look) -------------------------------------
-# Visual only, no collision unless noted: masts sit on rooftops nobody can
-# reach, strips are trim. Placeholder art until the art pass, built to the
-# SIGNALFALL palette (amber signal, cyan tech).
+# visual only, no collision unless noted: masts sit on rooftops nobody can
+# reach, strips are trim. amber signal / cyan tech colour scheme.
 
 var _beacons: Array[StandardMaterial3D] = []
 var _beacon_time: float = 0.0
@@ -506,8 +485,8 @@ func _visual_box(parent: Node3D, centre: Vector3, size: Vector3, material: Mater
 	return mesh
 
 
-## A relay mast standing on a rooftop at [param base]: a pole, cross-arms, a
-## dish and a blinking red beacon on top.
+## a relay mast standing on a rooftop at base: pole, cross-arms, dish and a
+## blinking red beacon on top.
 func _add_relay_mast(base: Vector3, height: float) -> void:
 	var mast := Node3D.new()
 	mast.name = "RelayMast"
@@ -537,8 +516,8 @@ func _add_relay_mast(base: Vector3, height: float) -> void:
 	_visual_box(mast, Vector3(0, height + 0.12, 0), Vector3(0.22, 0.22, 0.22), beacon_material)
 
 
-## A signal pylon: a slim pillar with glowing bands and a small light, used to
-## mark a site so it can be recognised from a distance. Solid.
+## a signal pylon: slim pillar with glowing bands and a small light, marks a
+## site so it's visible from a distance. solid.
 func _add_pylon(base: Vector3, colour: Color, height: float = 3.4) -> void:
 	var body := _add_box("Pylon", base + Vector3(0, height * 0.5, 0), Vector3(0.5, height, 0.5), &"metal")
 	var glow := _emissive(colour, 3.0)
@@ -552,7 +531,7 @@ func _add_pylon(base: Vector3, colour: Color, height: float = 3.4) -> void:
 	body.add_child(light)
 
 
-## A thin glowing strip between two points - roofline and trim lighting.
+## a thin glowing strip between two points - roofline and trim lighting.
 func _add_light_strip(from: Vector3, to: Vector3, colour: Color, energy: float = 2.0) -> void:
 	var length := from.distance_to(to)
 	if length < 0.01:
@@ -569,7 +548,7 @@ func _add_light_strip(from: Vector3, to: Vector3, colour: Color, energy: float =
 	strip.global_transform = Transform3D(Basis.looking_at(direction, up), (from + to) * 0.5)
 
 
-## Strips around the top edge of a block footprint.
+## strips around the top edge of a block footprint.
 func _outline_roof(min_xz: Vector2, max_xz: Vector2, y: float, colour: Color) -> void:
 	var a := Vector3(min_xz.x, y, min_xz.y)
 	var b := Vector3(max_xz.x, y, min_xz.y)
@@ -584,7 +563,7 @@ func _outline_roof(min_xz: Vector2, max_xz: Vector2, y: float, colour: Color) ->
 func _process(delta: float) -> void:
 	if _beacons.is_empty():
 		return
-	# One slow blink for every beacon on the map, like aircraft warning lights.
+	# one slow blink for every beacon on the map, like aircraft warning lights.
 	_beacon_time += delta
 	var on := fmod(_beacon_time, 1.6) < 0.25
 	for material in _beacons:

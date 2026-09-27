@@ -1,11 +1,11 @@
 class_name HudScreenFx
 extends ColorRect
-## Full-screen treatment of the 3D view, under the rest of the HUD:
-## - low health: colour drains and a heartbeat plays;
-## - dead: the picture greys out and darkens as the camera falls;
-## - concussion (a grenade close by): a white flash that fades;
-## - transitions: a fade from black at round start and on respawn.
-## One screen-reading shader, so all of it composes in a single pass.
+## full-screen treatment of the 3D view, under the rest of the HUD:
+## - low health: colour drains and a heartbeat plays
+## - dead: picture greys out and darkens as the camera falls
+## - concussion (grenade nearby): a white flash that fades
+## - transitions: fade from black at round start and on respawn
+## one shader does all of it in a single pass.
 
 var _desat: float = 0.0
 var _dark: float = 0.0

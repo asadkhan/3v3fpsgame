@@ -1,17 +1,17 @@
 class_name Hud
 extends CanvasLayer
-## The in-match heads-up display. Lives in the match scene ([Playtest]), so it
-## exists exactly while a match does and survives every phase change inside it.
+## the in-match heads-up display. lives in the match scene, exists exactly
+## while a match does.
 ##
-## Each piece is its own small script under [code]scripts/ui/hud/[/code]; this
-## node builds them, tells them who "you" are, and drives the ones that read
-## live state. It only ever [b]reads[/b] game state - nothing here changes the
-## match except the explicit buttons (start, rematch, leave).
+## each piece is its own small script under scripts/ui/hud/; this node builds
+## them and drives the ones that read live state. only reads game state -
+## nothing here changes the match except the explicit buttons (start,
+## rematch, leave).
 ##
-## Keys handled here: Tab (hold) scoreboard, Enter (host) start / rematch,
-## B buy menu (buy phase only).
+## keys handled here: tab (hold) scoreboard, enter (host) start/rematch,
+## b buy menu (buy phase only).
 
-## Slower-changing pieces refresh at this interval rather than every frame.
+## slower-changing pieces refresh at this interval instead of every frame.
 const SLOW_REFRESH := 0.2
 
 var _root: Control
@@ -32,7 +32,7 @@ var _scope: HudScopeOverlay
 var _screen_fx: HudScreenFx
 var _direction: HudDamageDirection
 
-## The player this machine drives, re-resolved each frame (bodies come and go).
+## the player this machine drives, re-resolved each frame (bodies come and go).
 var _player: Player = null
 var _slow_left: float = 0.0
 
@@ -91,22 +91,22 @@ func _process(delta: float) -> void:
 		and not GameManager.is_in(GamePhase.Phase.MATCH_END)
 	_scope.update_view(_player if not spectating else null)
 	if _scope.visible:
-		# The scope has its own reticle.
+		# the scope has its own reticle.
 		_crosshair.visible = false
 	_crosshair.aim_amount = _player.get_aim_amount() if _player != null and not spectating else 0.0
 	if _player != null and not spectating and _player.weapon != null and _player.weapon.data != null:
-		# The lines open with the spray and with moving, so the crosshair says
+		# lines open with the spray and with moving, so the crosshair shows
 		# honestly how wide the next shot can go.
 		_crosshair.bloom = _player.weapon.get_bloom() \
 			+ (_player.get_movement_inaccuracy() - 1.0) * _player.weapon.data.spread_degrees
 	else:
 		_crosshair.bloom = 0.0
 	_vignette.update_view(_player, delta)
-	# While spectating, the watched teammate is alive: no death greying.
+	# while spectating, the watched teammate is alive: no death greying.
 	_screen_fx.update_view(spectator.target if spectating else _player, delta)
 	_top_bar.update_view()
 	_status.update_view(spectator.target if spectating else _player, spectating)
-	# The result screen carries the score and everyone's numbers itself.
+	# the result screen carries the score and everyone's numbers itself.
 	var match_over := GameManager.is_in(GamePhase.Phase.MATCH_END)
 	_top_bar.visible = not match_over
 	if match_over:
@@ -123,9 +123,8 @@ func _process(delta: float) -> void:
 	_top_bar.core_planted = objective != null and objective.is_planted() \
 		and GameManager.is_in(GamePhase.Phase.ROUND_ACTIVE)
 
-	# The buy menu cannot be clicked once the pointer is captured again (Esc
-	# while it is open), so it closes rather than sitting on screen while the
-	# mouse fires the gun.
+	# buy menu can't be clicked once the pointer's captured again (esc while
+	# it's open), so close it instead of leaving it up while the mouse fires.
 	if _buy.is_open and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		_buy.close(_player)
 
@@ -144,18 +143,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(&"buy_menu"):
 		_buy.toggle(_player)
 	elif event.is_action_pressed(&"scoreboard"):
-		# Refresh immediately on the press, not up to one slow tick later.
+		# refresh immediately on press, not up to one slow tick later.
 		_scoreboard.visible = true
 		_scoreboard.update_view(_player)
 
 
-## Follows the local body as it is spawned, replaced or removed, and flashes
-## the vignette when its health drops.
+## follows the local body as it's spawned, replaced or removed, and flashes
+## the vignette when health drops.
 ##
-## A health comparison rather than [signal Player.took_hit]: that signal is
-## raised where damage is applied, which online is the host. A client learns of
-## its own damage only as a new health value, so watching the value is the one
-## method that works on every machine.
+## compares health directly instead of using Player.took_hit: that signal
+## fires where damage is applied (the host, online), but a client only
+## learns of its own damage as a new health value - so watching the value
+## is what works on every machine.
 func _track_local_player() -> void:
 	var current := NetworkManager.get_local_player()
 	if current != _player:
@@ -166,7 +165,7 @@ func _track_local_player() -> void:
 		return
 	if _player == null:
 		return
-	# Shield counts: losing shield is being hit too.
+	# shield counts: losing shield is being hit too.
 	var health := _player.state.health + _player.state.shield
 	var health_only := _player.state.health
 	var real_hit := health_only < _last_health_only or GameManager.is_in(GamePhase.Phase.ROUND_ACTIVE)
@@ -181,6 +180,6 @@ var _last_health_only: int = PlayerState.MAX_HEALTH
 
 
 func _on_phase_changed(_previous: int, current: int) -> void:
-	# The result screen has buttons; give the player their pointer back.
+	# the result screen has buttons; give the player their pointer back.
 	if current == GamePhase.Phase.MATCH_END and _player != null:
 		_player.capture_mouse(false)

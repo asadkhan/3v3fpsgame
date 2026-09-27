@@ -1,19 +1,13 @@
 extends Node
-## Player-owned preferences, saved to [code]user://settings.cfg[/code].
-## Registered as the [code]GameConfig[/code] autoload.
+## player preferences, saved to user://settings.cfg. the GameConfig autoload.
 ##
-## This holds only settings the player controls: audio levels, mouse
-## sensitivity, field of view. Anything that is part of the game's design -
-## weapon damage, ability cooldowns, how many rounds a match lasts - belongs
-## in [code]res://data/[/code] as a [Resource], not here. The test is simple:
-## would a player expect to change this in an options menu? If not, it is
-## game data, not config.
+## only stuff the player controls: audio, sensitivity, fov. game design
+## values (damage, cooldowns, round count) belong in res://data/ as a
+## Resource instead - if it wouldn't show up in an options menu, it's not
+## config.
 ##
-## Settings live in one dictionary so saving and loading stay generic. The
-## properties below are typed views onto that dictionary, so you get both
-## [code]GameConfig.mouse_sensitivity[/code] and
-## [code]GameConfig.get_setting("input/mouse_sensitivity")[/code] from a
-## single source of truth.
+## settings live in one dictionary so save/load stay generic. the typed
+## properties below are just views onto it.
 
 const SETTINGS_PATH := "user://settings.cfg"
 
@@ -26,8 +20,8 @@ signal settings_saved
 ## Fires whenever any value is changed, including by [method set_setting].
 signal setting_changed(key: String, value: Variant)
 
-## Every setting, its default, and its type. The type is needed because
-## [ConfigFile] stores everything as a string.
+## every setting, its default, and its type (needed since ConfigFile stores
+## everything as a string).
 var _settings: Dictionary = {
 	"audio/master_volume": {"default": 0.8, "type": TYPE_FLOAT},
 	"input/mouse_sensitivity": {"default": 0.4, "type": TYPE_FLOAT},
@@ -37,7 +31,7 @@ var _settings: Dictionary = {
 	"player/display_name": {"default": "", "type": TYPE_STRING},
 	"input/aim_toggle": {"default": false, "type": TYPE_BOOL},
 	"video/head_bob": {"default": true, "type": TYPE_BOOL},
-	## [enum GraphicsQuality.Level]; -1 picks from the GPU.
+	## GraphicsQuality.Level enum value; -1 auto-picks from the GPU.
 	"video/graphics_quality": {"default": -1, "type": TYPE_INT},
 }
 
@@ -47,8 +41,8 @@ func _ready() -> void:
 
 
 # --- Typed access -------------------------------------------------------
-# Properties are views onto _settings, so assigning to one goes through
-# set_setting() and still fires setting_changed + saves.
+# properties go through set_setting() so assigning still fires
+# setting_changed and saves.
 
 var master_volume: float:
 	get: return get_setting("audio/master_volume")
@@ -70,19 +64,18 @@ var fullscreen: bool:
 	get: return get_setting("video/fullscreen")
 	set(value): set_setting("video/fullscreen", value)
 
-## Camera bob while moving. Off for players prone to motion sickness; the
-## weapon still bobs either way.
+## camera bob while moving. off helps with motion sickness; weapon still bobs.
 var head_bob: bool:
 	get: return get_setting("video/head_bob")
 	set(value): set_setting("video/head_bob", value)
 
-## Right mouse toggles aiming instead of holding it.
+## right mouse toggles aiming instead of holding it.
 var aim_toggle: bool:
 	get: return get_setting("input/aim_toggle")
 	set(value): set_setting("input/aim_toggle", value)
 
-## The name shown to other players. Empty until the player picks one; see
-## [method NetworkManager.local_display_name] for the fallback.
+## name shown to other players. empty until picked - see
+## NetworkManager.local_display_name for the fallback.
 var display_name: String:
 	get: return get_setting("player/display_name")
 	set(value): set_setting("player/display_name", value)
@@ -90,7 +83,7 @@ var display_name: String:
 
 # --- Generic access -----------------------------------------------------
 
-## Reads a setting, falling back to its default if the key is unknown.
+## reads a setting, falls back to fallback if the key is unknown.
 func get_setting(key: String, fallback: Variant = null) -> Variant:
 	if not _settings.has(key):
 		if fallback == null:
@@ -99,12 +92,11 @@ func get_setting(key: String, fallback: Variant = null) -> Variant:
 	return _settings[key]["value"]
 
 
-## Writes a setting, fires [signal setting_changed] and saves to disk.
-## Returns false if the key is unknown.
+## writes a setting, fires setting_changed and saves to disk. returns false
+## if the key is unknown.
 ##
-## [param save] false defers the disk write - for a slider being dragged, which
-## changes the value dozens of times a second. Call [method save_settings] when
-## it settles.
+## save = false skips the disk write, for a slider being dragged fast -
+## call save_settings once it settles.
 func set_setting(key: String, value: Variant, save: bool = true) -> bool:
 	if not _settings.has(key):
 		push_warning("GameConfig: unknown setting '%s'" % key)
@@ -118,15 +110,15 @@ func set_setting(key: String, value: Variant, save: bool = true) -> bool:
 
 # --- Persistence --------------------------------------------------------
 
-## Fills [member _settings] with the defaults, then overwrites anything that
-## was saved previously. Safe to call more than once.
+## fills _settings with defaults, then overwrites with anything saved.
+## safe to call more than once.
 func load_settings() -> void:
 	var config := ConfigFile.new()
 	_reset_to_defaults()
 
 	var error := config.load(SETTINGS_PATH)
 	if error != OK:
-		# No save file yet. That is the normal first-run case, not a problem.
+		# no save file yet - normal on first run.
 		settings_loaded.emit()
 		return
 
@@ -138,7 +130,7 @@ func load_settings() -> void:
 	settings_loaded.emit()
 
 
-## Writes the current values to [code]user://settings.cfg[/code].
+## writes the current values to user://settings.cfg.
 func save_settings() -> void:
 	var config := ConfigFile.new()
 	for key in _settings:
@@ -151,8 +143,7 @@ func save_settings() -> void:
 	settings_saved.emit()
 
 
-## Puts every value back to its default. Does not save; call
-## [method save_settings] afterwards to make it stick.
+## puts every value back to default. doesn't save - call save_settings after.
 func reset_to_defaults() -> void:
 	_reset_to_defaults()
 	for key in _settings:
@@ -164,8 +155,8 @@ func _reset_to_defaults() -> void:
 		_settings[key]["value"] = _settings[key]["default"]
 
 
-## [ConfigFile] gives everything back as a string, so "0.5" has to become
-## 0.5 and "1" has to become true rather than the string "1".
+## ConfigFile hands everything back as a string, so "0.5" needs to become
+## 0.5 and "1" needs to become true, not the string "1".
 func _coerce(value: Variant, type: int) -> Variant:
 	match type:
 		TYPE_FLOAT:

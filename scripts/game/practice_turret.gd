@@ -1,62 +1,47 @@
 class_name PracticeTurret
 extends Node3D
-## A deliberately stupid hostile that shoots at the player, so Chapter 3's
-## combat loop runs both ways.
+## a dumb hostile that shoots at the player, so the practice range can hurt
+## you back.
 ##
-## [b]Why this exists at all.[/b] The chapter's own brief asks for a player who
-## can take damage and can die, but the test range it also asks for is entirely
-## static - dummies and a wall. Nothing in that range can answer back, so "the
-## player can die" would be a claim about a code path nothing exercises. This
-## is the cheapest thing that makes the claim true.
+## no behaviour tree, no cover logic, no accuracy model, no memory. finds the
+## nearest living player, turns towards them, fires when aimed at them.
 ##
-## [b]Why it is so simple.[/b] It has no behaviour tree, no cover logic, no
-## accuracy model and no memory of the player. It finds the nearest living
-## player, turns towards them, and fires when it is pointing at them. That is
-## the entire algorithm, and it is the whole of the AI budget for Chapter 3 -
-## Chapter 6 is where enemy behaviour is designed.
+## damages through Damageable rather than writing to PlayerState directly, so
+## the turret and the player's own weapon share the exact same damage path.
 ##
-## [b]It damages the player through [Damageable], not by writing to
-## [member PlayerState].[/b] That is the part worth keeping. The turret and the
-## player's own weapon are two completely unrelated damage sources, and they go
-## through exactly the same one method, so a bug in the damage path shows up
-## whichever one you test with first.
-##
-## Disposable with the rest of the grey box.
+## throwaway practice-range enemy, nothing fancier planned for it here.
 
-## Damage per shot. Low enough that standing in the open does not end the test
-## run in two seconds.
+## damage per shot. low enough that standing in the open doesn't end the run
+## in two seconds.
 @export var damage_per_shot: float = 9.0
 
-## Seconds between shots. Deliberately slow: the point is that the player can be
-## hurt, not that standing still is fatal.
+## seconds between shots. slow on purpose - point is you *can* get hurt, not
+## that standing still is fatal.
 @export var fire_interval: float = 1.4
 
-## How far it will engage. Beyond this the turret does not even turn.
+## how far it will engage. beyond this it doesn't even turn.
 @export var engagement_range: float = 32.0
 
-## Seconds before the very first shot, so a player who spawns next to the turret
-## gets a moment to find it.
+## seconds before its first shot, so a player spawning next to it gets a
+## moment to notice it.
 @export var start_delay: float = 3.0
 
-## How quickly the barrel swings onto the target, in radians per second. Slow
-## enough that a player can watch it turn and understand it is aiming at them.
+## how fast the barrel swings onto target, radians per second. slow enough to
+## watch it aim at you.
 @export var turn_speed: float = 2.6
 
-## How far off target the turret may be and still fire, in degrees. Loose
-## enough not to need frame-perfect tracking, tight enough that hiding behind
-## cover works.
+## how far off target it can be and still fire, in degrees. loose enough to
+## skip frame-perfect tracking, tight enough that cover still works.
 @export var aim_tolerance_degrees: float = 7.0
 
-## Whether a wall between the turret and the player blocks the shot. On, because
-## a turret that shoots through the cover the chapter also asks for would be
-## testing nothing.
+## whether a wall between the turret and the player blocks the shot.
 @export var requires_line_of_sight: bool = true
 
-## Whether the turret shoots at all. The test harness turns this off to measure
-## the player in isolation, and back on to prove it can be hurt.
+## whether the turret shoots at all. toggle off to test the player in
+## isolation.
 @export var enabled: bool = true
 
-## Emitted on every shot, for the test harness and the debug overlay.
+## emitted on every shot, for the debug overlay
 signal fired(hit: bool)
 
 var _cooldown: float = 0.0
@@ -90,18 +75,16 @@ func _process(delta: float) -> void:
 
 	_turn_towards(_target.get_eye_position(), delta)
 
-	# Every machine turns the turret, but only the authority for health fires
-	# it. A client that fired would damage its own copy of a player, putting
-	# its health out of step with the host's - and could "kill" a player the
-	# host still thinks is alive.
+	# every machine turns the turret, but only the health authority fires it -
+	# otherwise a client could damage its own copy of a player and desync
+	# health from the host
 	if _cooldown <= 0.0 and _is_aimed_at(_target.get_eye_position()) \
 			and (not NetworkManager.is_online or multiplayer.is_server()):
 		_shoot()
 
 
-## The nearest living player, or null. Nearest rather than first, so a second
-## player spawned closer to the turret takes the fire - which is the behaviour
-## Chapter 4's two-instance tests will need.
+## the nearest living player, or null. nearest rather than first, so whoever's
+## closer takes the fire.
 func _find_target() -> Player:
 	var best: Player = null
 	var best_distance := INF
@@ -118,14 +101,11 @@ func _find_target() -> Player:
 	return best
 
 
-## Swings the barrel towards [param point] at no more than [member turn_speed].
-## The rate is capped rather than applied absolutely, so a player who runs past
-## at speed does not make the turret whip around like a searchlight.
+## swings the barrel towards point, capped at turn_speed so it doesn't whip
+## around like a searchlight when a player runs past fast.
 func _turn_towards(point: Vector3, delta: float) -> void:
 	var to_target := point - _head.global_position
-	# Flattened: the turret yaws only. A head that tracked pitch as well would
-	# need to compensate for its own muzzle height, and a hostile that has to
-	# aim at where a player's eyes are is aiming at a moving part.
+	# flattened: turret only yaws, no pitch tracking
 	to_target.y = 0.0
 	if to_target.length_squared() <= 0.0001:
 		return
@@ -152,17 +132,14 @@ func _shoot() -> void:
 	var target := _target
 	var hit := false
 	if target != null:
-		# From the muzzle, not the centre, so a player standing directly in front
-		# of the turret is not hidden behind its own pedestal.
+		# fire from the muzzle, not the centre, so a player right in front
+		# isn't hidden behind the turret's own pedestal
 		var origin := _muzzle.global_position
 		var to_target := target.get_eye_position() - origin
 		var distance := to_target.length()
 		if distance > 0.001 and _has_line_of_sight(origin, to_target / distance, distance):
-			# The eye is roughly where a head is. The turret aims for the head
-			# deliberately, so a player in the open is punished for not moving
-			# - but the shot is resolved by the player's own height band, so
-			# ducking genuinely makes the shot miss rather than just being
-			# described as a miss.
+			# aims at the eye/head position, but hit resolution uses the
+			# player's actual height band - so ducking really does miss it
 			hit = Damageable.deal_damage(
 				target, damage_per_shot, self, Damageable.HitZone.HEAD) > 0.0
 
@@ -179,19 +156,18 @@ func _has_line_of_sight(origin: Vector3, direction: Vector3, distance: float) ->
 
 	var query := PhysicsRayQueryParameters3D.create(
 		origin, origin + direction * distance, CollisionLayers.WEAPON_MASK)
-	# The turret's own hull is on the target layer, so without excluding it the
-	# first thing this ray hits is always the pedestal it is standing on.
+	# exclude its own hull, otherwise the ray always hits the pedestal first
 	query.exclude = [_hull.get_rid()]
 	var result := space.intersect_ray(query)
 
-	# Nothing in the way at all is a clear shot. Something in the way is only a
-	# blocker if it is not the player being aimed at.
+	# nothing in the way = clear shot. something in the way only blocks if
+	# it's not the player being aimed at
 	if result.is_empty():
 		return true
 	return Damageable.find_target(result.get("collider")) == _target
 
 
-## One line for the debug overlay.
+## one line for the debug overlay
 func debug_line() -> String:
 	if not enabled:
 		return "%s  disabled" % name

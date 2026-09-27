@@ -1,28 +1,25 @@
 class_name SignalCoreObjective
 extends Node3D
-## The Signal Core: the attackers' objective.
+## the signal core: the attackers' objective.
 ##
-## Each round one attacker starts carrying the core. The carrier plants it by
-## holding [code]interact[/code] (E) while standing on a site; a defender stops
-## it by holding [code]interact[/code] beside the planted core. If the carrier
-## dies the core drops where they fell, and any attacker who walks over it picks
-## it up. The round clock and the win conditions live in
-## [code]round_active_state.gd[/code]; this node only reports what happened
-## through [EventBus] (core_planted / core_defused / core_detonated).
+## one attacker carries the core each round. plant by holding interact (E) on
+## a site; defenders stop it the same way, standing next to the planted core.
+## carrier dies -> core drops, any attacker walking over it picks it up.
+## round clock and win conditions live in round_active_state.gd; this node
+## just reports what happened through EventBus (core_planted / core_defused /
+## core_detonated).
 ##
-## [b]Authority.[/b] The host decides everything: who carries, whether a plant
-## or defuse is valid, and progress. Each client only reports whether its
-## player is holding the key, and draws the host's snapshot. Planting and
-## defusing are interrupted by letting go, moving out of range, or dying, and
-## start again from zero.
+## host decides everything - who carries, plant/defuse validity, progress.
+## clients only report whether their player is holding the key, and draw the
+## host's snapshot. letting go, moving out of range, or dying interrupts a
+## plant/defuse and resets it to zero.
 ##
-## Lives in the match scene as the node [code]Objective[/code]; the HUD finds
-## it through the group [constant GROUP].
+## lives in the match scene as node Objective; the HUD finds it via group GROUP.
 
 const GROUP := &"objective"
 
 enum CoreState {
-	INACTIVE,   ## No core this round (e.g. nobody on the attacking side).
+	INACTIVE,   ## no core this round (e.g. nobody on the attacking side)
 	CARRIED,
 	DROPPED,
 	PLANTED,
@@ -30,13 +27,13 @@ enum CoreState {
 	DETONATED,
 }
 
-## How close an attacker must walk to a dropped core to pick it up.
+## how close an attacker must be to a dropped core to pick it up
 const PICKUP_RADIUS := 1.6
 
-## How close a defender must be to the planted core to defuse it.
+## how close a defender must be to the planted core to defuse it
 const DEFUSE_RADIUS := 2.2
 
-## Progress snapshots per second while someone is planting or defusing.
+## progress snapshots per second while someone is planting or defusing
 const PROGRESS_SEND_RATE := 10.0
 
 # --- Replicated state (host truth, mirrored on clients) ----------------------
@@ -47,13 +44,13 @@ var core_position: Vector3 = Vector3.ZERO
 var planted_site: String = ""
 var plant_progress: float = 0.0
 var defuse_progress: float = 0.0
-## Peer currently planting / defusing, or 0.
+## peer currently planting / defusing, or 0
 var planter_peer: int = 0
 var defuser_peer: int = 0
 
 # --- Host-only ----------------------------------------------------------------
 
-## peer id -> whether that player is holding the interact key.
+## peer id -> whether that player is holding the interact key
 var _holding: Dictionary = {}
 var _send_left: float = 0.0
 
@@ -71,7 +68,7 @@ func _ready() -> void:
 	_build_visual()
 	GameManager.state_changed.connect(_on_phase_changed)
 	EventBus.core_detonated.connect(_on_core_detonated_request)
-	# Sounds, on every machine, where the core is.
+	# sounds, on every machine, at the core's position
 	EventBus.core_planted.connect(func(_id: int, _site: String) -> void:
 		Audio.play_at(&"core_planted", core_position, 2.0, 0.0, 70.0)
 		_beep_left = 0.4)
@@ -89,7 +86,7 @@ func is_planted() -> bool:
 	return core_state == CoreState.PLANTED
 
 
-## Whether [param player] could start planting right now (on a site, carrying).
+## whether player could start planting right now (on a site, carrying)
 func can_plant(player: Player) -> bool:
 	return player != null and player.state.is_alive \
 		and core_state == CoreState.CARRIED and carrier_peer == player.peer_id \
@@ -97,7 +94,7 @@ func can_plant(player: Player) -> bool:
 		and site_at(player.global_position) != ""
 
 
-## Whether [param player] could start defusing right now.
+## whether player could start defusing right now
 func can_defuse(player: Player) -> bool:
 	return player != null and player.state.is_alive \
 		and core_state == CoreState.PLANTED \
@@ -106,7 +103,7 @@ func can_defuse(player: Player) -> bool:
 		and GameManager.is_in(GamePhase.Phase.ROUND_ACTIVE)
 
 
-## The name of the site containing [param point] ("A", "B"), or "".
+## the name of the site containing point ("A", "B"), or ""
 func site_at(point: Vector3) -> String:
 	for node in get_tree().get_nodes_in_group(BlockMap.SITE_GROUP):
 		var area := node as Area3D
@@ -125,12 +122,10 @@ func site_at(point: Vector3) -> String:
 
 # --- Per-frame ----------------------------------------------------------------
 
-## Idle-frame rather than physics-frame, on purpose: the round and detonation
-## clocks tick in [GameManager]'s idle frame on real time, and plant / defuse
-## progress must run on the same clock. On a loaded host the physics step falls
-## behind real time (Godot caps catch-up steps per frame), and a defuse measured
-## in physics time then loses a race against a detonation measured in real time
-## that it should have won.
+## runs on the idle frame, not physics, so plant/defuse progress stays on the
+## same clock as the round/detonation timers in GameManager. on a loaded host
+## physics steps can fall behind real time, which would let a defuse lose a
+## race it should've won.
 func _process(delta: float) -> void:
 	_send_local_input()
 	if _is_authority():
@@ -139,8 +134,8 @@ func _process(delta: float) -> void:
 	_update_visual(delta)
 
 
-## Tells the host whether this machine's player is holding the key. Only sends
-## on change; the host remembers.
+## tells the host whether this machine's player is holding the key. only sends
+## on change; the host remembers the rest.
 func _send_local_input() -> void:
 	var local := NetworkManager.get_local_player()
 	var holding := local != null and local.input_enabled \
@@ -164,9 +159,9 @@ func _rpc_set_holding(holding: bool) -> void:
 	_holding[multiplayer.get_remote_sender_id()] = holding
 
 
-## Freezes the local player while their plant or defuse is in progress, or
-## while they are holding the key somewhere a plant or defuse is possible - so
-## the stop is instant rather than waiting for the host.
+## freezes the local player during a plant/defuse (or while holding the key
+## somewhere one is possible), so stopping is instant instead of waiting on
+## the host round trip.
 func _update_local_lock() -> void:
 	var local := NetworkManager.get_local_player()
 	if local == null:
@@ -268,7 +263,7 @@ func _drop(at: Vector3) -> void:
 	_broadcast()
 
 
-## Host only, at the start of every round: hand the core to an attacker.
+## host only, at the start of every round: hand the core to an attacker
 func _server_reset_for_round() -> void:
 	_holding.clear()
 	planted_site = ""
@@ -304,7 +299,7 @@ func _on_phase_changed(_previous: int, current: int) -> void:
 		_broadcast()
 
 
-## Raised by the round when the planted core's clock runs out.
+## raised by the round when the planted core's clock runs out
 func _on_core_detonated_request() -> void:
 	if _is_authority() and core_state == CoreState.PLANTED:
 		core_state = CoreState.DETONATED
@@ -312,7 +307,7 @@ func _on_core_detonated_request() -> void:
 
 
 func _on_roster_updated() -> void:
-	# A late joiner needs the current state.
+	# a late joiner needs the current state
 	if NetworkManager.is_online and NetworkManager.is_host:
 		_broadcast()
 
@@ -355,8 +350,8 @@ func _net_snapshot(p_state: int, p_carrier: int, p_position: Vector3, p_site: St
 	defuse_progress = p_defuse
 	planter_peer = p_planter
 	defuser_peer = p_defuser
-	# Clients raise the same events the host raised, so the HUD and the round
-	# state react identically everywhere.
+	# clients raise the same events the host raised, so the HUD and round
+	# state react the same everywhere
 	if previous != core_state:
 		match core_state:
 			CoreState.PLANTED:
@@ -373,9 +368,8 @@ func _is_authority() -> bool:
 
 # --- Visual ---------------------------------------------------------------------
 
-## The core itself: a glowing double pyramid with a light and a floating label,
-## drawn whenever it is lying on the ground or planted. Placeholder art until
-## the art pass.
+## the core itself: a glowing double pyramid with a light and a floating
+## label, drawn whenever it's on the ground or planted. placeholder art.
 func _build_visual() -> void:
 	_visual = Node3D.new()
 	_visual.name = "CoreVisual"
@@ -420,12 +414,12 @@ func _build_visual() -> void:
 	_visual.visible = false
 
 
-## Seconds to the planted core's next beep.
+## seconds to the planted core's next beep
 var _beep_left: float = 0.0
 
 
-## The planted core beeps, faster and faster as its clock runs down - the
-## sound every player in the match times their retake or their hold by.
+## the planted core beeps faster as its clock runs down - players time their
+## retake or hold by it.
 func _tick_beep(delta: float) -> void:
 	if not GameManager.is_in(GamePhase.Phase.ROUND_ACTIVE) or GameManager.current_state == null:
 		return

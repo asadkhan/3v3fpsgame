@@ -1,17 +1,15 @@
 class_name BattlefieldAtmosphere
 extends Node3D
-## Everything that makes a map feel like part of a war rather than a range:
-## dust drifting in the air, columns of smoke from fires beyond the walls,
-## burning barrels, blast scorches and stains on the ground, wind, distant
-## artillery and far-off firefights, a war-film colour grade and film grain.
+## everything that makes a map feel like part of a war instead of a range:
+## dust, smoke columns, burning barrels, scorches, wind, distant artillery
+## and firefights, a war-film grade and film grain.
 ##
-## Purely presentation and purely local - nothing here collides (except the
-## fire barrels, which are placed like any prop by the map) or replicates. A map
-## adds one and calls the [code]add_*[/code] helpers; [method _ready] sets up
-## the parts that need no placing.
+## purely presentation, purely local - nothing collides or replicates
+## (except the fire barrels, placed like any prop). a map adds one instance
+## and calls the add_* helpers; _ready sets up the parts that need no placing.
 
-## How often something big goes off in the distance, and a firefight flares, in
-## seconds (random between the two).
+## how often something booms in the distance / a firefight flares, seconds
+## (randomized between the two values).
 const BOOM_INTERVAL := Vector2(9.0, 22.0)
 const BURST_INTERVAL := Vector2(4.0, 11.0)
 
@@ -36,21 +34,21 @@ func _ready() -> void:
 
 # --- Placement helpers (called by the map) -----------------------------------------------
 
-## A column of smoke rising from somewhere beyond the walls.
+## a column of smoke rising from somewhere beyond the walls.
 func add_smoke_column(at: Vector3, scale: float = 1.0) -> void:
 	var low := GraphicsQuality.current() == GraphicsQuality.Level.LOW
 	var column := BattleFx.smoke_column(scale)
 	if low:
-		# Big soft quads are the costliest thing here on a weak GPU.
+		# big soft quads are the costliest thing here on a weak GPU.
 		column.amount = 30
 	add_child(column)
 	column.position = at
 	column.emitting = true
-	# Already billowing when the match starts, not just lighting up.
+	# already billowing when the match starts, not just lighting up.
 	column.restart()
 	if low:
 		return
-	# A dull glow at the foot of it, as if something is still burning there.
+	# a dull glow at the base, like something's still burning there.
 	var glow := OmniLight3D.new()
 	glow.light_color = Color(1.0, 0.45, 0.15)
 	glow.light_energy = 2.0 * scale
@@ -60,8 +58,8 @@ func add_smoke_column(at: Vector3, scale: float = 1.0) -> void:
 	glow.position = at + Vector3(0, 1.5, 0)
 
 
-## Flames, embers, smoke, flickering light and crackle at [param at] (the top
-## of a barrel or wreck).
+## flames, embers, smoke, flickering light and crackle at [param at] (top of
+## a barrel or wreck).
 func add_fire(at: Vector3, width: float = 0.5) -> void:
 	var root := Node3D.new()
 	add_child(root)
@@ -85,8 +83,7 @@ func add_fire(at: Vector3, width: float = 0.5) -> void:
 	_fires.append({"light": light, "seed": randf() * 100.0})
 
 
-## A blast scorch (or, with [param stain], an oil stain) lying on whatever is
-## below [param at].
+## a blast scorch (or, with [param stain], an oil stain) on whatever's below [param at].
 func add_scorch(at: Vector3, size: float, stain: bool = false) -> void:
 	var decal := Decal.new()
 	decal.texture_albedo = BattleFx.stain_texture() if stain else BattleFx.scorch_texture()
@@ -101,7 +98,7 @@ func add_scorch(at: Vector3, size: float, stain: bool = false) -> void:
 
 # --- Always-on parts ------------------------------------------------------------------------
 
-## Fine dust hanging in the sunlight around whoever is watching.
+## fine dust hanging in the sunlight around whoever's watching.
 func _add_dust_motes() -> void:
 	var p := CPUParticles3D.new()
 	p.amount = 90
@@ -126,7 +123,7 @@ func _add_dust_motes() -> void:
 	_dust = p
 
 
-## Film grain and a soft vignette over the 3D view, under the HUD.
+## film grain and a soft vignette over the 3d view, under the hud.
 func _add_film_overlay() -> void:
 	var layer := CanvasLayer.new()
 	layer.layer = 4
@@ -145,7 +142,7 @@ void fragment() {
 	uv.x *= SCREEN_PIXEL_SIZE.y / SCREEN_PIXEL_SIZE.x;
 	float v = smoothstep(0.35, 1.05, length(uv) * 1.25) * vignette;
 	float n = hash(floor(FRAGCOORD.xy / 1.5)) - 0.5;
-	// Grain: specks of light and dark; the vignette darkens over it.
+	// grain: specks of light and dark, vignette darkens over it.
 	float g = abs(n) * grain * 2.0;
 	COLOR = vec4(vec3(step(0.0, n) * (1.0 - step(g, v))), max(g, v));
 }
@@ -156,9 +153,9 @@ void fragment() {
 	layer.add_child(rect)
 
 
-## A war-film grade on the map's environment: teal in the shadows, warm
-## highlights, a little less saturation and a firmer contrast. A colour lookup
-## table, so it costs nothing per frame.
+## war-film grade on the map's environment: teal shadows, warm highlights,
+## a bit less saturation, firmer contrast. done as a lookup table so it
+## costs nothing per frame.
 func _grade_environment() -> void:
 	var world := get_parent().find_child("WorldEnvironment", true, false) as WorldEnvironment
 	if world == null or world.environment == null:
@@ -179,15 +176,15 @@ func _grade_environment() -> void:
 
 static func _grade(c: Color) -> Color:
 	var luma := c.r * 0.2126 + c.g * 0.7152 + c.b * 0.0722
-	# Slightly desaturated.
+	# slightly desaturated.
 	var out := Color(lerpf(luma, c.r, 0.86), lerpf(luma, c.g, 0.86), lerpf(luma, c.b, 0.86))
-	# Split toning: cool shadows, warm highlights.
+	# split toning: cool shadows, warm highlights.
 	var shadow := 1.0 - smoothstep(0.0, 0.5, luma)
 	var high := smoothstep(0.45, 1.0, luma)
 	out.r += -0.025 * shadow + 0.035 * high
 	out.g += 0.004 * shadow + 0.012 * high
 	out.b += 0.03 * shadow - 0.04 * high
-	# Gentle S-curve.
+	# gentle s-curve.
 	for i in 3:
 		var v: float = out[i]
 		out[i] = clampf(v + (v - 0.5) * 0.12 * (1.0 - absf(v - 0.5) * 2.0), 0.0, 1.0)
@@ -215,7 +212,7 @@ func _process(delta: float) -> void:
 		_distant(&"distant_burst", -8.0)
 
 
-## A sound from somewhere far off in a random direction, heard through the
+## a sound from somewhere far off in a random direction, heard through the
 ## listener so it comes from one side.
 func _distant(sound: StringName, volume_db: float) -> void:
 	var camera := get_viewport().get_camera_3d()

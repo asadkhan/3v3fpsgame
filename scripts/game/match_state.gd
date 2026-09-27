@@ -1,47 +1,38 @@
 class_name MatchState
 extends RefCounted
-## The numbers for the match in progress: which round we are on, the score,
-## and who has won.
+## the numbers for the match in progress: round, score, who's won.
 ##
-## Deliberately [b]not[/b] an autoload. There is only ever one match running,
-## so exactly one of these exists and [GameManager] owns it. Making it a
-## singleton would give every system a second, competing way to ask "what is
-## the score?" - ask [member GameManager.match_state] instead.
+## not an autoload on purpose - only one match ever runs, and GameManager
+## owns the one instance. use GameManager.match_state instead of making
+## this a singleton.
 ##
-## This holds no nodes and no scene references, which keeps it trivial to
-## replicate over the network in Chapter 4.
+## holds no nodes or scene refs, so it's trivial to replicate over the network.
 
-## The rules this match is being played under. Supplied by [GameManager] when
-## the match is created. Held rather than read from a constant so that when a
-## dedicated server becomes authoritative, the rules it owns are the same
-## values every client scores against.
+## rules this match is played under, supplied by GameManager on creation.
 var rules: MatchRules
 
-## Which round we are on. Incremented by [method start_round], so it is 0
-## until the first [b]BUY[/b].
+## which round we're on. bumped by start_round, so it's 0 until the first BUY.
 var round_number: int = 0
 
-## Winner of the most recent round, or [constant Team.Side.NONE] if it ended
-## with no winner (a draw, or a time-out with nobody ahead).
+## winner of the most recent round, or NONE for a draw/timeout.
 var last_round_winner: int = Team.Side.NONE
 
-## Winner of the match, or [constant Team.Side.NONE] while it is still going.
+## winner of the match, or NONE while still going.
 var winning_team: int = Team.Side.NONE
 
 var _scores: Dictionary = {}
 
-## Consecutive rounds each side has lost, for the economy's loss bonus.
+## consecutive rounds each side has lost, for the economy's loss bonus.
 var _loss_streaks: Dictionary = {}
 
 
 func _init(match_rules: MatchRules = null) -> void:
-	# Optional so a bare MatchState.new() still works in a test, falling back
-	# to the defaults rather than crashing on a null rules reference.
+	# optional so a bare MatchState.new() still works in a test.
 	rules = match_rules if match_rules != null else MatchRules.new()
 	reset()
 
 
-## Clears everything back to a fresh match. Called when a new lobby opens.
+## clears everything back to a fresh match, called when a new lobby opens.
 func reset() -> void:
 	round_number = 0
 	last_round_winner = Team.Side.NONE
@@ -60,7 +51,7 @@ func get_score(team: int) -> int:
 	return _scores.get(team, 0)
 
 
-## The team with more round wins, or [constant Team.Side.NONE] when level.
+## the team with more round wins, or NONE when tied.
 func get_leading_team() -> int:
 	var alpha := get_score(Team.Side.ALPHA)
 	var bravo := get_score(Team.Side.BRAVO)
@@ -69,12 +60,12 @@ func get_leading_team() -> int:
 	return Team.Side.ALPHA if alpha > bravo else Team.Side.BRAVO
 
 
-## Called at the start of each round, by [b]BUY[/b].
+## called at the start of each round, by BUY.
 func start_round() -> void:
 	round_number += 1
 
 
-## Credits a round win. Returns true if it also won the match.
+## credits a round win. returns true if it also won the match.
 func add_round_win(team: int) -> bool:
 	_scores[team] = get_score(team) + 1
 	if _scores[team] >= rules.rounds_to_win:
@@ -83,10 +74,9 @@ func add_round_win(team: int) -> bool:
 	return false
 
 
-## The side attacking in [param for_round] (default: the current round). ALPHA
-## attacks the first half and BRAVO the second - see
-## [method MatchRules.halftime_after]. Derived from the round number, so it
-## needs no replication of its own.
+## the side attacking in for_round (default: current round). ALPHA attacks
+## the first half, BRAVO the second - see MatchRules.halftime_after. derived
+## from the round number, so it needs no replication of its own.
 func attacking_side(for_round: int = -1) -> int:
 	var number := round_number if for_round < 0 else for_round
 	return Team.Side.ALPHA if number <= rules.halftime_after() else Team.Side.BRAVO
@@ -96,7 +86,7 @@ func defending_side(for_round: int = -1) -> int:
 	return Team.opposing_side(attacking_side(for_round))
 
 
-## Whether the current round is the first one after the sides swapped.
+## whether the current round is the first one after the sides swapped.
 func is_first_round_of_half() -> bool:
 	return round_number == 1 or round_number == rules.halftime_after() + 1
 
@@ -105,7 +95,7 @@ func get_loss_streak(team: int) -> int:
 	return _loss_streaks.get(team, 0)
 
 
-## Updates both sides' loss streaks for a finished round.
+## updates both sides' loss streaks for a finished round.
 func record_round_result(winner: int) -> void:
 	for side in [Team.Side.ALPHA, Team.Side.BRAVO]:
 		if winner == Team.Side.NONE:
@@ -113,7 +103,7 @@ func record_round_result(winner: int) -> void:
 		_loss_streaks[side] = 0 if side == winner else get_loss_streak(side) + 1
 
 
-## Clears the loss streaks, at the start of each half.
+## clears the loss streaks, at the start of each half.
 func reset_loss_streaks() -> void:
 	_loss_streaks[Team.Side.ALPHA] = 0
 	_loss_streaks[Team.Side.BRAVO] = 0
@@ -123,9 +113,8 @@ func is_match_over() -> bool:
 	return winning_team != Team.Side.NONE
 
 
-## Everything a client needs to mirror the host's match, as plain data that can
-## cross an RPC. The rules are deliberately not included - every peer loads the
-## same [code]match_rules.tres[/code].
+## everything a client needs to mirror the host's match, as plain data for an
+## RPC. rules aren't included - every peer loads the same match_rules.tres.
 func to_dict() -> Dictionary:
 	return {
 		"round_number": round_number,
@@ -138,7 +127,7 @@ func to_dict() -> Dictionary:
 	}
 
 
-## Replaces this match's numbers with a snapshot from [method to_dict].
+## replaces this match's numbers with a snapshot from to_dict.
 func apply_dict(data: Dictionary) -> void:
 	round_number = int(data.get("round_number", 0))
 	last_round_winner = int(data.get("last_round_winner", Team.Side.NONE))
@@ -149,7 +138,7 @@ func apply_dict(data: Dictionary) -> void:
 	_loss_streaks[Team.Side.BRAVO] = int(data.get("streak_bravo", 0))
 
 
-## "ALPHA 2 - 1 BRAVO" - for the HUD and the console.
+## "ALPHA 2 - 1 BRAVO" - for the hud and the console.
 func score_line() -> String:
 	return "%s %d - %d %s" % [
 		Team.side_name(Team.Side.ALPHA), get_score(Team.Side.ALPHA),

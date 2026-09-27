@@ -1,78 +1,72 @@
 extends Node
-## Global signal hub. Registered as the [code]EventBus[/code] autoload.
+## global signal hub. autoload: EventBus.
 ##
-## Use this for things that more than one unrelated system needs to hear
-## about - the HUD, the audio layer, the scoreboard - so those systems do not
-## each need a direct reference to whatever raised the event.
+## use this for things more than one unrelated system needs to hear about
+## (hud, audio, scoreboard) so they don't each need a direct reference to
+## whoever raised the event.
 ##
-## [b]When not to use it:[/b] if exactly one system cares about something,
-## that system should just call the other one directly. This file is not a
-## dumping ground; if you find yourself adding a signal nobody listens to,
-## delete it instead.
+## if exactly one system cares, just call it directly instead. don't add a
+## signal nobody listens to.
 
 # --- Lobby / connection -------------------------------------------------
 
-## A peer joined the session.
+## a peer joined the session.
 signal player_joined(peer_id: int, player_name: String)
 
-## A peer left the session.
+## a peer left the session.
 signal player_left(peer_id: int)
 
 # --- Combat -------------------------------------------------------------
 
-## Damage was dealt. [param amount] is the health actually removed.
+## damage was dealt. amount is the health actually removed.
 signal player_damaged(victim_id: int, attacker_id: int, amount: float)
 
-## A player was killed. [param killer_id] is [constant INVALID_PEER] for deaths
-## caused by the environment. Raised on every machine: on the host by
-## [method Player.die], on clients by the host's death announcement - so the
-## kill feed and the round's elimination check see the same events everywhere.
-## The player this machine controls was hurt by something at [param from]
-## (for the damage-direction indicator). Local presentation only.
+## the local player was hurt by something at `from` (damage-direction
+## indicator). local presentation only.
 signal local_hit_from(from: Vector3)
 
-## A blast went off near the local player; [param strength] 0..1.
+## a blast went off near the local player; strength 0..1.
 signal local_concussion(strength: float)
 
+## a player was killed. killer_id is INVALID_PEER for environmental deaths.
+## raised on every machine: host via Player.die, clients via the host's
+## death announcement, so the kill feed and elimination check agree everywhere.
 signal player_died(victim_id: int, killer_id: int, was_headshot: bool)
 
-## A shot was taken. For tracers, muzzle flash and the kill feed - the
-## authoritative hit resolution is Chapter 3's job, not this signal's.
+## a shot was taken - for tracers, muzzle flash, kill feed. not the
+## authoritative hit resolution.
 signal shot_fired(shooter_id: int, origin: Vector3, direction: Vector3)
 
-## An ability was activated. [param ability_id] matches an entry in [code]res://data/[/code].
+## an ability was activated. ability_id matches an entry in res://data/.
 signal ability_used(user_id: int, ability_id: StringName)
 
-## A standout moment for a player: first blood, a multi-kill, an ace, a
-## clutch. [param kind] is one of the [MatchTracker] callout constants. Raised
-## on every machine.
+## a standout moment for a player: first blood, multi-kill, ace, clutch.
+## kind is one of the MatchTracker callout constants. raised everywhere.
 signal player_callout(peer_id: int, kind: StringName)
 
 # --- Objective ----------------------------------------------------------
 
-## The Signal Core was planted on [param site]. [param planter_id] is 0 on
-## clients (they only learn that it happened). Raised on every machine.
+## the signal core was planted on site. planter_id is 0 on clients (they
+## only learn it happened). raised everywhere.
 signal core_planted(planter_id: int, site: String)
 
-## A defender finished defusing the planted core. Raised on every machine.
+## a defender finished defusing the planted core. raised everywhere.
 signal core_defused(defuser_id: int)
 
-## The planted core's clock ran out. Raised by the round on the host, then by
-## the objective's snapshot on clients.
+## the planted core's clock ran out. raised by the round on the host, then
+## by the objective's snapshot on clients.
 signal core_detonated
 
 # --- Match flow ---------------------------------------------------------
 
-## A round is being set up. This fires at [b]BUY[/b], not when combat
-## actually begins.
+## a round is being set up. fires at BUY, not when combat actually begins.
 signal round_started(round_number: int)
 
-## A round has been resolved. [param winning_team] is a [enum Team.Side], or
-## [constant Team.Side.NONE] if the round ended with no winner.
+## a round was resolved. winning_team is Team.Side.NONE if nobody won.
 signal round_ended(winning_team: int)
 
-## The match is over. [param winning_team] is a [enum Team.Side].
+## the match is over.
 signal match_ended(winning_team: int)
 
-## Used as [param killer_id] on [signal player_died] when nobody got the kill.
+## used as killer_id on player_died when nobody got the kill.
 const INVALID_PEER := 0

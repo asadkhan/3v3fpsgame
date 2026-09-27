@@ -1,15 +1,12 @@
 class_name HudMatchEndPanel
 extends PanelContainer
-## The result screen: VICTORY or DEFEAT from this player's side, the final
-## score, the match MVP, every player's numbers, and the XP this match earned
-## towards the player's profile level - then a rematch (host) or back to the
-## menu (anyone).
+## the result screen: VICTORY or DEFEAT from this player's side, final score,
+## match MVP, everyone's numbers, and the XP this match earned - then a
+## rematch (host) or back to the menu (anyone).
 ##
-## XP is recorded once per match, as soon as MATCH_END arrives: the host sends
-## everyone's final stats before it announces the phase, so they are already
-## here. Only real matches pay out: online, both sides populated, and actually
-## won by someone - a host skipping to the result screen from the lobby does
-## not count. The practice range never does.
+## XP is recorded once per match, as soon as MATCH_END arrives (host's final
+## stats are already in by then). only real matches pay out: online, both
+## sides populated, actually won by someone. practice never pays out.
 
 var _result: Label
 var _score: Label
@@ -89,7 +86,7 @@ func _ready() -> void:
 	GameManager.state_changed.connect(_on_phase_changed)
 
 
-## Host only: back to the lobby with the same players, score reset.
+## host only: back to the lobby with the same players, score reset
 func rematch() -> void:
 	if GameManager.is_in(GamePhase.Phase.MATCH_END) and GameManager.is_authority():
 		GameManager.change_state(GamePhase.Phase.LOBBY)
@@ -102,9 +99,8 @@ func _on_phase_changed(_previous: int, current: int) -> void:
 		_xp_lines.text = ""
 		_level_label.text = ""
 		_level_bar.value = 0.0
-		# Deferred so every other listener (the tracker's final flush on the
-		# host) has run first; immediate otherwise, so a quick rematch or leave
-		# cannot skip it.
+		# deferred so the tracker's final flush on the host runs first; a quick
+		# rematch or leave still can't skip it
 		_record_now.call_deferred()
 
 
@@ -141,9 +137,8 @@ func _set_result(text: String, colour: Color) -> void:
 	_result.add_theme_color_override(&"font_color", colour)
 
 
-## The highest combat score in the match, or null when nobody scored. Ties go
-## to more kills, then to the lower peer id, so every machine picks the same
-## player.
+## highest combat score in the match, or null if nobody scored. ties go to
+## more kills, then lower peer id, so every machine picks the same player.
 func _mvp_player() -> Player:
 	var best: Player = null
 	for player in NetworkManager.get_players():
@@ -166,7 +161,7 @@ var _table_left: float = 0.0
 
 
 func _rebuild_table() -> void:
-	# Cheap to rebuild, but no need to every frame.
+	# cheap to rebuild, but no need to every frame
 	_table_left -= get_process_delta_time()
 	if _table_left > 0.0:
 		return
@@ -208,7 +203,7 @@ func _row(values: Array, colour: Color) -> Control:
 	return row
 
 
-## Pays this match's XP into the profile and animates the level bar.
+## pays this match's XP into the profile and animates the level bar
 func _record_xp(local_team: int) -> void:
 	var local := NetworkManager.get_local_player()
 	var eligible := NetworkManager.is_online and local != null and local_team != Team.Side.NONE \
@@ -239,8 +234,8 @@ func _record_xp(local_team: int) -> void:
 		int(result["xp_after"]))
 
 
-## Fills the bar from where it was to where it is now, rolling over once per
-## level gained.
+## fills the bar from where it was to where it is now, rolling over once per
+## level gained
 func _animate_level(level_before: int, xp_before: int, level_after: int, xp_after: int) -> void:
 	if _xp_anim != null:
 		_xp_anim.kill()

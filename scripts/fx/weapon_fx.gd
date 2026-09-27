@@ -1,42 +1,30 @@
 class_name WeaponFx
 extends Node3D
-## Everything about a shot that is only worth showing to the machine that pulled
-## the trigger.
+## everything about a shot that's only worth showing to the machine that
+## pulled the trigger.
 ##
-## [b]This node is the network boundary for weapon presentation.[/b] The weapon
-## knows where a round stopped; it emits that as [signal Weapon.impact_requested]
-## and stops there. This listens and decides to draw. In Chapter 4, when a
-## client's shot is validated by the host, the host re-runs the hitscan and gets
-## a position back - and the machine that draws the spark is still the one whose
-## input caused it, not the one that happened to be authoritative. Keeping the
-## two apart is why the two classes are separate, and it means a future
-## "spectator mode shows other players' tracers" feature has somewhere to live
-## without either class growing a flag it should not have.
+## this is the network boundary for weapon presentation: the weapon knows
+## where a round stopped and emits impact_requested, then stops. this node
+## decides whether to draw it. the machine that draws the effect is always
+## the one whose input caused the shot, not necessarily the authoritative one.
 ##
-## [b]Muzzle flash and tracer are not here yet[/b] and do not need to be: the
-## flash is a light on the weapon, driven by the local trigger, and the tracer
-## would be spawned the same way as an impact. Chapter 8 replaces this file.
+## no muzzle flash/tracer logic lives here yet - flash is a light driven by
+## the local trigger, and tracers spawn the same way impacts do.
 
-## The effect spawned where a round stops.
+## the effect spawned where a round stops.
 @export var impact_scene: PackedScene
 
-## Rejects impacts from further away than this. A round that travelled the
-## weapon's whole 45 m range is a legitimate hit and should be marked; this is
-## only here so a bad origin from a network message cannot fill the screen with
-## effects.
+## ignore impacts further than this. legit hits at max weapon range (45m)
+## are fine - this just stops a bad network origin from spamming effects.
 @export var max_impact_distance: float = 100.0
 
 @onready var _weapon: Weapon = get_parent().get_node_or_null(^"Weapon") as Weapon
-## Found by walking up rather than by a fixed number of `get_parent()` hops:
-## this node lives at Player/Head/WeaponMount/WeaponFx, and the old
-## two-hop lookup landed on Head, so the player was always null and no network
-## impact was ever drawn.
+## found by walking up rather than a fixed number of get_parent() hops -
+## this node actually lives at Player/Head/WeaponMount/WeaponFx.
 @onready var _player: Player = _find_player()
 
-## Impacts alive at once. A full automatic burst is seven or eight rounds a
-## second, and each effect is meant to last a fifth of that, so the cap is
-## never reached in normal play - it exists so a pathological frame cannot
-## spawn hundreds of nodes and stall the game.
+## impacts alive at once, capped so a pathological frame can't spawn
+## hundreds of nodes and stall the game.
 const MAX_LIVE_EFFECTS := 24
 
 var _live: int = 0
@@ -48,10 +36,8 @@ func _ready() -> void:
 		return
 	_weapon.impact_requested.connect(_on_impact_requested)
 
-	# When this machine is not the one that resolved the shot, the impact
-	# arrives as a verdict from the host rather than as this weapon's own
-	# signal, and this machine's own trigger pulls draw their tracer the moment
-	# they happen rather than waiting for that verdict.
+	# when this machine isn't the one that resolved the shot, the impact
+	# arrives as a verdict from the host instead of this weapon's own signal.
 	if _player != null:
 		_player.shot_resolved.connect(_on_shot_resolved)
 		_player.shot_fired.connect(_on_shot_fired)
@@ -66,16 +52,14 @@ func _find_player() -> Player:
 	return null
 
 
-## Who draws what, so every shot is drawn exactly once on every machine:
+## who draws what, so every shot draws exactly once on every machine:
 ##
-## - [b]Tracer.[/b] The shooter's own machine draws it instantly from the local
-##   trigger ([method _on_shot_fired]). Every other machine draws it when it
-##   learns about the shot - the host from its own resolution
-##   ([method _on_impact_requested] on a remote body's weapon), clients from the
-##   host's verdict ([method _on_shot_resolved]) - and adds a muzzle flash,
-##   because the shooter's viewmodel is invisible to them.
-## - [b]Impact.[/b] Drawn from whichever resolution this machine sees: the
-##   weapon's own hitscan (offline, or the host), or the verdict (clients).
+## - tracer: shooter's own machine draws it instantly on trigger pull
+##   (_on_shot_fired). every other machine draws it when it learns about the
+##   shot - the host from its own resolution, clients from the host's
+##   verdict - plus a muzzle flash, since the shooter's viewmodel is invisible.
+## - impact: drawn from whichever resolution this machine sees - the
+##   weapon's own hitscan (offline/host) or the verdict (clients).
 func _on_impact_requested(at: Vector3, normal: Vector3, zone: int, surface: int) -> void:
 	_spawn_impact(at, normal, zone, surface)
 	if _is_remote_shooter():
@@ -85,17 +69,16 @@ func _on_impact_requested(at: Vector3, normal: Vector3, zone: int, surface: int)
 func _on_shot_resolved(at: Vector3, normal: Vector3, _victim: Player, zone: int, _killed: bool,
 		is_local: bool, surface: int) -> void:
 	if is_local:
-		# Already drawn from the weapon's own signal on the machine that ran the
-		# raycast. Drawing it again would double every effect.
+		# already drawn from the weapon's own signal - drawing again doubles it.
 		return
 	_spawn_impact(at, normal, zone, surface)
 	if _is_remote_shooter():
 		_spawn_tracer(at, true)
 
 
-## This machine's own shot: trace a purely visual ray to find where the streak
-## should end. The real result comes from the authority; this only decides where
-## a line of light is drawn, so it may disagree by a hair and nobody can tell.
+## this machine's own shot: trace a purely visual ray to find where the
+## tracer should end. the real hit comes from the authority; this can
+## disagree by a hair and nobody will notice.
 func _on_shot_fired(origin: Vector3, direction: Vector3) -> void:
 	if _weapon == null or _weapon.data == null:
 		return
@@ -116,7 +99,7 @@ func _on_shot_fired(origin: Vector3, direction: Vector3) -> void:
 	_spawn_tracer(end, false)
 
 
-## The gunshot sound for the held weapon.
+## the gunshot sound for the held weapon.
 func _shot_sound() -> StringName:
 	var data := _weapon.data if _weapon != null else null
 	if data == null:
@@ -132,8 +115,8 @@ func _shot_sound() -> StringName:
 var _last_echo_ms: int = -1000
 
 
-## The shot rolling back off the walls: one tail at most every quarter second,
-## so a spray does not become a roar.
+## the shot rolling back off the walls: at most one tail every quarter
+## second so a spray doesn't turn into a roar.
 func _echo(remote: bool, at := Vector3.ZERO) -> void:
 	var now := Time.get_ticks_msec()
 	if now - _last_echo_ms < 250:
@@ -145,7 +128,7 @@ func _echo(remote: bool, at := Vector3.ZERO) -> void:
 		get_tree().create_timer(0.06).timeout.connect(func() -> void: Audio.play(&"shot_echo", -18.0, 0.1))
 
 
-## A round that passes close to this machine's player cracks past their head.
+## a round passing close to this machine's player cracks past their head.
 func _crack_past_listener(from: Vector3, to: Vector3) -> void:
 	var me := NetworkManager.get_local_player()
 	if me == null or me == _player or not me.state.is_alive:
@@ -159,7 +142,7 @@ func _crack_past_listener(from: Vector3, to: Vector3) -> void:
 		Audio.play_at(&"bullet_crack", closest, lerpf(0.0, -12.0, miss / 3.0), 0.15, 25.0)
 
 
-## A case falling from somebody else's gun.
+## a case falling from somebody else's gun.
 func _eject_remote_casing(muzzle: Vector3) -> void:
 	if _weapon == null or _weapon.data == null or _player == null:
 		return
@@ -183,7 +166,7 @@ func _spawn_tracer(to: Vector3, with_flash: bool) -> void:
 	if _weapon == null:
 		return
 	if _weapon.data != null and _weapon.data.is_melee:
-		# Somebody else's knife: heard, not traced.
+		# somebody else's knife: heard, not traced.
 		if with_flash:
 			Audio.play_at(&"knife_swing", _weapon.global_position, -2.0, 0.08, 25.0)
 		return
@@ -193,7 +176,7 @@ func _spawn_tracer(to: Vector3, with_flash: bool) -> void:
 		if held != null:
 			from = held
 	if with_flash:
-		# Somebody else's shot: heard from where they are, so it can be located.
+		# somebody else's shot: heard from where they are, so it's locatable.
 		var far := StringName(String(_shot_sound()) + "_far")
 		var near := from.distance_to(_listener_position()) < 12.0
 		Audio.play_at(_shot_sound() if near or not Audio.has_sound(far) else far, from, 2.0, 0.05, 140.0)
@@ -207,13 +190,12 @@ func _spawn_tracer(to: Vector3, with_flash: bool) -> void:
 	_effects_parent().add_child(tracer)
 
 
-## The one place an impact actually gets drawn: the spark and debris, plus a
-## bullet hole on scenery. Nothing at all for a round that hit only air.
+## the one place an impact gets drawn: spark, debris, and a bullet hole on
+## scenery. nothing for a round that hit only air.
 ##
-## Refuses anything further than [member max_impact_distance] from this
-## player's eye. A round that travelled the weapon's whole range is fine; a
-## point 400 m away came from either a wrong origin or a node that has since
-## been freed, and neither is worth filling the screen with.
+## ignores anything further than max_impact_distance from the player's eye -
+## full-range hits are fine, but a point way out there means a bad origin or
+## a freed node, not worth drawing.
 func _spawn_impact(at: Vector3, normal: Vector3, zone: int, surface: int) -> void:
 	if surface == Weapon.Surface.NONE:
 		return
@@ -226,9 +208,8 @@ func _spawn_impact(at: Vector3, normal: Vector3, zone: int, surface: int) -> voi
 	if effect == null:
 		return
 
-	# Added to the world rather than to this node, so the effect stays where it
-	# was spawned instead of being dragged through the room as the player walks.
-	# It removes itself when it expires, so nothing has to remember to clean up.
+	# added to the world, not this node, so it stays put instead of getting
+	# dragged around as the player walks. frees itself when it expires.
 	_effects_parent().add_child(effect)
 	effect.setup(at, normal, zone, surface == Weapon.Surface.ENTITY)
 	var melee := _weapon != null and _weapon.data != null and _weapon.data.is_melee
@@ -244,8 +225,8 @@ func _spawn_impact(at: Vector3, normal: Vector3, zone: int, surface: int) -> voi
 		_effects_parent().add_child(hole)
 
 
-## The match scene, so effects are freed with it rather than lingering on the
-## permanent router after a match ends.
+## the match scene, so effects get freed with it instead of lingering after
+## the match ends.
 func _effects_parent() -> Node:
 	var match_scene := get_tree().get_first_node_in_group(&"match_scene")
 	return match_scene if match_scene != null else get_tree().current_scene

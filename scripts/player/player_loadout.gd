@@ -1,26 +1,21 @@
 class_name PlayerLoadout
 extends Node
-## What a player is carrying: a bought primary (or none) and the free sidearm,
-## which one is in their hands, and each one's magazine. Also the buy path.
+## what a player is carrying: bought primary (or none), the free sidearm,
+## which one's in hand, each weapon's magazine, and the buy path.
 ##
-## A child of [Player] rather than more code in it: the player script is
-## movement, combat and networking already, and the loadout is a self-contained
-## job with its own RPCs.
+## split out from Player since that script already does movement, combat and
+## networking. authority: buying is a request the host validates (phase,
+## price, balance) then broadcasts. switching hands is instant locally and
+## just announced, so the host resolves shots with the right weapon's stats.
 ##
-## [b]Authority.[/b] What you own ([member PlayerState.primary_id]) and your
-## credits are the host's: buying is a request, the host checks the phase, the
-## price and your balance, then tells everyone. Which slot is in your hands is
-## yours - you switch instantly and tell everyone, so the host resolves your
-## shots with the right weapon's numbers.
-##
-## Magazines are tracked per weapon on the owning machine, so switching away
-## from a half-empty rifle and back does not refill it.
+## magazines are tracked per weapon on the owning machine, so switching away
+## from a half-empty rifle and back doesn't refill it.
 
 const SLOT_PRIMARY := 0
 const SLOT_SIDEARM := 1
 const SLOT_KNIFE := 2
 
-## Something about the loadout changed - bought, lost, or switched.
+## loadout changed - bought, lost, or switched.
 signal changed
 
 var held_slot: int = SLOT_SIDEARM
@@ -39,7 +34,7 @@ func primary_data() -> WeaponData:
 	return WeaponCatalog.find(_player.state.primary_id)
 
 
-## The weapon in the player's hands right now.
+## the weapon in the player's hands right now.
 func held_data() -> WeaponData:
 	if held_slot == SLOT_KNIFE:
 		return WeaponCatalog.knife()
@@ -50,16 +45,16 @@ func held_data() -> WeaponData:
 	return WeaponCatalog.sidearm()
 
 
-## A fresh life: full magazines, best weapon in hand.
+## a fresh life: full magazines, best weapon in hand.
 func refill() -> void:
 	held_slot = SLOT_PRIMARY if has_primary() else SLOT_SIDEARM
 	_equip(held_data(), true)
-	# Cleared after the equip, which files the outgoing weapon's magazine away;
-	# otherwise a sidearm you survived holding keeps last round's ammo.
+	# clear after the equip (which files the outgoing weapon's ammo away),
+	# or a sidearm you survived holding keeps last round's ammo.
 	_slot_ammo.clear()
 
 
-## The owner switching weapons (keys 1 / 2 / 3).
+## the owner switching weapons (keys 1 / 2 / 3).
 func switch_to(slot: int) -> void:
 	if slot == held_slot or not _player.state.is_alive:
 		return
@@ -82,7 +77,7 @@ func _net_held_slot(slot: int) -> void:
 
 # --- Buying ---------------------------------------------------------------
 
-## Asks to buy [param weapon_id]. Decided by the host (or locally offline).
+## asks to buy weapon_id. decided by the host (or locally offline).
 func request_buy(weapon_id: StringName) -> void:
 	if _is_authority():
 		_server_buy(_player.peer_id, weapon_id)
@@ -90,7 +85,7 @@ func request_buy(weapon_id: StringName) -> void:
 		_rpc_buy.rpc_id(NetworkManager.SERVER_PEER_ID, weapon_id)
 
 
-## Whether a purchase would be accepted right now - for greying out the menu.
+## whether a purchase would be accepted right now - for greying out the menu.
 func can_buy(data: WeaponData) -> bool:
 	return data != null and data.is_buyable() \
 		and GameManager.is_in(GamePhase.Phase.BUY) \
@@ -137,7 +132,7 @@ static func shield_name(shield_id: StringName) -> String:
 	return "Heavy Shield" if shield_id == HEAVY_SHIELD else "Light Shield"
 
 
-## A shield can be bought when it would actually raise the current shield.
+## a shield can be bought when it would actually raise the current shield.
 func can_buy_shield(shield_id: StringName) -> bool:
 	return shield_id in SHIELD_IDS \
 		and GameManager.is_in(GamePhase.Phase.BUY) \
@@ -174,7 +169,7 @@ func _server_buy_shield(sender: int, shield_id: StringName) -> void:
 	changed.emit()
 
 
-## Host to the buyer: your shield purchase went through.
+## host to the buyer: your shield purchase went through.
 @rpc("any_peer", "call_remote", "reliable")
 func _net_shield_bought() -> void:
 	if multiplayer.get_remote_sender_id() == NetworkManager.SERVER_PEER_ID:
@@ -189,11 +184,11 @@ const GRENADE_IDS: Array[StringName] = [FRAG, SMOKE]
 const GRENADE_PRICE := {FRAG: 300, SMOKE: 200}
 const GRENADE_MAX := {FRAG: 1, SMOKE: 2}
 const GRENADE_NAME := {FRAG: "Frag Grenade", SMOKE: "Smoke Grenade"}
-## Metres per second a grenade leaves the hand at.
+## metres per second a grenade leaves the hand at.
 const THROW_SPEED := 17.0
 
-## Grenades carried. The host's copy is the authority; the owner's is a
-## prediction corrected by [method _net_grenades].
+## grenades carried. host's copy is authority; the owner's is a prediction
+## corrected by _net_grenades.
 var grenades := {FRAG: 0, SMOKE: 0}
 
 
@@ -231,7 +226,7 @@ func _server_buy_grenade(sender: int, grenade_id: StringName) -> void:
 	changed.emit()
 
 
-## Host: tell the owner how many grenades they really have.
+## host: tell the owner how many grenades they really have.
 func _sync_grenades() -> void:
 	if NetworkManager.is_online and multiplayer.is_server() and _player.peer_id != multiplayer.get_unique_id():
 		_net_grenades.rpc_id(_player.peer_id, int(grenades[FRAG]), int(grenades[SMOKE]))
@@ -246,7 +241,7 @@ func _net_grenades(frags: int, smokes: int) -> void:
 	changed.emit()
 
 
-## The owner throwing a grenade from their eye, along their aim.
+## the owner throwing a grenade from their eye, along their aim.
 func throw_grenade(grenade_id: StringName) -> void:
 	if not _player.state.is_alive or int(grenades.get(grenade_id, 0)) <= 0:
 		return
@@ -273,8 +268,7 @@ func _server_throw(sender: int, grenade_id: StringName, origin: Vector3, velocit
 		return
 	if not _player.state.is_alive or int(grenades.get(grenade_id, 0)) <= 0:
 		return
-	# Thrown from where the host believes this player is, at no more than a
-	# throw's speed.
+	# thrown from where the host believes this player is, capped at throw speed.
 	if origin.distance_to(_player.get_eye_position()) > 1.5:
 		origin = _player.get_eye_position()
 	velocity = velocity.limit_length(THROW_SPEED + 6.0)
@@ -299,7 +293,7 @@ func _spawn_grenade(grenade_id: StringName, origin: Vector3, velocity: Vector3) 
 	Grenade.spawn(parent, Grenade.Kind.FRAG if grenade_id == FRAG else Grenade.Kind.SMOKE, origin, velocity, _player)
 
 
-## Host only: the player died, so the primary is gone.
+## host only: the player died, so the primary is gone.
 func server_on_death() -> void:
 	grenades = {FRAG: 0, SMOKE: 0}
 	_sync_grenades()
@@ -307,7 +301,7 @@ func server_on_death() -> void:
 		_set_primary(&"", false)
 
 
-## Host only: the sides swapped, so everyone starts the half with a pistol.
+## host only: the sides swapped, so everyone starts the half with a pistol.
 func server_clear() -> void:
 	_set_primary(&"", false)
 
@@ -335,7 +329,7 @@ func _apply_primary(weapon_id: StringName, just_bought: bool) -> void:
 		if _player.state.is_alive:
 			_equip(held_data(), false)
 	elif just_bought:
-		# A new gun goes straight into your hands, fully loaded.
+		# a new gun goes straight into your hands, fully loaded.
 		held_slot = SLOT_PRIMARY
 		_slot_ammo.erase(weapon_id)
 		_equip(held_data(), true)
@@ -350,8 +344,8 @@ func _play_buy_sound() -> void:
 
 # --- Internals --------------------------------------------------------------
 
-## Puts [param data] in the player's hands, remembering the outgoing weapon's
-## magazine and restoring the incoming one's unless [param fresh].
+## puts data in the player's hands, remembering the outgoing weapon's magazine
+## and restoring the incoming one's unless fresh.
 func _equip(data: WeaponData, fresh: bool) -> void:
 	var weapon := _player.weapon
 	if weapon == null or data == null:
@@ -363,7 +357,7 @@ func _equip(data: WeaponData, fresh: bool) -> void:
 	if not fresh and _slot_ammo.has(data.weapon_id):
 		weapon.ammo_in_magazine = int(_slot_ammo[data.weapon_id])
 		weapon.ammo_changed.emit(weapon.ammo_in_magazine, weapon.reserve_ammo)
-	# A new weapon comes up at the hip; each gun aims with its own numbers.
+	# a new weapon comes up at the hip; each gun aims with its own numbers.
 	_player.aim.reset()
 	if not _player.is_network_remote and _player.is_inside_tree() and _player.state.is_alive:
 		Audio.play(&"switch", -8.0)

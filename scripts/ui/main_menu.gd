@@ -1,28 +1,22 @@
 extends Control
-## Title screen: host a match, join one, or quit.
+## title screen: host a match, join one, or quit.
 ##
-## This is the real screen for [b]MAIN_MENU[/b] and the first of the
-## [constant Main.SCREENS] entries. It is intentionally plain - default Godot
-## controls, no styling - because presentation is Chapter 8's job and anything
-## pretty added now would just be thrown away.
-##
-## Its only real content is the connection flow, which is the part that has to
-## be right: [method NetworkManager.join_game] returns before the connection
-## is actually established, so the move into the lobby has to wait for
-## [signal NetworkManager.join_succeeded] rather than happening immediately.
+## the important part is the connection flow: join_game() returns before the
+## connection is actually up, so moving to the lobby has to wait for the
+## join_succeeded signal instead of happening right away.
 
 @onready var _address_edit: LineEdit = %AddressEdit
 @onready var _name_edit: LineEdit = %NameEdit
 @onready var _status_label: Label = %StatusLabel
 
-## Guards the join-succeeded handler so a late success from an abandoned
-## attempt cannot drag us into the lobby.
+## guards the join-succeeded handler so a late success from an abandoned
+## attempt can't drag us into the lobby.
 var _awaiting_join: bool = false
 
 
 func _ready() -> void:
-	# Coming back here from a match leaves the pointer wherever the freed player
-	# last put it - usually captured, which makes every button unclickable.
+	# coming back from a match leaves the mouse wherever the freed player left
+	# it - usually captured, which makes every button unclickable.
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 	NetworkManager.join_succeeded.connect(_on_join_succeeded)
@@ -52,9 +46,8 @@ func _ready() -> void:
 
 const BACKDROP_MAP := preload("res://scenes/maps/meridian.tscn")
 
-## Slow ground-level dolly shots through Meridian, cut between like a trailer:
-## [camera from, camera to, look-at from, look-at to]. Each lasts
-## [constant SHOT_SECONDS].
+## slow ground-level dolly shots through Meridian, cut between like a trailer:
+## [camera from, camera to, look-at from, look-at to]. each lasts SHOT_SECONDS.
 const SHOTS := [
 	[Vector3(-25, 1.4, 26), Vector3(-25, 1.6, 12), Vector3(-24, 1.2, -10), Vector3(-22, 1.0, -20)],
 	[Vector3(-4, 1.1, 30), Vector3(3, 1.3, 30), Vector3(18, 2.5, 20), Vector3(22, 3.0, 8)],
@@ -69,10 +62,8 @@ var _shot: int = 0
 var _shot_time: float = 0.0
 
 
-## A live view of the map behind the menu: Meridian in its own world, with a
-## camera circling high above it, dimmed on the left where the text sits. Sets
-## the tone - this is the place you are about to fight over - before a single
-## button is pressed.
+## a live view of the map behind the menu: Meridian in its own world with a
+## camera circling above it, dimmed on the left where the text sits.
 func _build_backdrop() -> void:
 	var container := SubViewportContainer.new()
 	container.name = "Backdrop"
@@ -93,8 +84,8 @@ func _build_backdrop() -> void:
 	_orbit_camera.make_current()
 	_update_orbit()
 
-	# The old flat background becomes a readability gradient over the view:
-	# dark on the left under the menu, clear on the right.
+	# readability gradient over the backdrop: dark on the left under the
+	# menu, clear on the right.
 	var gradient := Gradient.new()
 	gradient.set_color(0, Color(0.02, 0.02, 0.04, 0.92))
 	gradient.set_color(1, Color(0.02, 0.02, 0.04, 0.15))
@@ -124,8 +115,8 @@ func _update_orbit() -> void:
 	_orbit_camera.look_at((shot[2] as Vector3).lerp(shot[3], t), Vector3.UP)
 
 
-## Your level, title, progress to the next level and career numbers - the
-## first thing on screen, so every match visibly moves something.
+## level, title, progress to next level and career numbers - the first
+## thing on screen so every match visibly moves something.
 func _build_profile_card() -> void:
 	var card := PanelContainer.new()
 	UITheme.pin(card, Vector2(0.0, 0.5), 40, -170, 360, -170)
@@ -174,25 +165,16 @@ func _build_profile_card() -> void:
 		column.add_child(row)
 
 
-## Stores the typed name before any path into a match, so the host - or the
-## local body offline - is given it.
+## stores the typed name before heading into a match, host or offline.
 func _commit_name() -> void:
 	var clean := NetworkManager.sanitize_name(_name_edit.text)
 	if not clean.is_empty():
 		GameConfig.display_name = clean
 
 
-## Single-player, no session at all.
-##
-## Not an afterthought. The offline path is the one every automated Chapter 2
-## and Chapter 3 test runs through, and it is also the fastest way to work on
-## movement or weapon feel without a second instance to keep alive. It was a
-## second button in Chapter 1 but became unreachable once Chapter 2 booted
-## straight into the playtest; with the menu as the front door again, it needs
-## to be back.
-##
-## Any existing session is left first, so pressing this after a failed join
-## does not drop you into a lobby with a stale peer underneath.
+## single-player, no session at all. handy for testing movement/weapon feel
+## without a second instance running. leaves any existing session first, so
+## pressing this after a failed join doesn't drop you in with a stale peer.
 func _on_offline_pressed() -> void:
 	_commit_name()
 	if NetworkManager.is_online:
@@ -202,8 +184,8 @@ func _on_offline_pressed() -> void:
 
 func _on_host_pressed() -> void:
 	_commit_name()
-	# A host is connected the instant create_server() succeeds, so the lobby
-	# can be entered straight away.
+	# hosting is live the instant create_server() succeeds, so we can jump
+	# straight to the lobby.
 	if NetworkManager.is_online:
 		NetworkManager.leave_game()
 	var error := NetworkManager.host_game()
@@ -225,8 +207,8 @@ func _on_join_pressed() -> void:
 	_status_label.text = "Connecting to %s..." % address
 	_awaiting_join = true
 
-	# Returns before the connection is up. On failure join_failed() fires
-	# immediately; on success _on_join_succeeded() fires later.
+	# returns before the connection is up: join_failed() fires immediately
+	# on failure, _on_join_succeeded() fires later on success.
 	if NetworkManager.join_game(address) != OK:
 		_awaiting_join = false
 
@@ -244,5 +226,5 @@ func _on_join_failed(reason: String) -> void:
 
 
 func _on_quit_pressed() -> void:
-	# Routed through GameManager so leaving always tears the network down.
+	# routed through GameManager so quitting always tears the network down.
 	GameManager.quit_game()

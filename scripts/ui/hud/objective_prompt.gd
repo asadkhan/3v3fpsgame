@@ -1,8 +1,7 @@
 class_name HudObjectivePrompt
 extends VBoxContainer
-## Below the crosshair: what the objective lets you do right now ("Hold E to
-## plant"), a progress bar while a plant or defuse is under way, and a small
-## reminder when you are the one carrying the core.
+## below the crosshair: what you can do right now ("Hold E to plant"), a
+## progress bar during plant/defuse, and a reminder when you're carrying the core.
 
 var _prompt: Label
 var _bar: ProgressBar

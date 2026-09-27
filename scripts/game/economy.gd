@@ -1,18 +1,18 @@
 class_name Economy
 extends RefCounted
-## The credit rules, in one place. All amounts come from [MatchRules]; this
-## class only applies them. Host / offline authority only - clients receive
-## balances through the player state RPC.
+## the credit rules, in one place. all amounts come from MatchRules; this
+## class only applies them. host/offline authority only - clients receive
+## balances through the player state rpc.
 
 
-## Adds (or, negative, removes) credits, clamped to 0..max.
+## adds (or, negative, removes) credits, clamped to 0..max.
 static func add_credits(state: PlayerState, amount: int) -> void:
 	var cap := GameManager.match_rules.max_credits
 	state.credits = clampi(state.credits + amount, 0, cap)
 
 
-## Pays both sides for a finished round. Called by ROUND_END before the loss
-## streaks are updated, so a side's first loss earns the base amount.
+## pays both sides for a finished round. called by ROUND_END before loss
+## streaks update, so a side's first loss earns the base amount.
 static func pay_round(winner: int) -> void:
 	var rules := GameManager.match_rules
 	var match_state := GameManager.match_state
@@ -32,7 +32,7 @@ static func pay_round(winner: int) -> void:
 		player._publish_net_state()
 
 
-## Everyone back to the starting balance and a pistol - the start of each half.
+## everyone back to the starting balance and a pistol - start of each half.
 static func reset_for_half() -> void:
 	for player in NetworkManager.get_players():
 		player.state.credits = GameManager.match_rules.starting_credits
