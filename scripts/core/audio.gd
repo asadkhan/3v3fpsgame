@@ -102,30 +102,49 @@ func _heartbeat() -> AudioStreamWAV:
 
 # --- Music --------------------------------------------------------------------
 
-## the menu theme. swap the file to change the music.
-const MUSIC_PATH := "res://assets/audio/music/menu_theme.wav"
+## music tracks. swap a file (keep the name, or change the path here) to
+## change the music. ogg/mp3/wav all work; they're set to loop in code.
+const MUSIC_TRACKS := {
+	&"menu": "res://assets/audio/music/wow_menu.ogg",
+	&"battle": "res://assets/audio/music/wow_chapter3.ogg",
+}
 ## how loud the music sits under everything else, before the music slider
 const MUSIC_BASE_DB := -9.0
-## per phase, dB on top of the base. missing = music off (live rounds, so
-## footsteps stay readable)
+## per phase: [track, dB on top of the base]. missing = music off (live
+## rounds, so footsteps stay readable)
 const MUSIC_BY_PHASE := {
-	GamePhase.Phase.MAIN_MENU: 0.0,
-	GamePhase.Phase.LOBBY: -4.0,
-	GamePhase.Phase.WARMUP: -8.0,
-	GamePhase.Phase.BUY: -10.0,
-	GamePhase.Phase.MATCH_END: 0.0,
+	GamePhase.Phase.MAIN_MENU: [&"menu", 0.0],
+	GamePhase.Phase.LOBBY: [&"battle", -5.0],
+	GamePhase.Phase.WARMUP: [&"battle", -6.0],
+	GamePhase.Phase.BUY: [&"battle", -8.0],
+	GamePhase.Phase.MATCH_END: [&"menu", 0.0],
 }
 
 var _music: AudioStreamPlayer = null
 var _music_tween: Tween = null
+var _music_streams: Dictionary = {}
+var _music_track: StringName = &""
 
 
 func _setup_music() -> void:
-	if not ResourceLoader.exists(MUSIC_PATH):
+	for track: StringName in MUSIC_TRACKS:
+		var path: String = MUSIC_TRACKS[track]
+		if not ResourceLoader.exists(path):
+			continue
+		var stream: AudioStream = load(path)
+		if stream is AudioStreamOggVorbis:
+			(stream as AudioStreamOggVorbis).loop = true
+		elif stream is AudioStreamMP3:
+			(stream as AudioStreamMP3).loop = true
+		elif stream is AudioStreamWAV:
+			var wav := stream as AudioStreamWAV
+			wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+			wav.loop_end = int(wav.get_length() * wav.mix_rate)
+		_music_streams[track] = stream
+	if _music_streams.is_empty():
 		return
 	_music = AudioStreamPlayer.new()
 	_music.name = "Music"
-	_music.stream = load(MUSIC_PATH)
 	_music.volume_db = -60.0
 	add_child(_music)
 	GameManager.state_changed.connect(func(_from: int, _to: int) -> void: _update_music(1.5))
@@ -133,24 +152,32 @@ func _setup_music() -> void:
 
 
 ## fades the music to wherever the current phase wants it, over seconds.
+## a change of track fades the old one out first.
 func _update_music(seconds: float) -> void:
 	if _music == null:
 		return
 	var phase: int = GameManager.current_phase
 	var music := clampf(GameConfig.music_volume, 0.0, 1.0)
-	var on := MUSIC_BY_PHASE.has(phase) and music > 0.001
-	var target := MUSIC_BASE_DB + float(MUSIC_BY_PHASE.get(phase, 0.0)) + linear_to_db(maxf(music, 0.0001))
-	if on and not _music.playing:
-		_music.volume_db = -60.0
-		_music.play()
+	var entry: Array = MUSIC_BY_PHASE.get(phase, [])
+	var track: StringName = entry[0] if not entry.is_empty() else &""
+	var on := not entry.is_empty() and music > 0.001 and _music_streams.has(track)
+	var target := MUSIC_BASE_DB + (float(entry[1]) if on else 0.0) + linear_to_db(maxf(music, 0.0001))
 	if _music_tween != null:
 		_music_tween.kill()
 	_music_tween = create_tween()
-	if on:
-		_music_tween.tween_property(_music, "volume_db", target, seconds)
-	else:
+	if not on:
 		_music_tween.tween_property(_music, "volume_db", -60.0, seconds)
 		_music_tween.tween_callback(_music.stop)
+		return
+	if track != _music_track or not _music.playing:
+		if _music.playing:
+			_music_tween.tween_property(_music, "volume_db", -60.0, 0.8)
+		_music_tween.tween_callback(func() -> void:
+			_music_track = track
+			_music.stream = _music_streams[track]
+			_music.volume_db = -60.0
+			_music.play())
+	_music_tween.tween_property(_music, "volume_db", target, seconds)
 
 
 func _apply_volume() -> void:

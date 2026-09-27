@@ -42,7 +42,8 @@ the project.
 
 ## Music
 
-- The menu theme (`assets/audio/music/menu_theme.wav`) was made for this project.
+- **"War on Water: Tracks"** by yd (https://opengameart.org/content/war-on-water-tracks), CC0: `wow_menu.ogg` (menu and results) and `wow_chapter3.ogg` (lobby, warmup, buy phase).
+- The magazine reload sounds are cut from "Handgun Magazine Loading - Sound Effect for editing" (YouTube). Used for a non-commercial college showcase only.
 
 ## Weapon sounds (weapons_custom)
 

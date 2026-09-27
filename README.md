@@ -13,7 +13,7 @@
 - impact effects, shell casings, tracers, recorded gunshot sounds
 - Meridian map with a battlefield look (smoke, fires, dust)
 - graphics presets (low / medium / high / ultra)
-- original menu music, red dot sight on the Kestrel
+- menu and lobby music, red dot sight on the Kestrel
 
 ## Running it
 
@@ -73,7 +73,7 @@ You can also put your own files in `assets/audio/weapons_custom/`. Any `.wav` th
 
 Each one also has a `_far.wav` version (e.g. `shot_rifle_far.wav`) that plays when the shot is more than 12 m away. If you delete a `_far` file the normal one is used instead. Which weapon uses which sound is decided in `_shot_sound()` in `scripts/fx/weapon_fx.gd`.
 
-The menu music is `assets/audio/music/menu_theme.wav`. To use your own track, replace that file and turn on looping in the Import tab (Loop Mode: Forward). Music volume per game phase is `MUSIC_BY_PHASE` in `scripts/core/audio.gd`; players can change it in the pause menu.
+Music is in `assets/audio/music/`: `wow_menu.ogg` plays in the main menu and on the results screen, `wow_chapter3.ogg` in the lobby, warmup and buy phase, and it fades out during live rounds. To use your own tracks, replace those files (ogg, mp3 or wav; looping is set in code) or change the paths in `MUSIC_TRACKS` in `scripts/core/audio.gd`. Volume per phase is `MUSIC_BY_PHASE` in the same file; players can change it in the pause menu.
 
 ## Credits
 
